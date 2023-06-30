@@ -1376,7 +1376,7 @@ func (r stack) typ() (kind string, typ stackType) {
 /*
 Pop removes and returns the final slice value from
 the receiver instance. A boolean value is returned
-alongisde, indicative of whether an actual slice
+alongside, indicative of whether an actual slice
 value was found. Note that if the receiver is in an
 invalid state, or has a zero length, nothing will
 be removed, and a meaningless value of true will be

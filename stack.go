@@ -193,9 +193,9 @@ func (r stack) valid() (err error) {
 }
 
 /*
-SetMessageChan assigns the provided *Message channel instance
+SetMessageChan assigns the provided Message channel instance
 to the receiver. Error and debug information will be sent to
-the channel in *Message form. The user will need to listen on
+the channel in Message form. The user will need to listen on
 the channel and actually read messages.
 */
 func (r Stack) SetMessageChan(mchan chan Message) Stack {

@@ -186,15 +186,18 @@ func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 
 	a := typOf(u)       // current (src) type
 	b := typOf(Stack{}) // target (dest) type
-	if a.ConvertibleTo(b) {
-		if X := valOf(u).Convert(b).Interface().(Stack); !X.IsZero() {
-			if s := X.String(); s != badStack && len(s) > 0 {
-				S = X
-				converted = true
-				return
-			}
-		}
-	}
+        if a.ConvertibleTo(b) {
+                X := valOf(u).Convert(b).Interface()
+                if assert, ok := X.(Stack); ok {
+                        if !assert.IsZero() {
+                                if s := assert.String(); s != badCond && len(s) > 0 {
+                                        S = assert
+                                        converted = true
+                                        return
+                                }
+                        }
+                }
+        }
 
 	return
 }
@@ -217,11 +220,14 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 	a := typOf(u)       // current (src) type
 	b := typOf(Stack{}) // target (dest) type
 	if a.ConvertibleTo(b) {
-		if X := valOf(u).Convert(b).Interface().(Condition); !X.IsZero() {
-			if s := X.String(); s != badCond && len(s) > 0 {
-				C = X
-				converted = true
-				return
+		X := valOf(u).Convert(b).Interface()
+		if assert, ok := X.(Condition); ok {
+			if !assert.IsZero() {
+				if s := assert.String(); s != badCond && len(s) > 0 {
+					C = assert
+					converted = true
+					return
+				}
 			}
 		}
 	}

@@ -564,6 +564,9 @@ ID returns the assigned identifier string, if set, from within the underlying
 stack configuration.
 */
 func (r Stack) ID() string {
+	if r.IsZero() {
+		return ``
+	}
 	return r.stack.getID()
 }
 

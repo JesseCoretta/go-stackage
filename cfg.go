@@ -232,6 +232,11 @@ For example, if the following slices are received in the order shown:
 No single character can appear in more than one []string value.
 */
 func (r *nodeConfig) setEncap(x ...any) {
+	if len(x) == 0 {
+		r.enc = [][]string{}
+		return
+	}
+
 	for sl := 0; sl < len(x); sl++ {
 		switch tv := x[sl].(type) {
 		case string:
@@ -270,10 +275,6 @@ setStringSliceEncapOne is a private method called by setStringSliceEncap
 for the purpose of assigning a single character for L and R encapsulation.
 */
 func (r *nodeConfig) setStringSliceEncapOne(x []string) {
-	if len(x[0]) == 0 {
-		return
-	}
-
 	var found bool
 	for u := 0; u < len(r.enc); u++ {
 		if found = strInSlice(x[0], r.enc[u]); found {

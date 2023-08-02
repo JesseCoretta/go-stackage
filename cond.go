@@ -440,6 +440,14 @@ func (r Condition) Paren(state ...bool) Condition {
 	return r
 }
 
+/*
+IsParen returns a boolean value indicative of whether the
+receiver is parenthetical.
+*/
+func (r Condition) IsParen() bool {
+	return r.cfg.positive(parens)
+}
+
 func (r *condition) toggleOpt(x cfgFlag) {
 	r.cfg.toggleOpt(x)
 }
@@ -478,6 +486,14 @@ func (r Condition) NoPadding(state ...bool) Condition {
 	}
 
 	return r
+}
+
+/*
+IsPadded returns a boolean value indicative of whether the
+receiver pads its contents with a SPACE char (ASCII #32).
+*/
+func (r Condition) IsPadded() bool {
+	return !r.cfg.positive(nspad)
 }
 
 /*

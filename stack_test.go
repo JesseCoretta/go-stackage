@@ -20,9 +20,34 @@ func TestStack_And001(t *testing.T) {
 		`testing2`,
 		`testing3`,
 	)
+
 	want := `( testing1 AND testing2 AND testing3 )`
 	if got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+}
+
+func TestStack_IsParen(t *testing.T) {
+	stk := And().Paren().Fold().Push(
+		`testing1`,
+		`testing2`,
+		`testing3`,
+	)
+
+	if got := stk.IsParen(); !got {
+		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
+	}
+}
+
+func TestStack_IsPadded(t *testing.T) {
+	stk := And().Paren().Fold().Push(
+		`testing1`,
+		`testing2`,
+		`testing3`,
+	)
+
+	if got := stk.IsPadded(); !got {
+		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
 	}
 }
 

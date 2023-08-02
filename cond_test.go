@@ -26,6 +26,24 @@ func TestCondition_002(t *testing.T) {
 	}
 }
 
+func TestCondition_IsParen(t *testing.T) {
+	cond := List().Paren().Push(
+		Cond(`person`, Eq, `Jesse`),
+	)
+
+	if got := cond.IsParen(); !got {
+		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
+	}
+}
+
+func TestCondition_IsPadded(t *testing.T) {
+	cond := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
+
+	if got := cond.IsPadded(); got {
+		t.Errorf("%s failed: want 'false', got '%t'", t.Name(), got)
+	}
+}
+
 func ExampleCondition_basic() {
 	c := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
 	fmt.Printf("%s", c)

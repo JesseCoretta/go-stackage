@@ -372,6 +372,14 @@ func (r Stack) Paren(state ...bool) Stack {
 }
 
 /*
+IsParen returns a boolean value indicative of whether the
+receiver is parenthetical.
+*/
+func (r Stack) IsParen() bool {
+	return r.stack.positive(parens)
+}
+
+/*
 Stack will fold the case of logical Boolean operators which
 are not represented through symbols. For example, `AND`
 becomes `and`, or vice versa. This won't have any effect
@@ -627,6 +635,14 @@ func (r Stack) NoPadding(state ...bool) Stack {
 	}
 
 	return r
+}
+
+/*
+IsPadded returns a boolean value indicative of whether the
+receiver pads its contents with a SPACE char (ASCII #32).
+*/
+func (r Stack) IsPadded() bool {
+	return r.stack.positive(parens)
 }
 
 /*

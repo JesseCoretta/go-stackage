@@ -1340,8 +1340,13 @@ receiver configuration. This will only encapsulate the
 outside of the stack, not its value(s).
 */
 func (r stack) paren(v string) string {
+	var pad string = string(rune(32))
+	if sc, _ := r.config(); sc.positive(nspad) {
+		pad = ``
+	}
+
 	if r.positive(parens) && r.stackType() != basic {
-		return sprintf("(%s)", v)
+		return sprintf("(%s%s%s)", pad, v, pad)
 	}
 	return v
 }

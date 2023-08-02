@@ -561,7 +561,7 @@ func (r condition) string() string {
 
 	s := sprintf("%s%s%s%s%s", r.kw, pad, r.op, pad, val)
 	if r.cfg.positive(parens) {
-		s = sprintf("(%s)", s)
+		s = sprintf("(%s%s%s)", pad, s, pad)
 	}
 
 	return s

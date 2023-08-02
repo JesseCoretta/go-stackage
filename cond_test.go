@@ -19,7 +19,7 @@ func TestCondition_002(t *testing.T) {
 		Cond(`person`, Eq, `Jesse`),
 	)
 
-	want := `(person = Jesse)`
+	want := `( person = Jesse )`
 	got := st.String()
 	if want != got {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)

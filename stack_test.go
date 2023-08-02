@@ -20,7 +20,7 @@ func TestStack_And001(t *testing.T) {
 		`testing2`,
 		`testing3`,
 	)
-	want := `(testing1 AND testing2 AND testing3)`
+	want := `( testing1 AND testing2 AND testing3 )`
 	if got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 	}
@@ -36,7 +36,7 @@ func TestStackAnd_001(t *testing.T) {
 		),
 	)
 
-	want := `(top_element_number_0 AND (sub_element_number_0 OR sub_element_number_1))`
+	want := `( top_element_number_0 AND ( sub_element_number_0 OR sub_element_number_1 ) )`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 	}
@@ -54,7 +54,7 @@ func TestAnd_002(t *testing.T) {
 		),
 	)
 
-	want := `(top_element_number_0 AND ("<sub_element_number_0>" OR "<sub_element_number_1>"))`
+	want := `( top_element_number_0 AND ( "<sub_element_number_0>" OR "<sub_element_number_1>" ) )`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 	}

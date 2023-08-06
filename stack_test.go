@@ -384,6 +384,25 @@ func TestBasic_withCapacity(t *testing.T) {
 	}
 }
 
+func TestReset(t *testing.T) {
+	b := Basic()
+	b.Push(
+		float64(3.14159),
+		float64(-9.378),
+		float64(139.104),
+	)
+	if b.Len() != 3 {
+		t.Errorf("%s failed: want '%d', got: '%d' [%s]", t.Name(), 3, b.Len(), b)
+	}
+
+	b.Reset()
+
+	if b.Len() != 0 {
+		sl, _ := b.Index(0)
+		t.Errorf("%s failed: want '%d', got: '%d' [%#v]", t.Name(), 0, b.Len(), sl)
+	}
+}
+
 func ExampleBasic() {
 	b := Basic()
 	b.Push(

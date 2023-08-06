@@ -288,6 +288,24 @@ func (r *stack) insert(x any, left int) (ok bool) {
 }
 
 /*
+Reset will silently iterate and delete each slice found within
+the receiver, leaving it unpopulated but still retaining its
+active configuration. Nothing is returned.
+*/
+func (r Stack) Reset() {
+	r.stack.reset()
+}
+
+/*
+reset is a private method called by Stack.Reset.
+*/
+func (r *stack) reset() {
+	for i := r.ulen(); i > 0; i-- {
+		r.remove(i - 1)
+	}
+}
+
+/*
 Remove will remove and return the Nth slice from the index,
 along with a success-indicative boolean value. A value of
 true indicates the receiver length became shorter by one (1).

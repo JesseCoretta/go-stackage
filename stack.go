@@ -208,9 +208,18 @@ func (r Stack) SetMessageChan(mchan chan Message) Stack {
 }
 
 /*
-Insert will insert value x to the right side of the left integer,
-and returns a success indicative boolean value. A value of true
-indicates the receiver length became longer by one (1).
+Insert will insert value x to become the left index. For example,
+using zero (0) as left shall result in value x becoming the first
+slice within the receiver.
+
+This method returns a boolean value indicative of success. A value
+of true indicates the receiver length became longer by one (1).
+
+This method does not currently respond to forward/negative index
+support. An integer value less than or equal to zero (0) shall
+become zero (0). An integer value that exceeds the length of the
+receiver shall become index len-1. A value that falls within the
+bounds of the receiver's current length is inserted as intended.
 */
 func (r Stack) Insert(x any, left int) (ok bool) {
 	return r.stack.insert(x, left)
@@ -218,71 +227,66 @@ func (r Stack) Insert(x any, left int) (ok bool) {
 
 /*
 insert is a private method called by Stack.Insert.
-
-TODO: clean this monstrosity up.
 */
 func (r *stack) insert(x any, left int) (ok bool) {
+	// bail out if receiver is nil
 	if x == nil {
-		return false
+		return
+	}
+
+	// note the len before we start
+	var u1 int = r.ulen()
+
+	// bail out if a capacity has been set and
+	// would be breached by this insertion.
+	if u1+1 > r.cap() && r.cap() != 0 {
+		return
 	}
 
 	r.lock()
 	defer r.unlock()
 
-	_, index, found := r.index(left)
-	if !found {
-		return
-	}
-
-	fname := uc(fmname())
-
-	// note the len before we start
-	var u1 int = r.ulen()
 	cfg, _ := r.config()
 
-	// If left was the final index; just do
-	// a push and then verify before return.
-	if index > u1 {
-		r.wrmsg(sprintf("%s: adding new slice [%d]", fname, r.len()+1))
+	// If left is greater-than-or-equal
+	// to the user length, just push.
+	if u1-1 < left {
 		*r = append(*r, x)
-		ok = u1+1 == r.ulen()
-		r.wrmsg(sprintf("%s: updated: %t", fname, ok))
 
-		return
-	} else if index <= 2 {
-		r.wrmsg(sprintf("%s: allocation", fname))
-		var R stack = make(stack, 0)
-		R = append(R, cfg)
-		r.wrmsg(sprintf("%s: migrating index 1", fname))
-		R = append(R, (*r)[1]) // just add the second (2nd) slice
-		r.wrmsg(sprintf("%s: adding new slice [2]", fname))
-		R = append(R, x) // add the new item
-		r.wrmsg(sprintf("%s: migrating indices 2 through %d", fname, r.len()))
-		R = append(R, (*r)[2:]...) // add everything from third (3rd) slice onwards
-		r.wrmsg(sprintf("%s: updating %T PTR ref", fname, r))
-		*r = R
+		// Verify something was added
 		ok = u1+1 == r.ulen()
-		r.wrmsg(sprintf("%s: updated: %t", fname, ok))
-
 		return
 	}
 
 	var R stack = make(stack, 0)
-	r.wrmsg(sprintf("%s: allocation", fname))
-	R = append(R, cfg)
-	r.wrmsg(sprintf("%s: migrating indices 1 through %d", fname, index))
-	R = append(R, (*r)[1:index]...) // take everything from first (1st) slice -> index
-	r.wrmsg(sprintf("%s: adding new slice [%d]", fname, index+1))
-	R = append(R, x) // add the new item
-	r.wrmsg(sprintf("%s: migrating indices %d through %d", fname, index, r.len()))
-	R = append(R, (*r)[index:]...) // add everything from index onwards
-	r.wrmsg(sprintf("%s: updating %T PTR ref", fname, r))
-	*r = R
+	left += 1
 
-	// make sure we succeeded both in non-nilness
-	// and in the expected integer length change.
+	// If left is less-than-or-equal to
+	// zero (0), we'll use a new stack
+	// alloc (R) and move items into it
+	// in the appropriate order. The
+	// new element will be the first
+	// user slice.
+	if left <= 1 {
+		left = 1
+		R = append(R, cfg)
+		R = append(R, x)
+		R = append(R, (*r)[left:]...)
+
+		// If left falls within the user length,
+		// append all elements up to and NOT
+		// including the desired index, and also
+		// append everything after desired index.
+		// This leaves a slot into which we can
+		// drop the new element (x)
+	} else {
+		R = append((*r)[:left+1], (*r)[left:]...)
+		R[left] = x
+	}
+
+	// Verify something was added
+	*r = R
 	ok = u1+1 == r.ulen()
-	r.wrmsg(sprintf("%s: updated: %t", fname, ok))
 
 	return
 }

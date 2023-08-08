@@ -27,6 +27,33 @@ func TestStack_And001(t *testing.T) {
 	}
 }
 
+func TestStack_Insert(t *testing.T) {
+	got := And().Paren().Fold().Push(
+		`testing1`,
+		`testing2`,
+		`testing3`,
+	)
+
+	got.Insert(`testing0`, 0)
+
+	want := `( testing0 AND testing1 AND testing2 AND testing3 )`
+	if got.String() != want {
+		t.Errorf("%s.1 failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+
+	got.Insert(`testing2.5`, 3)
+	want = `( testing0 AND testing1 AND testing2 AND testing2.5 AND testing3 )`
+	if got.String() != want {
+		t.Errorf("%s.2 failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+
+	got.Insert(`testing4`, 15)
+	want = `( testing0 AND testing1 AND testing2 AND testing2.5 AND testing3 AND testing4 )`
+	if got.String() != want {
+		t.Errorf("%s.3 failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+}
+
 func TestStack_IsParen(t *testing.T) {
 	stk := And().Paren().Fold().Push(
 		`testing1`,

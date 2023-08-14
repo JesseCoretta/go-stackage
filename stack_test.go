@@ -66,6 +66,25 @@ func TestStack_IsParen(t *testing.T) {
 	}
 }
 
+func TestStack_Transfer(t *testing.T) {
+	stk := And().Push(
+		`testing1`,
+		`testing2`,
+		`testing3`,
+	)
+
+	or := Or()
+	if ok := stk.Transfer(or); or.Len() != 3 || !ok {
+		t.Errorf("%s failed [post-transfer len comparisons]: want len:%d, got len:%d", t.Name(), stk.Len(), or.Len())
+	}
+
+	stk.Reset() // reset source, removing all slices
+	if or.Len() != 3 && stk.Len() != 0 {
+		t.Errorf("%s failed [post-transfer src reset]: want slen:%d; dlen:%d, got slen:%d; dlen:%d",
+			t.Name(), 0, 3, stk.Len(), or.Len())
+	}
+}
+
 func TestStack_IsPadded(t *testing.T) {
 	stk := And().Paren().Fold().Push(
 		`testing1`,

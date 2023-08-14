@@ -208,6 +208,78 @@ func (r Stack) SetMessageChan(mchan chan Message) Stack {
 }
 
 /*
+Transfer will iterate the receiver (r) and add all slices
+contained therein to the destination instance.
+
+The following circumstances will result in a false return:
+
+- Capacity constraints are in-force within the destination
+instance, and any attempt to comply with the request would
+exceed said constraints
+
+- The destination instance is nil, or has not been properly
+initialized
+
+- The receiver instance (r) contains no slices to transfer
+
+The receiver instance (r) is not modified in any way as a
+result of calling this method. If the receiver undergoes a
+call to its Reset() method, only the receiver instance will
+be emptied, and the transferred slices within the submitted
+destination instance shall remain.
+*/
+func (r Stack) Transfer(dest Stack) bool {
+	return r.transfer(dest.stack)
+}
+
+/*
+transfer is a private method executed by the Stack.Transfer
+method. It will return a *stack instance containing the same
+slices as the receiver (r). Configuration is not copied, nor
+is a destination *stack subject to initialization within this
+method. Thus, the user must submit a *stack instance ready to
+receive slices immediately.
+
+Capacity enforcement is honored. If the source (r) contains
+more slices than a non-zero destination capacity allows, the
+operation is canceled outright and false is returned.
+*/
+func (r *stack) transfer(dest *stack) bool {
+	if r.ulen() == 0 || dest == nil {
+		// nothing to xfer
+		return false
+	}
+
+	if r.stackType() == 0x0 {
+		// dest MUST be initialized in some way
+		// or this happens ...
+		return false
+	}
+
+	// if a capacity was set, make sure
+	// the destination can handle it...
+	if dest.cap() > 0 {
+		if r.ulen() > dest.cap()-r.ulen() {
+			// capacity is in-force, and
+			// there are too many slices
+			// to xfer.
+			return false
+		}
+	}
+
+	// xfer slices, without any regard for
+	// nilness. Slice type is not subject
+	// to discrimination.
+	for i := 0; i < r.ulen(); i++ {
+		sl, _, _ := r.index(i) // cfg offset handled by index method
+		dest.push(sl)
+	}
+
+	// return newly populated stack
+	return dest.ulen() >= r.ulen()
+}
+
+/*
 Insert will insert value x to become the left index. For example,
 using zero (0) as left shall result in value x becoming the first
 slice within the receiver.
@@ -585,6 +657,10 @@ func (r Stack) Category() string {
 getCat is a private method called by Stack.Category.
 */
 func (r *stack) getCat() string {
+	if r.isZero() {
+		return ``
+	}
+
 	sc, _ := r.config()
 	return sc.cat
 }
@@ -604,6 +680,10 @@ func (r Stack) ID() string {
 getID is a private method called by Stack.ID.
 */
 func (r *stack) getID() string {
+	if r.isZero() {
+		return ``
+	}
+
 	sc, _ := r.config()
 	return sc.id
 }
@@ -901,6 +981,10 @@ func (r stack) len() int {
 Len returns the integer length of the receiver.
 */
 func (r Stack) Len() int {
+	if r.isZero() {
+		return 0
+	}
+
 	return r.ulen()
 }
 

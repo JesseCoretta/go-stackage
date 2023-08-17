@@ -1396,7 +1396,7 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 		} else {
 			// We have leftovers. If the Condition's value is a
 			// Stack *OR* a Stack alias, traverse it ...
-			return r.traverseStack(c.Value(), idx, indices...)
+			return r.traverseStack(c.Expression(), idx, indices...)
 		}
 	}
 

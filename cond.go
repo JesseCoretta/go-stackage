@@ -72,26 +72,81 @@ newCondition initializes, (optionally sets) and returns a new instance of
 *condition in one shot.
 */
 func newCondition(kw any, op Operator, ex any) (r *condition) {
+	r = initCondition()
+
+	r.setKeyword(kw)    // keyword
+	r.setOperator(op)   // operator
+	r.setExpression(ex) // expr. value(s)
+
+	return
+}
+
+func initCondition() (r *condition) {
 	r = new(condition)
 	r.cfg = new(nodeConfig)
 	r.cfg.typ = cond
 
+	return
+}
+
+/*
+SetKeyword sets the receiver's keyword using the specified kw
+input argument.
+*/
+func (r *Condition) SetKeyword(kw any) *Condition {
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
+
+	r.condition.setKeyword(kw)
+	return r
+}
+
+func (r *condition) setKeyword(kw any) {
 	switch tv := kw.(type) {
 	case string:
 		r.kw = tv
 	default:
 		r.kw = assertKeyword(tv)
 	}
+}
 
+/*
+SetOperator sets the receiver's comparison operator using the
+specified Operator-qualifying input argument (op).
+*/
+func (r *Condition) SetOperator(op Operator) *Condition {
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
+
+	r.condition.setOperator(op)
+	return r
+}
+
+func (r *condition) setOperator(op Operator) {
 	if len(op.Context()) > 0 && len(op.String()) > 0 {
 		r.op = op
 	}
+}
 
+/*
+SetExpression sets the receiver's expression value(s) using the
+specified ex input argument.
+*/
+func (r *Condition) SetExpression(ex any) *Condition {
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
+
+	r.condition.setExpression(ex)
+	return r
+}
+
+func (r *condition) setExpression(ex any) {
 	if v, ok := r.assertConditionExpressionValue(ex); ok {
 		r.ex = v
 	}
-
-	return
 }
 
 /*
@@ -321,7 +376,7 @@ func (r Condition) Valid() (err error) {
 
 	// no validity policy was provided, just check
 	// what we can.
-	if r.Value() == nil {
+	if r.Expression() == nil {
 		err = errorf("%T expression value is nil", r)
 	}
 
@@ -515,11 +570,14 @@ func (r Condition) SetPushPolicy(x PushPolicy) Condition {
 }
 
 /*
-Value returns the expression value stored within the receiver, or nil if
-unset. A valid receiver instance MUST always possess a non-nil expression
-value.
+Expression returns the expression value(s) stored within the receiver, or
+nil if unset. A valid receiver instance MUST always possess a non-nil
+expression value.
 */
-func (r Condition) Value() any {
+func (r Condition) Expression() any {
+	if r.condition == nil {
+		return nil
+	}
 	return r.condition.ex
 }
 
@@ -528,8 +586,8 @@ Operator returns the Operator interface type instance found within the
 receiver.
 */
 func (r Condition) Operator() Operator {
-	if err := r.Valid(); err != nil {
-		return nil
+	if r.condition == nil {
+		return nco
 	}
 	return r.condition.op
 }
@@ -539,9 +597,10 @@ Keyword returns the Keyword interface type instance found within the
 receiver.
 */
 func (r Condition) Keyword() string {
-	if err := r.Valid(); err != nil {
+	if r.condition == nil {
 		return ``
 	}
+
 	return r.condition.kw
 }
 

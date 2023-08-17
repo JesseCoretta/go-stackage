@@ -49,3 +49,13 @@ func ExampleCondition_basic() {
 	fmt.Printf("%s", c)
 	// Output: (person="Jesse")
 }
+
+func ExampleCondition_stepByStep() {
+	var c Condition
+	c.SetKeyword(`myKeyword`)
+	c.SetOperator(Eq)
+	c.SetExpression(`value123`)
+
+	fmt.Printf("%s", c)
+	// Output: myKeyword = value123
+}

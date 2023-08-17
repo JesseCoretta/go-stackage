@@ -461,6 +461,24 @@ func ExampleBasic() {
 	// Output: 3.14
 }
 
+func ExampleBasic_setAsReadOnly() {
+        b := Basic()
+        b.Push(
+                float64(3.14159),
+                float64(-9.378),
+        )
+	b.ReadOnly()		// set readonly
+	b.Remove(1)		// this ought to fail ...
+	first := b.Len()	// record len
+
+	b.ReadOnly()		// unset readonly
+	b.Remove(1)		// retry removal
+	second := b.Len()	// record len again
+
+	fmt.Printf("first try: %d vs. second try: %d", first, second)
+        // Output: first try: 2 vs. second try: 1 
+}
+
 func ExampleBasic_withCapacity() {
 	b := Basic(2)
 	b.Push(

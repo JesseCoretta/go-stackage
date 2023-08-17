@@ -199,6 +199,10 @@ the channel in Message form. The user will need to listen on
 the channel and actually read messages.
 */
 func (r Stack) SetMessageChan(mchan chan Message) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if mchan != nil {
 		sc, _ := r.config()
 		sc.msg = mchan
@@ -245,6 +249,10 @@ more slices than a non-zero destination capacity allows, the
 operation is canceled outright and false is returned.
 */
 func (r *stack) transfer(dest *stack) bool {
+	if r.positive(ronly) {
+		return false
+	}
+
 	if r.ulen() == 0 || dest == nil {
 		// nothing to xfer
 		return false
@@ -304,6 +312,10 @@ func (r *stack) insert(x any, left int) (ok bool) {
 	// bail out if receiver is nil
 	if x == nil {
 		return
+	}
+
+	if r.positive(ronly) {
+		return false
 	}
 
 	// note the len before we start
@@ -376,6 +388,10 @@ func (r Stack) Reset() {
 reset is a private method called by Stack.Reset.
 */
 func (r *stack) reset() {
+	if r.positive(ronly) {
+		return
+	}
+
 	for i := r.ulen(); i > 0; i-- {
 		r.remove(i - 1)
 	}
@@ -394,6 +410,9 @@ func (r Stack) Remove(idx int) (slice any, ok bool) {
 remove is a private method called by Stack.Remove.
 */
 func (r *stack) remove(idx int) (slice any, ok bool) {
+	if r.positive(ronly) {
+		return
+	}
 
 	r.lock()
 	defer r.unlock()
@@ -452,6 +471,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Paren(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(parens)
@@ -486,6 +509,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Fold(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(cfold)
@@ -510,6 +537,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) NegativeIndices(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(negidx)
@@ -534,6 +565,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) ForwardIndices(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(fwdidx)
@@ -553,6 +588,10 @@ joining when the underlying type is a list. The input value shall be
 used for joining delimitation.
 */
 func (r Stack) JoinDelim(x string) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setJoinDelim(x)
 	return r
 }
@@ -588,6 +627,10 @@ value is identical to providing a single string value, in that both
 L and R will use one value.
 */
 func (r Stack) Encap(x ...any) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setEncap(x...)
 	return r
 }
@@ -615,6 +658,10 @@ value. This allows for a means of identifying a particular stack in
 the midst of many.
 */
 func (r Stack) SetID(id string) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setID(id)
 	return r
 }
@@ -633,6 +680,10 @@ value. This allows for a means of identifying a particular kind of stack
 in the midst of many.
 */
 func (r Stack) SetCategory(cat string) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setCat(cat)
 	return r
 }
@@ -702,6 +753,10 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) LeadOnce(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(lonce)
@@ -726,6 +781,10 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoPadding(state ...bool) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(nspad)
@@ -748,6 +807,33 @@ func (r Stack) IsPadded() bool {
 }
 
 /*
+ReadOnly sets the receiver bit 'ronly' to a positive state.
+This will prevent any writes to the receiver or its underlying
+configuration.
+*/
+func (r Stack) ReadOnly(state ...bool) Stack {
+        if len(state) > 0 {
+                if state[0] {
+                        r.stack.setOpt(ronly)
+                } else {
+                        r.stack.unsetOpt(ronly)
+                }
+        } else {
+                r.stack.toggleOpt(ronly)
+        }
+
+        return r
+}
+
+/*
+IsReadOnly returns a boolean value indicative of whether the
+receiver is set as read-only.
+*/
+func (r Stack) IsReadOnly() bool {
+	return r.stack.positive(ronly)
+}
+
+/*
 Symbol sets the provided symbol expression, which will be
 a sequence of any characters desired, to represent various
 Boolean operators without relying on words such as "AND".
@@ -764,6 +850,10 @@ word-based behavior.
 This method has no effect on list-style stacks.
 */
 func (r Stack) Symbol(c ...any) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	if len(c) == 0 {
 		r.stack.setSymbol(``)
 		return r
@@ -1526,6 +1616,10 @@ func (r *stack) pop() (any, bool) {
 		return nil, true
 	}
 
+	if r.positive(ronly) {
+		return nil, false
+	}
+
 	r.lock()
 	defer r.unlock()
 
@@ -1565,6 +1659,10 @@ func (r *stack) push(x ...any) *stack {
 	}
 	if err := r.valid(); err != nil {
 		r.wrmsg(errorf("%s: %s", fname, err.Error()))
+		return r
+	}
+
+	if r.positive(ronly) {
 		return r
 	}
 
@@ -1656,6 +1754,10 @@ appends to the Stack. The provided function shall be executed
 by the Push method for each individual item being added.
 */
 func (r Stack) SetPushPolicy(ppol PushPolicy) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setPushPolicy(ppol)
 	return r
 }
@@ -1687,6 +1789,10 @@ String() method will execute the provided policy instead of the
 package-provided routine.
 */
 func (r Stack) SetPresentationPolicy(ppol PresentationPolicy) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setPresentationPolicy(ppol)
 	return r
 }
@@ -1721,6 +1827,10 @@ gauge its validity. The provided function shall be executed
 by the Valid method.
 */
 func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
+	if r.stack.positive(ronly) {
+		return r
+	}
+
 	r.stack.setValidityPolicy(vpol)
 	return r
 }

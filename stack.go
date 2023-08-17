@@ -249,9 +249,6 @@ more slices than a non-zero destination capacity allows, the
 operation is canceled outright and false is returned.
 */
 func (r *stack) transfer(dest *stack) bool {
-	if r.positive(ronly) {
-		return false
-	}
 
 	if r.ulen() == 0 || dest == nil {
 		// nothing to xfer

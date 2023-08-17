@@ -246,6 +246,21 @@ func TestList_001(t *testing.T) {
 	}
 }
 
+func TestList_001_withNoDelim(t *testing.T) {
+
+        A := List().Push(
+                `(top_element_number_0)`,
+                `(top_element_number_1)`,
+                `(top_element_number_2)`,
+                `(top_element_number_3)`,
+        )
+
+        want := `(top_element_number_0)(top_element_number_1)(top_element_number_2)(top_element_number_3)`
+        if got := A; got.String() != want {
+                t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+        }
+}
+
 func TestCustomStack001(t *testing.T) {
 	A := List().JoinDelim(`,`).Push(
 		`top_element_number_0`,

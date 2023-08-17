@@ -809,17 +809,17 @@ This will prevent any writes to the receiver or its underlying
 configuration.
 */
 func (r Stack) ReadOnly(state ...bool) Stack {
-        if len(state) > 0 {
-                if state[0] {
-                        r.stack.setOpt(ronly)
-                } else {
-                        r.stack.unsetOpt(ronly)
-                }
-        } else {
-                r.stack.toggleOpt(ronly)
-        }
+	if len(state) > 0 {
+		if state[0] {
+			r.stack.setOpt(ronly)
+		} else {
+			r.stack.unsetOpt(ronly)
+		}
+	} else {
+		r.stack.toggleOpt(ronly)
+	}
 
-        return r
+	return r
 }
 
 /*

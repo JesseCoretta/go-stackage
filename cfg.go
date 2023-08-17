@@ -111,7 +111,7 @@ const (
 	negidx                     //    16 // enable negative index support
 	fwdidx                     //    32 // enable forward index support
 	joinl                      //    64 // list joining value
-	_                          //   128
+	ronly                      //   128 // stack is read-only
 	_                          //   256
 	_                          //   512
 	_                          //  1024

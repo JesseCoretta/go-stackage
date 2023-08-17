@@ -248,17 +248,17 @@ func TestList_001(t *testing.T) {
 
 func TestList_001_withNoDelim(t *testing.T) {
 
-        A := List().Push(
-                `(top_element_number_0)`,
-                `(top_element_number_1)`,
-                `(top_element_number_2)`,
-                `(top_element_number_3)`,
-        )
+	A := List().Push(
+		`(top_element_number_0)`,
+		`(top_element_number_1)`,
+		`(top_element_number_2)`,
+		`(top_element_number_3)`,
+	)
 
-        want := `(top_element_number_0)(top_element_number_1)(top_element_number_2)(top_element_number_3)`
-        if got := A; got.String() != want {
-                t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
-        }
+	want := `(top_element_number_0)(top_element_number_1)(top_element_number_2)(top_element_number_3)`
+	if got := A; got.String() != want {
+		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+	}
 }
 
 func TestCustomStack001(t *testing.T) {
@@ -464,6 +464,11 @@ func TestReset(t *testing.T) {
 	}
 }
 
+/*
+This example demonstrates the creation of a basic stack
+and a call to its first (0th) index. Type assertion is
+performed to reveal a float64 instance.
+*/
 func ExampleBasic() {
 	b := Basic()
 	b.Push(
@@ -476,6 +481,10 @@ func ExampleBasic() {
 	// Output: 3.14
 }
 
+/*
+This example demonstrates the creation of a basic stack
+with (and without) read-only controls enabled.
+*/
 func ExampleBasic_setAsReadOnly() {
 	b := Basic()
 	b.Push(
@@ -484,6 +493,7 @@ func ExampleBasic_setAsReadOnly() {
 	)
 	b.ReadOnly()     // set readonly
 	b.Remove(1)      // this ought to fail ...
+	//b.Pop()	 // alternative to b.Remove(1) in this case
 	first := b.Len() // record len
 
 	b.ReadOnly()      // unset readonly
@@ -494,6 +504,10 @@ func ExampleBasic_setAsReadOnly() {
 	// Output: first try: 2 vs. second try: 1
 }
 
+/*
+This example demonstrates the creation of a basic stack
+and an enforced capacity constraint.
+*/
 func ExampleBasic_withCapacity() {
 	b := Basic(2)
 	b.Push(
@@ -517,6 +531,10 @@ func TestList_Join(t *testing.T) {
 	}
 }
 
+/*
+This example demonstrates the creation of a list stack
+using comma delimitation.
+*/
 func ExampleStack_JoinDelim() {
 	L := List().JoinDelim(`,`).Push(
 		`item1`,

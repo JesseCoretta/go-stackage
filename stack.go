@@ -218,8 +218,8 @@ contained therein to the destination instance.
 The following circumstances will result in a false return:
 
 - Capacity constraints are in-force within the destination
-instance, and any attempt to comply with the request would
-exceed said constraints
+instance, and the transfer request (if larger than the sum
+number of available slices) cannot proceed as a result
 
 - The destination instance is nil, or has not been properly
 initialized

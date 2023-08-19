@@ -246,6 +246,10 @@ func getStringer(x any) func() string {
 		return nil
 	}
 	method := v.MethodByName(`String`)
+        if method.Kind() == reflect.Invalid {
+                return nil
+        }
+
 	if meth, ok := method.Interface().(func() string); ok {
 		return meth
 	}

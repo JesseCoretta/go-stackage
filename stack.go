@@ -1122,6 +1122,29 @@ func (r Stack) Cap() int {
 }
 
 /*
+Avail returns the available number of slices as an integer value by
+subtracting the current length from a non-zero capacity.
+
+If no capacity is set, this method returns minus one (-1), meaning
+infinite capacity is available.
+
+If the receiver (r) is uninitialized, zero (0) is returned.
+*/
+func (r Stack) Avail() int {
+	if r.IsZero() {
+		return 0
+	}
+	return r.stack.avail()
+}
+
+func (r stack) avail() int {
+	if r.cap() == 0 {
+		return -1	// no cap set means "infinite capacity"
+	}
+	return r.cap()-r.len()
+}
+
+/*
 ulen returns the practical integer length of the receiver. This does
 *NOT* include slice zero (0), which is reserved for the configuration
 instance, therefore this method always returns len()-1 for stacks with

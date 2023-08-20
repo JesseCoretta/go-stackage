@@ -465,6 +465,24 @@ func TestBasic_withCapacity(t *testing.T) {
 	}
 }
 
+func TestBasic_availableCapacity(t *testing.T) {
+        b := Basic(2)
+        b.Push(
+                float64(3.14159),
+                float64(-9.378),
+                float64(139.104),
+        )
+
+	if b.Avail() != 0 {
+                t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
+        }
+
+	b = Basic(5)
+	if b.Avail() != 5 {
+                t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
+	}
+}
+
 func TestReset(t *testing.T) {
 	b := Basic()
 	b.Push(

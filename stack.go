@@ -285,6 +285,38 @@ func (r *stack) transfer(dest *stack) bool {
 }
 
 /*
+Replace will overwrite slice i using value x and returns a Boolean
+value indicative of success.
+
+If slice i does not exist (e.g.: i > receiver len), then nothing is
+altered and a false Boolean value is returned.
+*/
+func (r Stack) Replace(x any, i int) bool {
+	return r.stack.replace(x,i)
+}
+
+func (r *stack) replace(x any, i int) (ok bool) {
+        // bail out if receiver or
+	// input value is nil
+        if r == nil || x == nil {
+                return
+        }
+
+        if r.positive(ronly) {
+                return
+        }
+
+	if i+1 > r.ulen() {
+		return
+	}
+
+	(*r)[i+1] = x
+	ok = true
+
+	return
+}
+
+/*
 Insert will insert value x to become the left index. For example,
 using zero (0) as left shall result in value x becoming the first
 slice within the receiver.
@@ -298,7 +330,7 @@ become zero (0). An integer value that exceeds the length of the
 receiver shall become index len-1. A value that falls within the
 bounds of the receiver's current length is inserted as intended.
 */
-func (r Stack) Insert(x any, left int) (ok bool) {
+func (r Stack) Insert(x any, left int) bool {
 	return r.stack.insert(x, left)
 }
 
@@ -306,13 +338,14 @@ func (r Stack) Insert(x any, left int) (ok bool) {
 insert is a private method called by Stack.Insert.
 */
 func (r *stack) insert(x any, left int) (ok bool) {
-	// bail out if receiver is nil
-	if x == nil {
+	// bail out if receiver or
+	// input value is nil
+	if r == nil || x == nil {
 		return
 	}
 
 	if r.positive(ronly) {
-		return false
+		return
 	}
 
 	// note the len before we start

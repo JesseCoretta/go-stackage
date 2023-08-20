@@ -54,6 +54,26 @@ func TestStack_Insert(t *testing.T) {
 	}
 }
 
+func TestStack_Replace(t *testing.T) {
+        s := List().JoinDelim(`,`).Push(
+                `testing1`,
+                `testing2`,
+                `testing3`,
+        )
+
+	want := `testing0,testing2,testing3`
+	s.Replace(`testing0`,0)
+	got := s.String()
+	if want != got {
+		t.Errorf("%s.1 failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+
+	if ok := s.Replace(`testingX`,6); ok {
+                t.Errorf("%s.2 failed: want '%t', got '%t'", t.Name(), false, ok)
+        }
+
+}
+
 func TestStack_IsParen(t *testing.T) {
 	stk := And().Paren().Fold().Push(
 		`testing1`,

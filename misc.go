@@ -190,7 +190,7 @@ func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 		X := valOf(u).Convert(b).Interface()
 		if assert, ok := X.(Stack); ok {
 			if !assert.IsZero() {
-				if s := assert.String(); s != badCond && len(s) > 0 {
+				if s := assert.String(); s != badStack && len(s) > 0 {
 					S = assert
 					converted = true
 					return
@@ -246,9 +246,9 @@ func getStringer(x any) func() string {
 		return nil
 	}
 	method := v.MethodByName(`String`)
-        if method.Kind() == reflect.Invalid {
-                return nil
-        }
+	if method.Kind() == reflect.Invalid {
+		return nil
+	}
 
 	if meth, ok := method.Interface().(func() string); ok {
 		return meth

@@ -14,6 +14,23 @@ func (r customStack) String() string {
 	return Stack(r).String()
 }
 
+func TestStack_noInit(t *testing.T) {
+	var x Stack
+	x.Push(`well?`)	// first off, this should not panic
+
+	// next, make sure it really
+	// did not work ...
+	if length := x.Len(); length != 0 {
+		t.Errorf("%s failed [noInit]: want '%d' elements, got '%d'", t.Name(), 0, length)
+	}
+
+	// lastly, we should definitely see an indication
+	// of this issue during validity checks ...
+	if err := x.Valid(); err == nil {
+		t.Errorf("%s failed [noInit]: want 'error', got '%T'", t.Name(), nil)
+	}
+}
+
 func TestStack_And001(t *testing.T) {
 	got := And().Paren().Fold().Push(
 		`testing1`,
@@ -135,19 +152,19 @@ func TestStackAnd_001(t *testing.T) {
 
 func TestStack_IsNesting(t *testing.T) {
 
-        A := And().Paren().Push(
-                `top_element_number_0`,
-                Or().Paren().Push(
-                        `sub_element_number_0`,
-                        `sub_element_number_1`,
-                ),
-        )
+	A := And().Paren().Push(
+		`top_element_number_0`,
+		Or().Paren().Push(
+			`sub_element_number_0`,
+			`sub_element_number_1`,
+		),
+	)
 
 	want := true
 	got := A.IsNesting()
-	if want != got  {
-                t.Errorf("%s failed [isNesting]: want '%t', got '%t'", t.Name(), want, got)
-        }
+	if want != got {
+		t.Errorf("%s failed [isNesting]: want '%t', got '%t'", t.Name(), want, got)
+	}
 }
 
 func TestAnd_002(t *testing.T) {

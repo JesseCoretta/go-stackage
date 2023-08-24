@@ -199,6 +199,10 @@ the channel in Message form. The user will need to listen on
 the channel and actually read messages.
 */
 func (r Stack) SetMessageChan(mchan chan Message) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -292,19 +296,19 @@ If slice i does not exist (e.g.: i > receiver len), then nothing is
 altered and a false Boolean value is returned.
 */
 func (r Stack) Replace(x any, i int) bool {
-	return r.stack.replace(x,i)
+	return r.stack.replace(x, i)
 }
 
 func (r *stack) replace(x any, i int) (ok bool) {
-        // bail out if receiver or
+	// bail out if receiver or
 	// input value is nil
-        if r == nil || x == nil {
-                return
-        }
+	if r == nil || x == nil {
+		return
+	}
 
-        if r.positive(ronly) {
-                return
-        }
+	if r.positive(ronly) {
+		return
+	}
 
 	if i+1 > r.ulen() {
 		return
@@ -501,6 +505,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Paren(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -731,6 +739,9 @@ Category returns the categorical label string value assigned to the receiver,
 if set, else a zero string.
 */
 func (r Stack) Category() string {
+	if r.IsZero() {
+		return ``
+	}
 	return r.stack.getCat()
 }
 
@@ -783,6 +794,10 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) LeadOnce(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -811,6 +826,10 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoPadding(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -833,6 +852,10 @@ IsPadded returns a boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
 func (r Stack) IsPadded() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.stack.positive(parens)
 }
 
@@ -842,6 +865,10 @@ This will prevent any writes to the receiver or its underlying
 configuration.
 */
 func (r Stack) ReadOnly(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if len(state) > 0 {
 		if state[0] {
 			r.stack.setOpt(ronly)
@@ -860,6 +887,10 @@ IsReadOnly returns a boolean value indicative of whether the
 receiver is set as read-only.
 */
 func (r Stack) IsReadOnly() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.stack.positive(ronly)
 }
 
@@ -880,6 +911,10 @@ word-based behavior.
 This method has no effect on list-style stacks.
 */
 func (r Stack) Symbol(c ...any) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -994,6 +1029,10 @@ func (r stack) positive(x cfgFlag) bool {
 Mutex enables the receiver's mutual exclusion locking capabilities.
 */
 func (r Stack) Mutex() {
+	if r.IsZero() {
+		return
+	}
+
 	r.stack.setMutex()
 }
 
@@ -1015,6 +1054,10 @@ instance has been equipped with mutual exclusion locking features.
 This does NOT indicate whether the receiver is actually locked.
 */
 func (r Stack) CanMutex() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.stack.canMutex()
 }
 
@@ -1101,7 +1144,7 @@ func (r stack) len() int {
 Len returns the integer length of the receiver.
 */
 func (r Stack) Len() int {
-	if r.isZero() {
+	if r.IsZero() {
 		return 0
 	}
 
@@ -1118,6 +1161,10 @@ func (r stack) cap() int {
 }
 
 func (r Stack) Cap() int {
+	if r.IsZero() {
+		return 0
+	}
+
 	return r.cap()
 }
 
@@ -1134,14 +1181,15 @@ func (r Stack) Avail() int {
 	if r.IsZero() {
 		return 0
 	}
+
 	return r.stack.avail()
 }
 
 func (r stack) avail() int {
 	if r.cap() == 0 {
-		return -1	// no cap set means "infinite capacity"
+		return -1 // no cap set means "infinite capacity"
 	}
-	return r.cap()-r.len()
+	return r.cap() - r.len()
 }
 
 /*
@@ -1166,6 +1214,10 @@ func (r stack) ulen() (l int) {
 Kind returns the string name of the type of receiver configuration.
 */
 func (r Stack) Kind() string {
+	if r.IsZero() {
+		return badStack
+	}
+
 	switch t, c := r.stack.typ(); c {
 	case and, or, not, list, basic:
 		return t
@@ -1360,6 +1412,10 @@ know they took a wrong turn somewhere.
 As the return type is any, the slice value must be manually type asserted.
 */
 func (r Stack) Traverse(indices ...int) (slice any, ok bool) {
+	if r.IsZero() {
+		return nil, false
+	}
+
 	slice, ok, _ = r.stack.traverse(indices...)
 	return
 }
@@ -1509,6 +1565,10 @@ In any scenario, a valid index within the bounds of the stack's length
 returns the intended slice along with boolean value of true.
 */
 func (r Stack) Index(i int) (slice any, ok bool) {
+	if r.IsZero() {
+		return nil, false
+	}
+
 	slice, _, ok = r.stack.index(i)
 	return
 }
@@ -1656,6 +1716,10 @@ be removed, and a meaningless value of true will be
 returned alongside a nil slice value.
 */
 func (r Stack) Pop() (any, bool) {
+	if r.IsZero() {
+		return nil, false
+	}
+
 	return r.stack.pop()
 }
 
@@ -1698,6 +1762,10 @@ if maximum capacity has been set and reached, each of
 the values intended for append shall be ignored.
 */
 func (r Stack) Push(y ...any) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	r.stack.push(y...)
 	return r
 }
@@ -1769,6 +1837,10 @@ CapReached returns a boolean value indicative of whether the receiver
 has reached the maximum configured capacity.
 */
 func (r Stack) CapReached() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.capReached()
 }
 
@@ -1807,6 +1879,10 @@ appends to the Stack. The provided function shall be executed
 by the Push method for each individual item being added.
 */
 func (r Stack) SetPushPolicy(ppol PushPolicy) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -1842,6 +1918,10 @@ String() method will execute the provided policy instead of the
 package-provided routine.
 */
 func (r Stack) SetPresentationPolicy(ppol PresentationPolicy) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -1880,6 +1960,10 @@ gauge its validity. The provided function shall be executed
 by the Valid method.
 */
 func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}

@@ -283,9 +283,10 @@ This allows for a means of identifying a particular kind of Condition in the mid
 of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.setCategory(cat)
 	return r
 }
@@ -315,9 +316,10 @@ in which "labeling" certain components may be advantageous. It has no effect
 on an evaluation, nor should a name ever cause a validity check to fail.
 */
 func (r Condition) SetID(n string) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.setID(n)
 	return r
 }
@@ -407,9 +409,10 @@ will allow the Evaluate method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetEvaluator(x Evaluator) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.evl = x
 	return r
 }
@@ -421,9 +424,10 @@ This will allow the Valid method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.vpf = x
 	return r
 }
@@ -436,9 +440,10 @@ use when this type's String method is called.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.rpf = x
 	return r
 }
@@ -457,9 +462,10 @@ value is identical to providing a single string value, in that both
 L and R will use one value.
 */
 func (r Condition) Encap(x ...any) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.setEncap(x...)
 	return r
 }
@@ -478,9 +484,9 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Condition) Paren(state ...bool) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
 
 	if len(state) > 0 {
 		if state[0] {
@@ -500,6 +506,10 @@ IsParen returns a boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Condition) IsParen() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.cfg.positive(parens)
 }
 
@@ -526,9 +536,9 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Condition) NoPadding(state ...bool) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
 
 	if len(state) > 0 {
 		if state[0] {
@@ -548,6 +558,10 @@ IsPadded returns a boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
 func (r Condition) IsPadded() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return !r.cfg.positive(nspad)
 }
 
@@ -562,9 +576,10 @@ behavior without the involvement of a PushPolicy instance.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPushPolicy(x PushPolicy) Condition {
-	if r.IsZero() {
-		return r
-	}
+        if r.condition == nil {
+                r.condition = initCondition()
+        }
+
 	r.condition.cfg.ppf = x
 	return r
 }
@@ -575,9 +590,10 @@ nil if unset. A valid receiver instance MUST always possess a non-nil
 expression value.
 */
 func (r Condition) Expression() any {
-	if r.condition == nil {
+	if r.IsZero() {
 		return nil
 	}
+
 	return r.condition.ex
 }
 
@@ -586,7 +602,7 @@ Operator returns the Operator interface type instance found within the
 receiver.
 */
 func (r Condition) Operator() Operator {
-	if r.condition == nil {
+	if r.IsZero() {
 		return nco
 	}
 	return r.condition.op
@@ -597,7 +613,7 @@ Keyword returns the Keyword interface type instance found within the
 receiver.
 */
 func (r Condition) Keyword() string {
-	if r.condition == nil {
+	if r.IsZero() {
 		return ``
 	}
 

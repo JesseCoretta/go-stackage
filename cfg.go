@@ -112,7 +112,7 @@ const (
 	fwdidx                     //    32 // enable forward index support
 	joinl                      //    64 // list joining value
 	ronly                      //   128 // stack is read-only
-	_                          //   256
+	nnest                      //   256 // stack does not allow stack/stack alias instances as slice members
 	_                          //   512
 	_                          //  1024
 	_                          //  2048

@@ -94,7 +94,7 @@ func newStack(t stackType, c ...int) *stack {
 }
 
 /*
-IsZero returns a boolean value indicative of whether the
+IsZero returns a Boolean value indicative of whether the
 receiver is nil, or uninitialized.
 */
 func (r Stack) IsZero() bool {
@@ -132,7 +132,7 @@ func (r *stack) setError(err error) {
 }
 
 /*
-isError returns a boolean value indicative of whether the
+isError returns a Boolean value indicative of whether the
 receiver is in an aberrant state.
 */
 func (r stack) isError() bool {
@@ -166,6 +166,7 @@ func (r Stack) Valid() (err error) {
 		err = errorf("%T instance is nil", r)
 		return
 	}
+
 	if err = r.stack.valid(); err != nil {
 		return
 	}
@@ -183,13 +184,32 @@ func (r Stack) Valid() (err error) {
 valid is a private method called by Stack.Valid.
 */
 func (r stack) valid() (err error) {
-	if &r == nil {
-		err = errorf("%T instance is nil", r)
+	if !r.isInit() {
+		err = errorf("%T instance is not initialized", Stack{})
 		return
 	}
 
 	_, err = r.config()
 	return
+}
+
+/*
+IsInit returns a Boolean value indicative of whether the
+receiver has been initialized.
+*/
+func (r Stack) IsInit() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return r.stack.isInit()
+}
+
+/*
+isInit is a private method called by Stack.IsInit.
+*/
+func (r stack) isInit() bool {
+	return r.stackType() != 0x0
 }
 
 /*
@@ -259,7 +279,7 @@ func (r *stack) transfer(dest *stack) bool {
 		return false
 	}
 
-	if r.stackType() == 0x0 {
+	if !r.isInit() {
 		// dest MUST be initialized in some way
 		// or this happens ...
 		return false
@@ -325,7 +345,7 @@ Insert will insert value x to become the left index. For example,
 using zero (0) as left shall result in value x becoming the first
 slice within the receiver.
 
-This method returns a boolean value indicative of success. A value
+This method returns a Boolean value indicative of success. A value
 of true indicates the receiver length became longer by one (1).
 
 This method does not currently respond to forward/negative index
@@ -433,7 +453,7 @@ func (r *stack) reset() {
 
 /*
 Remove will remove and return the Nth slice from the index,
-along with a success-indicative boolean value. A value of
+along with a success-indicative Boolean value. A value of
 true indicates the receiver length became shorter by one (1).
 */
 func (r Stack) Remove(idx int) (slice any, ok bool) {
@@ -499,8 +519,8 @@ representation process. Individual string values shall not
 be encapsulated in parenthesis, only the whole (current)
 stack.
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
 current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
@@ -527,7 +547,7 @@ func (r Stack) Paren(state ...bool) Stack {
 }
 
 /*
-IsNesting returns a boolean value indicative of whether
+IsNesting returns a Boolean value indicative of whether
 at least one (1) slice member is either a Stack or Stack
 type alias. If true, this indicates the relevant slice
 descends into another hierarchical (nested) context.
@@ -543,7 +563,7 @@ func (r Stack) IsNesting() bool {
 /*
 isNesting is a private method called by Stack.IsNesting.
 
-When called, this method returns a boolean value indicative
+When called, this method returns a Boolean value indicative
 of whether the receiver contains one (1) or more slice elements
 that match either of the following conditions:
 
@@ -588,7 +608,7 @@ func (r stack) isNesting() bool {
 }
 
 /*
-IsParen returns a boolean value indicative of whether the
+IsParen returns a Boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Stack) IsParen() bool {
@@ -606,9 +626,9 @@ becomes `and`, or vice versa. This won't have any effect
 on List-based receivers, or if symbols are used in place
 of said Boolean words.
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
-current state of the encapsulation bit (i.e.: true->false
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the case-folding bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Fold(state ...bool) Stack {
@@ -638,9 +658,9 @@ NegativeIndices will enable negative index support when
 using the Index method extended by this type. See the
 method documentation for further details.
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
-current state of the encapsulation bit (i.e.: true->false
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the negative indices bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) NegativeIndices(state ...bool) Stack {
@@ -670,9 +690,9 @@ ForwardIndices will enable forward index support when using
 the Index method extended by this type. See the method
 documentation for further details.
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
-current state of the encapsulation bit (i.e.: true->false
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the forward indices bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) ForwardIndices(state ...bool) Stack {
@@ -882,8 +902,8 @@ causes two (2) things to happen:
 • Only use said operator at the very beginning of the
 stack string value.
 
-Execution without a boolean input value will *TOGGLE* the
-current state of the quotation bit (i.e.: true->false and
+Execution without a Boolean input value will *TOGGLE* the
+current state of the lead-once bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) LeadOnce(state ...bool) Stack {
@@ -909,13 +929,13 @@ func (r Stack) LeadOnce(state ...bool) Stack {
 }
 
 /*
-Padding sets the no-space-padding bit within the receiver.
+NoPadding sets the no-space-padding bit within the receiver.
 String values within the receiver shall not be padded using
 a single space character (ASCII #32).
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
-current state of the quotation bit (i.e.: true->false and
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the padding bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoPadding(state ...bool) Stack {
@@ -941,7 +961,62 @@ func (r Stack) NoPadding(state ...bool) Stack {
 }
 
 /*
-IsPadded returns a boolean value indicative of whether the
+NoNesting sets the no-nesting bit within the receiver. If
+set to true, the receiver shall ignore any Stack or Stack
+type alias instance when pushed using the Push method. In
+such a case, only primitives, Conditions, etc., shall be
+honored during the Push operation.
+
+Note this will only have an effect when not using a custom
+PushPolicy. When using a custom PushPolicy, the user has
+total control -- and full responsibility -- in deciding
+what may or may not be pushed. 
+
+Also note that setting or unsetting this bit shall not, in
+any way, have an impact on pre-existing Stack or Stack type
+alias instances within the receiver. This bit only has an
+influence on the Push method and only when set to true.
+
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the nesting bit (i.e.: true->false and
+false->true)
+*/
+func (r Stack) NoNesting(state ...bool) Stack {
+        if r.IsZero() {
+                return r
+        }
+
+        if len(state) > 0 {
+                if state[0] {
+                        r.stack.setOpt(nnest)
+                } else {
+                        r.stack.unsetOpt(nnest)
+                }
+        } else {
+                r.stack.toggleOpt(nnest)
+        }
+
+        return r
+}
+
+/*
+CanNest returns a Boolean value indicative of whether
+the no-nesting bit is unset, thereby allowing the Push
+of Stack and/or Stack type alias instances.
+
+See also the IsNesting method.
+*/
+func (r Stack) CanNest() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return !r.stack.positive(nnest)
+}
+
+/*
+IsPadded returns a Boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
 func (r Stack) IsPadded() bool {
@@ -976,7 +1051,7 @@ func (r Stack) ReadOnly(state ...bool) Stack {
 }
 
 /*
-IsReadOnly returns a boolean value indicative of whether the
+IsReadOnly returns a Boolean value indicative of whether the
 receiver is set as read-only.
 */
 func (r Stack) IsReadOnly() bool {
@@ -1106,7 +1181,7 @@ func (r *stack) unsetOpt(x cfgFlag) *stack {
 }
 
 /*
-positive returns a boolean value indicative of whether the specified
+positive returns a Boolean value indicative of whether the specified
 cfgFlag input value is "on" within the receiver's configuration
 value.
 */
@@ -1141,7 +1216,7 @@ func (r *stack) setMutex() {
 }
 
 /*
-CanMutex returns a boolean value indicating whether the receiver
+CanMutex returns a Boolean value indicating whether the receiver
 instance has been equipped with mutual exclusion locking features.
 
 This does NOT indicate whether the receiver is actually locked.
@@ -1482,7 +1557,7 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 /*
 Traverse will "walk" a structure of stack elements using the path indices
 provided. It returns the slice found at the final index, or nil, along with
-a success-indicative boolean value.
+a success-indicative Boolean value.
 
 The semantics of "traversability" are as follows:
 
@@ -1633,7 +1708,7 @@ func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, don
 
 /*
 Index returns the Nth slice within the given receiver alongside the
-true index number and a boolean value indicative of a successful call
+true index number and a Boolean value indicative of a successful call
 of a non-nil value.
 
 This method supports the use of the following index values depending
@@ -1645,17 +1720,17 @@ becomes positive and within the bounds of the stack length, and (perhaps
 most importantly) aligned with the relative (intended) slice. To offer an
 example, -2 would return the second-to-last slice. When negative index
 support is NOT enabled, nil is returned for any index out of bounds along
-with a boolean value of false, although no panic will occur.
+with a Boolean value of false, although no panic will occur.
 
 • Positives: When forward index support is enabled, an index greater than
 the length of the stack shall be reduced to the highest valid slice index.
 For example, if an index of twenty (20) were used on a stack instance of
 a length of ten (10), the index would transform to nine (9). When forward
 index support is NOT enabled, nil is returned for any index out of bounds
-along with a boolean value of false, although no panic will occur.
+along with a Boolean value of false, although no panic will occur.
 
 In any scenario, a valid index within the bounds of the stack's length
-returns the intended slice along with boolean value of true.
+returns the intended slice along with Boolean value of true.
 */
 func (r Stack) Index(idx int) (slice any, ok bool) {
 	if r.IsZero() {
@@ -1793,7 +1868,7 @@ func (r stack) typ() (kind string, typ stackType) {
 	if sym := r.getSymbol(); len(sym) > 0 {
 		kind = sym
 	} else if !(typ == list || typ == basic) {
-		kind = padValue(true, kind)
+		kind = padValue(true, kind)	// TODO: make this better
 	}
 
 	return
@@ -1801,7 +1876,7 @@ func (r stack) typ() (kind string, typ stackType) {
 
 /*
 Pop removes and returns the final slice value from
-the receiver instance. A boolean value is returned
+the receiver instance. A Boolean value is returned
 alongside, indicative of whether an actual slice
 value was found. Note that if the receiver is in an
 invalid state, or has a zero length, nothing will
@@ -1899,6 +1974,15 @@ func (r *stack) push(x ...any) *stack {
 	return r
 }
 
+func (r *stack) canPushNester(x any) (ok bool) {
+	if !r.positive(nnest) {
+		return true
+	}
+
+	_, ok = stackTypeAliasConverter(x)
+	return
+}
+
 /*
 methodAppend is a private method called by stack.push.
 */
@@ -1926,7 +2010,7 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 }
 
 /*
-CapReached returns a boolean value indicative of whether the receiver
+CapReached returns a Boolean value indicative of whether the receiver
 has reached the maximum configured capacity.
 */
 func (r Stack) CapReached() bool {
@@ -1955,6 +2039,10 @@ maximum capacity --if one was specified-- is not exceeded.
 func (r *stack) genericAppend(x ...any) *stack {
 	fname := uc(fmname())
 	for i := 0; i < len(x); i++ {
+		if !r.canPushNester(x[i]) {
+			continue
+		}
+
 		if r.capReached() {
 			break
 		}

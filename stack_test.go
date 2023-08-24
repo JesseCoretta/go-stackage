@@ -55,22 +55,22 @@ func TestStack_Insert(t *testing.T) {
 }
 
 func TestStack_Replace(t *testing.T) {
-        s := List().JoinDelim(`,`).Push(
-                `testing1`,
-                `testing2`,
-                `testing3`,
-        )
+	s := List().JoinDelim(`,`).Push(
+		`testing1`,
+		`testing2`,
+		`testing3`,
+	)
 
 	want := `testing0,testing2,testing3`
-	s.Replace(`testing0`,0)
+	s.Replace(`testing0`, 0)
 	got := s.String()
 	if want != got {
 		t.Errorf("%s.1 failed: want '%s', got '%s'", t.Name(), want, got)
 	}
 
-	if ok := s.Replace(`testingX`,6); ok {
-                t.Errorf("%s.2 failed: want '%t', got '%t'", t.Name(), false, ok)
-        }
+	if ok := s.Replace(`testingX`, 6); ok {
+		t.Errorf("%s.2 failed: want '%t', got '%t'", t.Name(), false, ok)
+	}
 
 }
 
@@ -131,6 +131,23 @@ func TestStackAnd_001(t *testing.T) {
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 	}
+}
+
+func TestStack_IsNesting(t *testing.T) {
+
+        A := And().Paren().Push(
+                `top_element_number_0`,
+                Or().Paren().Push(
+                        `sub_element_number_0`,
+                        `sub_element_number_1`,
+                ),
+        )
+
+	want := true
+	got := A.IsNesting()
+	if want != got  {
+                t.Errorf("%s failed [isNesting]: want '%t', got '%t'", t.Name(), want, got)
+        }
 }
 
 func TestAnd_002(t *testing.T) {
@@ -466,20 +483,20 @@ func TestBasic_withCapacity(t *testing.T) {
 }
 
 func TestBasic_availableCapacity(t *testing.T) {
-        b := Basic(2)
-        b.Push(
-                float64(3.14159),
-                float64(-9.378),
-                float64(139.104),
-        )
+	b := Basic(2)
+	b.Push(
+		float64(3.14159),
+		float64(-9.378),
+		float64(139.104),
+	)
 
 	if b.Avail() != 0 {
-                t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
-        }
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
+	}
 
 	b = Basic(5)
 	if b.Avail() != 5 {
-                t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
 	}
 }
 
@@ -529,8 +546,8 @@ func ExampleBasic_setAsReadOnly() {
 		float64(3.14159),
 		float64(-9.378),
 	)
-	b.ReadOnly()     // set readonly
-	b.Remove(1)      // this ought to fail ...
+	b.ReadOnly() // set readonly
+	b.Remove(1)  // this ought to fail ...
 	//b.Pop()	 // alternative to b.Remove(1) in this case
 	first := b.Len() // record len
 

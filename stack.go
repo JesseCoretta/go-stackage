@@ -527,10 +527,75 @@ func (r Stack) Paren(state ...bool) Stack {
 }
 
 /*
+IsNesting returns a boolean value indicative of whether
+at least one (1) slice member is either a Stack or Stack
+type alias. If true, this indicates the relevant slice
+descends into another hierarchical (nested) context.
+*/
+func (r Stack) IsNesting() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return r.stack.isNesting()
+}
+
+/*
+isNesting is a private method called by Stack.IsNesting.
+
+When called, this method returns a boolean value indicative
+of whether the receiver contains one (1) or more slice elements
+that match either of the following conditions:
+
+• Slice type is a stackage.Stack native type instance, OR ...
+
+• Slice type is a stackage.Stack type-aliased instance
+
+A return value of true is thrown at the first of either
+occurrence. Length of matched candidates is not significant
+during the matching process.
+*/
+func (r stack) isNesting() bool {
+
+	// start iterating at index #1, thereby
+	// skipping the configuration slice.
+        for i := 1; i < r.len(); i++ {
+
+		// perform a type switch on the
+		// current index, thereby allowing
+		// evaluation of slice types.
+		switch tv := r[i].(type) {
+
+		// native Stack instance
+		case Stack:
+			return true
+
+		// type alias stack instnaces, since
+		// we have no knowledge of them here,
+		// will be matched in default using
+		// the stackTypeAliasConverter func.
+		default:
+
+			// If convertible is true, we know the
+			// instance (tv) is a stack alias.
+			if _, convertible := stackTypeAliasConverter(tv); convertible {
+				return convertible
+			}
+		}
+	}
+
+	return false
+}
+
+/*
 IsParen returns a boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Stack) IsParen() bool {
+	if r.IsZero() {
+		return false
+	}
+
 	return r.stack.positive(parens)
 }
 
@@ -547,6 +612,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Fold(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -575,6 +644,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) NegativeIndices(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -603,6 +676,10 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) ForwardIndices(state ...bool) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -626,6 +703,10 @@ joining when the underlying type is a list. The input value shall be
 used for joining delimitation.
 */
 func (r Stack) JoinDelim(x string) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -665,6 +746,10 @@ value is identical to providing a single string value, in that both
 L and R will use one value.
 */
 func (r Stack) Encap(x ...any) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -696,6 +781,10 @@ value. This allows for a means of identifying a particular stack in
 the midst of many.
 */
 func (r Stack) SetID(id string) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}
@@ -718,6 +807,10 @@ value. This allows for a means of identifying a particular kind of stack
 in the midst of many.
 */
 func (r Stack) SetCategory(cat string) Stack {
+	if r.IsZero() {
+		return r
+	}
+
 	if r.stack.positive(ronly) {
 		return r
 	}

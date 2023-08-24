@@ -25,7 +25,7 @@ this package:
 
 • Eq, or "equal to" (=)
 
-• Ne, or "not equal to" (!=)
+• Ne, or "not equal to" (!=)	// USE WITH CAUTION!!
 
 • Lt, or "less than" (<)
 
@@ -170,7 +170,7 @@ func assertKeyword(x any) (s string) {
 
 /*
 tryPushPolicy will execute a push policy if one is set, and will return an error
-and a boolean value indicative of the presence of said policy.
+and a Boolean value indicative of the presence of said policy.
 */
 func (r *condition) tryPushPolicy(x any) (err error, found bool) {
 	if r.cfg.ppf != nil {
@@ -193,7 +193,7 @@ func (r *condition) setError(err error) {
 }
 
 /*
-isError returns a boolean value indicative of whether the underlying
+isError returns a Boolean value indicative of whether the underlying
 configuration contains a non-nil error instance.
 */
 func (r condition) isError() bool {
@@ -209,7 +209,7 @@ func (r condition) error() error {
 
 /*
 assertConditionExpressionValue returns a string value alongside a
-success-indicative boolean value. This method is used during the
+success-indicative Boolean value. This method is used during the
 set-execution of the receiver, and is designed to prevent unwanted
 types from being assigned as the expression value (ex).
 */
@@ -283,9 +283,9 @@ This allows for a means of identifying a particular kind of Condition in the mid
 of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.setCategory(cat)
 	return r
@@ -316,9 +316,9 @@ in which "labeling" certain components may be advantageous. It has no effect
 on an evaluation, nor should a name ever cause a validity check to fail.
 */
 func (r Condition) SetID(n string) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.setID(n)
 	return r
@@ -334,7 +334,7 @@ func (r Condition) ID() string {
 }
 
 /*
-IsZero returns a boolean value indicative of whether the receiver is nil,
+IsZero returns a Boolean value indicative of whether the receiver is nil,
 or unset.
 */
 func (r Condition) IsZero() bool {
@@ -390,7 +390,7 @@ Evaluate uses the Evaluator closure function to apply the value (x)
 to the receiver in order to conduct a matching/assertion test or
 analysis for some reason. This is entirely up to the user.
 
-A boolean value returned indicative of the result. Note that if an
+A Boolean value returned indicative of the result. Note that if an
 instance of Evaluator was not assigned to the Condition prior to
 execution of this method, the return value shall always be false.
 */
@@ -409,9 +409,9 @@ will allow the Evaluate method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetEvaluator(x Evaluator) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.evl = x
 	return r
@@ -424,9 +424,9 @@ This will allow the Valid method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.vpf = x
 	return r
@@ -440,9 +440,9 @@ use when this type's String method is called.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.rpf = x
 	return r
@@ -462,9 +462,9 @@ value is identical to providing a single string value, in that both
 L and R will use one value.
 */
 func (r Condition) Encap(x ...any) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.setEncap(x...)
 	return r
@@ -478,15 +478,15 @@ representation process. Individual string values shall not
 be encapsulated in parenthesis, only the whole (current)
 stack.
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
 current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Condition) Paren(state ...bool) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	if len(state) > 0 {
 		if state[0] {
@@ -502,7 +502,7 @@ func (r Condition) Paren(state ...bool) Condition {
 }
 
 /*
-IsParen returns a boolean value indicative of whether the
+IsParen returns a Boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Condition) IsParen() bool {
@@ -530,15 +530,15 @@ Padding sets the no-space-padding bit within the receiver.
 String values within the receiver shall not be padded using
 a single space character (ASCII #32).
 
-A boolean input value explicitly sets the bit as intended.
-Execution without a boolean input value will *TOGGLE* the
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
 current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Condition) NoPadding(state ...bool) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	if len(state) > 0 {
 		if state[0] {
@@ -554,7 +554,7 @@ func (r Condition) NoPadding(state ...bool) Condition {
 }
 
 /*
-IsPadded returns a boolean value indicative of whether the
+IsPadded returns a Boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
 func (r Condition) IsPadded() bool {
@@ -576,9 +576,9 @@ behavior without the involvement of a PushPolicy instance.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPushPolicy(x PushPolicy) Condition {
-        if r.condition == nil {
-                r.condition = initCondition()
-        }
+	if r.condition == nil {
+		r.condition = initCondition()
+	}
 
 	r.condition.cfg.ppf = x
 	return r

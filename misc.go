@@ -73,7 +73,7 @@ func (r Message) String() string {
 }
 
 /*
-Valid returns a boolean value indicative of whether the receiver
+Valid returns a Boolean value indicative of whether the receiver
 is perceived to be valid.
 */
 func (r Message) Valid() bool {
@@ -104,7 +104,7 @@ func errorf(msg any, x ...any) error {
 }
 
 /*
-strInSlice returns a boolean value indicative of whether the
+strInSlice returns a Boolean value indicative of whether the
 specified string (str) is present within slice. Please note
 that case is a significant element in the matching process.
 */
@@ -172,7 +172,7 @@ func condenseWHSP(b string) (a string) {
 /*
 stackTypeAliasConverter attempts to convert any (u) back to a bonafide instance
 of Stack. This will only work if input value u is a type alias of Stack. An
-instance of Stack is returned along with a success-indicative boolean value.
+instance of Stack is returned along with a success-indicative Boolean value.
 */
 func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 	// If it isn't a Stack alias, but is a
@@ -205,7 +205,7 @@ func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 /*
 conditionTypeAliasConverter attempts to convert any (u) back to a bonafide instance
 of Condition. This will only work if input value u is a type alias of Condition. An
-instance of Condition is returned along with a success-indicative boolean value.
+instance of Condition is returned along with a success-indicative Boolean value.
 */
 func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 	// If it isn't a Condition alias, but is a
@@ -291,7 +291,7 @@ func encapValue(enc [][]string, v string) string {
 
 /*
 padValue may, or may not, enclose the given string value input
-within ASCII #32 (WHSP) "padding" characters. The boolean "do"
+within ASCII #32 (WHSP) "padding" characters. The Boolean "do"
 input value will control whether or not padding is actually to
 be invoked. Zero string values are ineligible for padding.
 */

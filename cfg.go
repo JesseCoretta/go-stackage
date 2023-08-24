@@ -123,7 +123,7 @@ const (
 )
 
 /*
-isZero returns a boolean value indicative of whether the
+isZero returns a Boolean value indicative of whether the
 receiver is nil, or uninitialized.
 */
 func (r *nodeConfig) isZero() bool {
@@ -179,7 +179,7 @@ func (r *nodeConfig) valid() (err error) {
 }
 
 /*
-positive returns a boolean value indicative of whether the specified
+positive returns a Boolean value indicative of whether the specified
 cfgFlag input value is "on" within the receiver's opt field.
 */
 func (r nodeConfig) positive(x cfgFlag) bool {
@@ -191,7 +191,7 @@ func (r nodeConfig) positive(x cfgFlag) bool {
 }
 
 /*
-positive returns a boolean value indicative of whether the specified
+positive returns a Boolean value indicative of whether the specified
 cfgFlag input value is "on" within the receiver's uint16 bit value.
 */
 func (r cfgFlag) positive(x cfgFlag) bool {
@@ -395,7 +395,7 @@ func (r *cfgFlag) toggle(x cfgFlag) {
 
 /*
 mutex returns the *sync.Mutext instance, alongside a presence-indicative
-boolean value.
+Boolean value.
 */
 func (r *stack) mutex() (mutex *sync.Mutex, found bool) {
 	sc, _ := r.config()

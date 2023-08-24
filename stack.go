@@ -970,7 +970,7 @@ honored during the Push operation.
 Note this will only have an effect when not using a custom
 PushPolicy. When using a custom PushPolicy, the user has
 total control -- and full responsibility -- in deciding
-what may or may not be pushed. 
+what may or may not be pushed.
 
 Also note that setting or unsetting this bit shall not, in
 any way, have an impact on pre-existing Stack or Stack type
@@ -983,21 +983,21 @@ current state of the nesting bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoNesting(state ...bool) Stack {
-        if r.IsZero() {
-                return r
-        }
+	if r.IsZero() {
+		return r
+	}
 
-        if len(state) > 0 {
-                if state[0] {
-                        r.stack.setOpt(nnest)
-                } else {
-                        r.stack.unsetOpt(nnest)
-                }
-        } else {
-                r.stack.toggleOpt(nnest)
-        }
+	if len(state) > 0 {
+		if state[0] {
+			r.stack.setOpt(nnest)
+		} else {
+			r.stack.unsetOpt(nnest)
+		}
+	} else {
+		r.stack.toggleOpt(nnest)
+	}
 
-        return r
+	return r
 }
 
 /*
@@ -1868,7 +1868,7 @@ func (r stack) typ() (kind string, typ stackType) {
 	if sym := r.getSymbol(); len(sym) > 0 {
 		kind = sym
 	} else if !(typ == list || typ == basic) {
-		kind = padValue(true, kind)	// TODO: make this better
+		kind = padValue(true, kind) // TODO: make this better
 	}
 
 	return

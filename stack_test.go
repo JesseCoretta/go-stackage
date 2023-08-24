@@ -16,7 +16,7 @@ func (r customStack) String() string {
 
 func TestStack_noInit(t *testing.T) {
 	var x Stack
-	x.Push(`well?`)	// first off, this should not panic
+	x.Push(`well?`) // first off, this should not panic
 
 	// next, make sure it really
 	// did not work ...

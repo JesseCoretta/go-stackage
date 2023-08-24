@@ -289,14 +289,14 @@ func (r *stack) transfer(dest *stack) bool {
 }
 
 /*
-Replace will overwrite slice i using value x and returns a Boolean
+Replace will overwrite slice idx using value x and returns a Boolean
 value indicative of success.
 
-If slice i does not exist (e.g.: i > receiver len), then nothing is
+If slice i does not exist (e.g.: idx > receiver len), then nothing is
 altered and a false Boolean value is returned.
 */
-func (r Stack) Replace(x any, i int) bool {
-	return r.stack.replace(x, i)
+func (r Stack) Replace(x any, idx int) bool {
+	return r.stack.replace(x, idx)
 }
 
 func (r *stack) replace(x any, i int) (ok bool) {
@@ -559,7 +559,7 @@ func (r stack) isNesting() bool {
 
 	// start iterating at index #1, thereby
 	// skipping the configuration slice.
-        for i := 1; i < r.len(); i++ {
+	for i := 1; i < r.len(); i++ {
 
 		// perform a type switch on the
 		// current index, thereby allowing
@@ -1657,12 +1657,12 @@ along with a boolean value of false, although no panic will occur.
 In any scenario, a valid index within the bounds of the stack's length
 returns the intended slice along with boolean value of true.
 */
-func (r Stack) Index(i int) (slice any, ok bool) {
+func (r Stack) Index(idx int) (slice any, ok bool) {
 	if r.IsZero() {
 		return nil, false
 	}
 
-	slice, _, ok = r.stack.index(i)
+	slice, _, ok = r.stack.index(idx)
 	return
 }
 

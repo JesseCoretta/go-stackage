@@ -44,6 +44,14 @@ func TestCondition_IsPadded(t *testing.T) {
 	}
 }
 
+func TestCondition_IsEncap(t *testing.T) {
+	cond := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
+
+	if got := cond.IsEncap(); !got {
+		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
+	}
+}
+
 func ExampleCondition_basic() {
 	c := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
 	fmt.Printf("%s", c)

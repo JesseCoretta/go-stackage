@@ -787,8 +787,20 @@ func (r *stack) setEncap(x ...any) {
 }
 
 /*
-getJoinDelim is a private method called during the string representation
-process for a variety Stack designs.
+IsEncap returns a Boolean value indicative of whether value encapsulation
+characters have been set within the receiver.
+*/
+func (r Stack) IsEncap() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return len(r.stack.getEncap()) > 0
+}
+
+/*
+getEncap returns the current value encapsulation character pattern
+set within the receiver instance.
 */
 func (r *stack) getEncap() [][]string {
 	sc, _ := r.config()

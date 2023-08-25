@@ -25,7 +25,7 @@ this package:
 
 • Eq, or "equal to" (=)
 
-• Ne, or "not equal to" (!=)	// USE WITH CAUTION!!
+• Ne, or "not equal to" (!=)	!! USE WITH CAUTION !!
 
 • Lt, or "less than" (<)
 
@@ -468,6 +468,22 @@ func (r Condition) Encap(x ...any) Condition {
 
 	r.condition.cfg.setEncap(x...)
 	return r
+}
+
+/*
+IsEncap returns a Boolean value indicative of whether value encapsulation
+characters have been set within the receiver.
+*/
+func (r Condition) IsEncap() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return len(r.condition.getEncap()) > 0
+}
+
+func (r *condition) getEncap() [][]string {
+	return r.cfg.enc
 }
 
 /*

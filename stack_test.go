@@ -169,19 +169,24 @@ func TestStack_IsNesting(t *testing.T) {
 
 func TestAnd_002(t *testing.T) {
 
+	// make each OR condition look like "<...>" (including quotes)
+	O := Or().Paren().Encap(`"`, []string{`<`, `>`}).Push(
+		`sub_element_number_0`,
+		`sub_element_number_1`,
+	)
+
 	A := And().Paren().Push(
 		`top_element_number_0`,
-
-		// make each OR condition look like "<...>" (including quotes)
-		Or().Paren().Encap(`"`, []string{`<`, `>`}).Push(
-			`sub_element_number_0`,
-			`sub_element_number_1`,
-		),
+		O,
 	)
 
 	want := `( top_element_number_0 AND ( "<sub_element_number_0>" OR "<sub_element_number_1>" ) )`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+	}
+
+	if !O.IsEncap() {
+		t.Errorf("%s failed [IsEncap]: want '%t', got '%t'", t.Name(), true, false)
 	}
 }
 

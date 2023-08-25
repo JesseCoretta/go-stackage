@@ -112,7 +112,7 @@ const (
 	fwdidx                     //    32 // enable forward index support
 	joinl                      //    64 // list joining value
 	ronly                      //   128 // stack is read-only
-	nnest                      //   256 // stack does not allow stack/stack alias instances as slice members
+	nnest                      //   256 // stack/condition does not allow stack/stack alias instances as slice members or expression value
 	_                          //   512
 	_                          //  1024
 	_                          //  2048
@@ -150,7 +150,7 @@ func (r *nodeConfig) kind() (kind string) {
 	}
 
 	switch r.typ {
-	case and, or, not, list:
+	case and, or, not, list, cond:
 		kind = r.typ.String()
 	}
 

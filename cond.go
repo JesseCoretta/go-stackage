@@ -94,8 +94,8 @@ SetKeyword sets the receiver's keyword using the specified kw
 input argument.
 */
 func (r *Condition) SetKeyword(kw any) *Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.setKeyword(kw)
@@ -103,6 +103,10 @@ func (r *Condition) SetKeyword(kw any) *Condition {
 }
 
 func (r *condition) setKeyword(kw any) {
+	if r == nil {
+		r = initCondition()
+	}
+
 	switch tv := kw.(type) {
 	case string:
 		r.kw = tv
@@ -116,8 +120,8 @@ SetOperator sets the receiver's comparison operator using the
 specified Operator-qualifying input argument (op).
 */
 func (r *Condition) SetOperator(op Operator) *Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.setOperator(op)
@@ -125,6 +129,10 @@ func (r *Condition) SetOperator(op Operator) *Condition {
 }
 
 func (r *condition) setOperator(op Operator) {
+	if r == nil {
+		r = initCondition()
+	}
+
 	if len(op.Context()) > 0 && len(op.String()) > 0 {
 		r.op = op
 	}
@@ -135,8 +143,8 @@ SetExpression sets the receiver's expression value(s) using the
 specified ex input argument.
 */
 func (r *Condition) SetExpression(ex any) *Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.setExpression(ex)
@@ -144,9 +152,29 @@ func (r *Condition) SetExpression(ex any) *Condition {
 }
 
 func (r *condition) setExpression(ex any) {
+	if r == nil {
+		r = initCondition()
+	}
+
 	if v, ok := r.assertConditionExpressionValue(ex); ok {
 		r.ex = v
 	}
+}
+
+func (r condition) canAssignNester(x any) (ok bool) {
+	// if no-nesting bit is enabled ...
+	if r.positive(nnest) {
+
+		// ... and if the input value (x) is a
+		// Stack or Stack type alias, we'll invert
+		// the bool (ok) return.
+		_, ok = stackTypeAliasConverter(x)
+		return !ok
+	}
+
+	// if no-nesting bit is not enabled,
+	// assign whatever you want ...
+	return true
 }
 
 /*
@@ -173,7 +201,7 @@ tryPushPolicy will execute a push policy if one is set, and will return an error
 and a Boolean value indicative of the presence of said policy.
 */
 func (r *condition) tryPushPolicy(x any) (err error, found bool) {
-	if r.cfg.ppf != nil {
+	if found = r.cfg.ppf != nil; found {
 		// if we have a policy, always set
 		// found to true, regardless of the
 		// outcome
@@ -214,6 +242,7 @@ set-execution of the receiver, and is designed to prevent unwanted
 types from being assigned as the expression value (ex).
 */
 func (r *condition) assertConditionExpressionValue(x any) (X any, ok bool) {
+
 	switch tv := x.(type) {
 	case string:
 		if len(tv) > 0 {
@@ -231,23 +260,26 @@ func (r *condition) assertConditionExpressionValue(x any) (X any, ok bool) {
 defaultAssertionExpressionHandler is the catch-all private method called
 by condition.assertConditionExpressionValue.
 */
-func (r *condition) defaultAssertionExpressionHandler(x any) (X any) {
+func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
+
 	// Try to find a push policy first and, IF
 	// FOUND, run it and break out of the case
 	// statement either way.
-	if err, found := r.tryPushPolicy(x); err == nil {
+	if err, found := r.tryPushPolicy(x); found {
 		X = x
 		return
 	} else if err != nil {
 		r.setError(err)
-		return
-	} else if found {
 		return
 	}
 
 	// no push policy, so we'll see if the basic
 	// guidelines were satisfied, at least ...
 	if v, ok := stackTypeAliasConverter(x); ok {
+		if r.positive(nnest) {
+			return
+		}
+
 		// a user-created type alias of Stack
 		// was converted back to Stack without
 		// any issues ...
@@ -282,9 +314,9 @@ SetCategory assigns the provided string to the receiver internal category value.
 This allows for a means of identifying a particular kind of Condition in the midst
 of many.
 */
-func (r Condition) SetCategory(cat string) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetCategory(cat string) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.setCategory(cat)
@@ -305,8 +337,8 @@ func (r Condition) Category() string {
 /*
 Cond returns an instance of *Condition bearing the provided component values.
 */
-func Cond(kw any, op Operator, ex any) Condition {
-	return Condition{newCondition(kw, op, ex)}
+func Cond(kw any, op Operator, ex any) *Condition {
+	return &Condition{newCondition(kw, op, ex)}
 }
 
 /*
@@ -315,9 +347,9 @@ This is optional, and is usually only needed in complex Condition structures
 in which "labeling" certain components may be advantageous. It has no effect
 on an evaluation, nor should a name ever cause a validity check to fail.
 */
-func (r Condition) SetID(n string) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetID(n string) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.setID(n)
@@ -337,19 +369,22 @@ func (r Condition) ID() string {
 IsZero returns a Boolean value indicative of whether the receiver is nil,
 or unset.
 */
-func (r Condition) IsZero() bool {
+func (r *Condition) IsZero() bool {
+	if r == nil {
+		return true
+	}
+
 	return r.condition.isZero()
 }
 
 func (r *condition) isZero() bool {
 	if r == nil {
 		return true
+	} else if r.cfg == nil {
+		return true
 	}
 
-	return len(r.kw) == 0 &&
-		r.op == nil &&
-		r.ex == nil &&
-		r.cfg == nil
+	return false
 }
 
 /*
@@ -408,9 +443,9 @@ will allow the Evaluate method to return a more meaningful result.
 
 Specifying nil shall disable this capability if enabled.
 */
-func (r Condition) SetEvaluator(x Evaluator) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetEvaluator(x Evaluator) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.evl = x
@@ -423,9 +458,9 @@ This will allow the Valid method to return a more meaningful result.
 
 Specifying nil shall disable this capability if enabled.
 */
-func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetValidityPolicy(x ValidityPolicy) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.vpf = x
@@ -439,9 +474,9 @@ use when this type's String method is called.
 
 Specifying nil shall disable this capability if enabled.
 */
-func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetPresentationPolicy(x PresentationPolicy) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.rpf = x
@@ -461,9 +496,9 @@ slice values respectively. An instance of []string with only one (1)
 value is identical to providing a single string value, in that both
 L and R will use one value.
 */
-func (r Condition) Encap(x ...any) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) Encap(x ...any) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.setEncap(x...)
@@ -487,6 +522,86 @@ func (r *condition) getEncap() [][]string {
 }
 
 /*
+NoNesting sets the no-nesting bit within the receiver. If
+set to true, the receiver shall ignore any Stack or Stack
+type alias instance when pushed using the Push method. In
+such a case, only primitives, Conditions, etc., shall be
+honored during the Push operation.
+
+Note this will only have an effect when not using a custom
+PushPolicy. When using a custom PushPolicy, the user has
+total control -- and full responsibility -- in deciding
+what may or may not be pushed.
+
+Also note that setting or unsetting this bit shall not, in
+any way, have an impact on pre-existing Stack or Stack type
+alias instances within the receiver. This bit only has an
+influence on the Push method and only when set to true.
+
+A Boolean input value explicitly sets the bit as intended.
+Execution without a Boolean input value will *TOGGLE* the
+current state of the nesting bit (i.e.: true->false and
+false->true)
+*/
+func (r *Condition) NoNesting(state ...bool) *Condition {
+
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
+	}
+
+	if len(state) > 0 {
+		if state[0] {
+			r.condition.setOpt(nnest)
+		} else {
+			r.condition.unsetOpt(nnest)
+		}
+	} else {
+		r.condition.toggleOpt(nnest)
+	}
+
+	return r
+}
+
+/*
+CanNest returns a Boolean value indicative of whether
+the no-nesting bit is unset, thereby allowing a Stack
+or Stack type alias instance to be set as the value.
+
+See also the IsNesting method.
+*/
+func (r Condition) CanNest() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return !r.condition.positive(nnest)
+}
+
+/*
+IsNesting returns a Boolean value indicative of whether the
+underlying expression value is either a Stack or Stack type
+alias. If true, this indicates the expression value descends
+into another hierarchical (nested) context.
+*/
+func (r Condition) IsNesting() bool {
+	if r.IsZero() {
+		return false
+	}
+
+	return r.condition.isNesting()
+}
+
+/*
+isNesting is a private method called by Condition.IsNesting.
+*/
+func (r condition) isNesting() bool {
+	// If convertible is true, we know the
+	// instance (tv) is a stack alias.
+	_, convertible := stackTypeAliasConverter(r.ex)
+	return convertible
+}
+
+/*
 Paren sets the string-encapsulation bit for parenthetical
 expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
@@ -499,9 +614,9 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
-func (r Condition) Paren(state ...bool) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) Paren(state ...bool) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	if len(state) > 0 {
@@ -526,23 +641,42 @@ func (r Condition) IsParen() bool {
 		return false
 	}
 
-	return r.cfg.positive(parens)
+	return r.condition.positive(parens)
 }
 
 func (r *condition) toggleOpt(x cfgFlag) {
+	if r == nil {
+		r = initCondition()
+	}
+
 	r.cfg.toggleOpt(x)
 }
 
 func (r *condition) setOpt(x cfgFlag) {
+	if r.isZero() || r == nil {
+		r = initCondition()
+	}
+
 	r.cfg.setOpt(x)
 }
 
 func (r *condition) unsetOpt(x cfgFlag) {
+	if r == nil {
+		r = initCondition()
+	}
+
 	r.cfg.unsetOpt(x)
 }
 
+func (r *condition) positive(x cfgFlag) bool {
+	if r == nil {
+		r = initCondition()
+	}
+	return r.cfg.positive(x)
+}
+
 /*
-Padding sets the no-space-padding bit within the receiver.
+NoPadding sets the no-space-padding bit within the receiver.
 String values within the receiver shall not be padded using
 a single space character (ASCII #32).
 
@@ -551,19 +685,19 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the quotation bit (i.e.: true->false and
 false->true)
 */
-func (r Condition) NoPadding(state ...bool) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) NoPadding(state ...bool) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	if len(state) > 0 {
 		if state[0] {
-			r.condition.cfg.setOpt(nspad)
+			r.condition.setOpt(nspad)
 		} else {
-			r.condition.cfg.unsetOpt(nspad)
+			r.condition.unsetOpt(nspad)
 		}
 	} else {
-		r.condition.cfg.toggleOpt(nspad)
+		r.condition.toggleOpt(nspad)
 	}
 
 	return r
@@ -591,9 +725,9 @@ behavior without the involvement of a PushPolicy instance.
 
 Specifying nil shall disable this capability if enabled.
 */
-func (r Condition) SetPushPolicy(x PushPolicy) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+func (r *Condition) SetPushPolicy(x PushPolicy) *Condition {
+	if r.IsZero() {
+		*r = Condition{condition: initCondition()}
 	}
 
 	r.condition.cfg.ppf = x

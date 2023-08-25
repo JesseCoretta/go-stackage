@@ -413,7 +413,7 @@ func ExampleStack_Traverse() {
 
 	// An optional Condition "maker", same logic
 	// as above ...
-	cMaker := func(r Condition) Condition {
+	cMaker := func(r *Condition) *Condition {
 		// encapsulate in parens, no padding between
 		// kw, op and value ...
 		return r.Paren().NoPadding()
@@ -441,9 +441,9 @@ func ExampleStack_Traverse() {
 
 	// Bool returns shadowed only for brevity.
 	// Generally you should not do that ...
-	slice, _ := filter.Traverse(1, 1)  // Enter coordinates
-	condAssert, _ := slice.(Condition) // The return is any, so assert to what we expect
-	fmt.Printf("%s", condAssert)       // use its String method automagically
+	slice, _ := filter.Traverse(1, 1)   // Enter coordinates
+	condAssert, _ := slice.(*Condition) // The return is any, so assert to what we expect
+	fmt.Printf("%s", condAssert)        // use its String method automagically
 	// Output: (objectClass=shareholder)
 }
 

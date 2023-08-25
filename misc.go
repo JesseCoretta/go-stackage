@@ -328,3 +328,7 @@ func foldValue(do bool, value string) string {
 
 	return value // do not.
 }
+
+func isPtr(x any) bool {
+	return typOf(x).Kind() == reflect.Ptr
+}

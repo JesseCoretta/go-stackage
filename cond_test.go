@@ -36,6 +36,43 @@ func TestCondition_IsParen(t *testing.T) {
 	}
 }
 
+func TestCondition_NoNesting(t *testing.T) {
+	var c Condition
+	c.NoNesting(true)
+
+	if c.CanNest() {
+		t.Errorf("%s failed: want '%t', got '%t'", t.Name(), false, true)
+	}
+
+	c.SetKeyword(`myKeyword`)
+	c.SetOperator(Eq)
+	c.SetExpression(And().Push(`this`, `that`))
+
+	// value should NOT have been assigned.
+	if c.Expression() != nil {
+		t.Errorf("%s failed: want '%t', got '%t' [%T]", t.Name(), false, true, c.Expression())
+	}
+}
+
+func TestCondition_CanNest(t *testing.T) {
+	var c Condition
+	c.NoNesting(true)
+	if c.CanNest() {
+		t.Errorf("%s failed: want '%t', got '%t'", t.Name(), false, true)
+	}
+}
+
+func TestCondition_IsNesting(t *testing.T) {
+	var c Condition
+	c.SetKeyword(`myKeyword`)
+	c.SetOperator(Eq)
+	c.SetExpression(And().Push(`this`, `that`))
+
+	if !c.IsNesting() {
+		t.Errorf("%s failed: want '%t', got '%t'", t.Name(), true, false)
+	}
+}
+
 func TestCondition_IsPadded(t *testing.T) {
 	cond := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
 
@@ -60,10 +97,11 @@ func ExampleCondition_basic() {
 
 func ExampleCondition_stepByStep() {
 	var c Condition
+	c.Paren()
 	c.SetKeyword(`myKeyword`)
 	c.SetOperator(Eq)
 	c.SetExpression(`value123`)
 
 	fmt.Printf("%s", c)
-	// Output: myKeyword = value123
+	// Output: ( myKeyword = value123 )
 }

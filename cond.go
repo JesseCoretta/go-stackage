@@ -161,22 +161,6 @@ func (r *condition) setExpression(ex any) {
 	}
 }
 
-func (r condition) canAssignNester(x any) (ok bool) {
-	// if no-nesting bit is enabled ...
-	if r.positive(nnest) {
-
-		// ... and if the input value (x) is a
-		// Stack or Stack type alias, we'll invert
-		// the bool (ok) return.
-		_, ok = stackTypeAliasConverter(x)
-		return !ok
-	}
-
-	// if no-nesting bit is not enabled,
-	// assign whatever you want ...
-	return true
-}
-
 /*
 assertKeyword returns a valid keyword string value based on the input value.
 If the value is a string, it is returned as-is. Else, if a custom type that
@@ -284,10 +268,22 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 		// was converted back to Stack without
 		// any issues ...
 		X = v
+
 	} else if meth := getStringer(x); meth != nil {
 		// whatever it is, it seems to have
 		// a stringer method, at least ...
 		X = x
+
+	} else if isNumberPrimitive(x) {
+		// value is one of go's builtin
+		// numerical primitives, which
+		// are string represented using
+		// sprintf.
+		X = numberStringer(x)
+
+	} else if isStringPrimitive(x) {
+		// value is a simple string
+		X = x.(string)
 	}
 
 	return
@@ -407,7 +403,7 @@ func (r Condition) Valid() (err error) {
 
 	// if a validitypolicy was provided, use it
 	if r.condition.cfg.vpf != nil {
-		err = r.condition.cfg.vpf()
+		err = r.condition.cfg.vpf(r)
 		return
 	}
 
@@ -524,19 +520,9 @@ func (r *condition) getEncap() [][]string {
 /*
 NoNesting sets the no-nesting bit within the receiver. If
 set to true, the receiver shall ignore any Stack or Stack
-type alias instance when pushed using the Push method. In
-such a case, only primitives, Conditions, etc., shall be
-honored during the Push operation.
-
-Note this will only have an effect when not using a custom
-PushPolicy. When using a custom PushPolicy, the user has
-total control -- and full responsibility -- in deciding
-what may or may not be pushed.
-
-Also note that setting or unsetting this bit shall not, in
-any way, have an impact on pre-existing Stack or Stack type
-alias instances within the receiver. This bit only has an
-influence on the Push method and only when set to true.
+type alias instance when assigned using the SetExpression
+method. In such a case, only primitives, etc., shall be
+honored during the SetExpression operation.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
@@ -712,7 +698,7 @@ func (r Condition) IsPadded() bool {
 		return false
 	}
 
-	return !r.cfg.positive(nspad)
+	return !r.condition.positive(nspad)
 }
 
 /*
@@ -788,7 +774,7 @@ of the receiver instance.
 */
 func (r condition) string() string {
 	if r.cfg.rpf != nil {
-		return r.cfg.rpf()
+		return r.cfg.rpf(r)
 	}
 
 	// begin default presentation

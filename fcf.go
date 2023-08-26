@@ -46,7 +46,7 @@ validity of a stack based on its configuration and/or values.
 A ValidityPolicy function or method is executed via the Stack
 method Valid.
 */
-type ValidityPolicy func() error
+type ValidityPolicy func(any) error
 
 /*
 PresentationPolicy is a first-class (closure) function signature
@@ -59,4 +59,4 @@ String method(s).
 Note that basic Stack instances are ineligible for the process of
 string representation, thus no PresentationPolicy may be set.
 */
-type PresentationPolicy func() string
+type PresentationPolicy func(any) string

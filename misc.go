@@ -332,3 +332,88 @@ func foldValue(do bool, value string) string {
 func isPtr(x any) bool {
 	return typOf(x).Kind() == reflect.Ptr
 }
+
+func isNumberPrimitive(x any) bool {
+	switch x.(type) {
+	case int, int8, int16, int32, int64,
+		float32, float64, complex64, complex128,
+		uint, uint8, uint16, uint32, uint64, uintptr:
+		return true
+	}
+
+	return false
+}
+
+func isStringPrimitive(x any) bool {
+	switch x.(type) {
+	case string:
+		return true
+	}
+
+	return false
+}
+
+func numberStringer(x any) string {
+	switch tv := x.(type) {
+	case float32, float64:
+		return floatStringer(tv)
+	case complex64, complex128:
+		return complexStringer(tv)
+	case int, int8, int16, int32, int64:
+		return intStringer(tv)
+	case uint, uint8, uint16, uint32, uint64, uintptr:
+		return uintStringer(tv)
+	}
+
+	return `<invalid_number>`
+}
+
+func floatStringer(x any) string {
+	switch tv := x.(type) {
+	case float64:
+		return sprintf("%.02f", tv)
+	}
+
+	return sprintf("%.02f", x.(float32))
+}
+
+func complexStringer(x any) string {
+	switch tv := x.(type) {
+	case complex128:
+		return sprintf("%v", tv)
+	}
+
+	return sprintf("%v", x.(complex64))
+}
+
+func uintStringer(x any) string {
+	switch tv := x.(type) {
+	case uint8:
+		return sprintf("%d", tv)
+	case uint16:
+		return sprintf("%d", tv)
+	case uint32:
+		return sprintf("%d", tv)
+	case uint64:
+		return sprintf("%d", tv)
+	case uintptr:
+		return sprintf("%d", tv)
+	}
+
+	return sprintf("%d", x.(uint))
+}
+
+func intStringer(x any) string {
+	switch tv := x.(type) {
+	case int8:
+		return sprintf("%d", tv)
+	case int16:
+		return sprintf("%d", tv)
+	case int32:
+		return sprintf("%d", tv)
+	case int64:
+		return sprintf("%d", tv)
+	}
+
+	return sprintf("%d", x.(int))
+}

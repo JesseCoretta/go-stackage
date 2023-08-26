@@ -174,7 +174,7 @@ func (r Stack) Valid() (err error) {
 	// try to see if the user provided a
 	// validity function
 	if meth := r.getValidityPolicy(); meth != nil {
-		err = meth()
+		err = meth(r)
 	}
 
 	return
@@ -1442,7 +1442,7 @@ func (r stack) string() string {
 	// policy, if defined, instead of going any
 	// further.
 	if ppol := r.getPresentationPolicy(); ppol != nil {
-		return ppol()
+		return ppol(r)
 	}
 
 	// Scan each slice and attempt stringification

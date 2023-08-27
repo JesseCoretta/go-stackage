@@ -72,7 +72,7 @@ func TestStack_Insert(t *testing.T) {
 }
 
 func TestStack_Replace(t *testing.T) {
-	s := List().JoinDelim(`,`).Push(
+	s := List().SetDelimiter(rune(44)).Push(
 		`testing1`,
 		`testing2`,
 		`testing3`,
@@ -305,7 +305,7 @@ func TestAnd_005_nestedWithTraversal(t *testing.T) {
 
 func TestList_001(t *testing.T) {
 
-	A := List().JoinDelim(` `).Push(
+	A := List().SetDelimiter(rune(32)).Push(
 		`top_element_number_0`,
 		`top_element_number_1`,
 		`top_element_number_2`,
@@ -334,7 +334,7 @@ func TestList_001_withNoDelim(t *testing.T) {
 }
 
 func TestCustomStack001(t *testing.T) {
-	A := List().JoinDelim(`,`).Push(
+	A := List().SetDelimiter(`,`).Push(
 		`top_element_number_0`,
 		`top_element_number_1`,
 		`top_element_number_2`,
@@ -610,7 +610,7 @@ func ExampleBasic_withCapacity() {
 }
 
 func TestList_Join(t *testing.T) {
-	L := List().JoinDelim(`,`).Push(
+	L := List().SetDelimiter(`,`).Push(
 		`item1`,
 		`item2`,
 	)
@@ -625,8 +625,10 @@ func TestList_Join(t *testing.T) {
 This example demonstrates the creation of a list stack
 using comma delimitation.
 */
-func ExampleStack_JoinDelim() {
-	L := List().JoinDelim(`,`).Push(
+func ExampleStack_SetDelimiter() {
+	// note: one could also use a rune
+	// e.g: ',' or rune(44) for comma.
+	L := List().SetDelimiter(`,`).Push(
 		`item1`,
 		`item2`,
 	)

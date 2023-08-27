@@ -248,10 +248,22 @@ func (r *nodeConfig) setEncap(x ...any) {
 }
 
 /*
-setJoinDelim is a private method invoked by stack.setJoinDelim.
+setListDelimiter is a private method invoked by stack.setListDelimiter.
 */
-func (r *nodeConfig) setJoinDelim(x string) {
+func (r *nodeConfig) setListDelimiter(x string) {
+	if !eq(r.kind(), `list`) {
+		// don't set if stack is not a list
+		return
+	}
+
 	r.ljc = x
+}
+
+/*
+getListDelimiter is a private method invoked by stack.getListDelimiter.
+*/
+func (r nodeConfig) getListDelimiter() string {
+	return r.ljc
 }
 
 /*

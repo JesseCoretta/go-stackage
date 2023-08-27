@@ -18,6 +18,7 @@ var (
 	valOf   func(any) reflect.Value           = reflect.ValueOf
 	printf  func(string, ...any) (int, error) = fmt.Printf
 	sprintf func(string, ...any) string       = fmt.Sprintf
+	eq      func(string, string) bool         = strings.EqualFold
 	lc      func(string) string               = strings.ToLower
 	ilc     func(rune) bool                   = unicode.IsLower
 	uc      func(string) string               = strings.ToUpper

@@ -18,7 +18,7 @@ type stack []any
 /*
 List initializes and returns a new instance of Stack
 configured as a simple list. Stack instances of this
-design can be delimited using the JoinDelim method.
+design can be delimited using the SetDelimiter method.
 */
 func List(capacity ...int) Stack {
 	return Stack{newStack(list, capacity...)}
@@ -718,11 +718,19 @@ func (r Stack) ForwardIndices(state ...bool) Stack {
 }
 
 /*
-JoinDelim accepts input characters for use in controlled stack value
-joining when the underlying type is a list. The input value shall be
-used for joining delimitation.
+SetDelimiter accepts input characters (as string, or a single rune) for use
+in controlled stack value joining when the underlying stack type is a LIST.
+In such a case, the input value shall be used for delimitation of all slice
+values during the string representation process.
+
+A zero string, the NTBS (NULL) character -- ASCII #0 -- or nil, shall unset
+this value within the receiver.
+
+If this method is executed using any other stack type, the operation has no
+effect. If using Boolean AND, OR or NOT stacks and a character delimiter is
+preferred over a Boolean WORD, see the Stack.Symbol method.
 */
-func (r Stack) JoinDelim(x string) Stack {
+func (r Stack) SetDelimiter(x any) Stack {
 	if r.IsZero() {
 		return r
 	}
@@ -731,25 +739,56 @@ func (r Stack) JoinDelim(x string) Stack {
 		return r
 	}
 
-	r.stack.setJoinDelim(x)
+	r.stack.setListDelimiter(x)
 	return r
 }
 
 /*
-setJoinDelim is a private method called by Stack.JoinDelim.
+assertListDelimiter is a private function called (indirectly)
+by the Stack.SetDelimiter method for the purpose of handing
+type assertion for values that may express a particular value
+intended to serve as delimiter character for a LIST Stack when
+string representation is requested.
 */
-func (r *stack) setJoinDelim(x string) {
-	sc, _ := r.config()
-	sc.setJoinDelim(x)
+func assertListDelimiter(x any) (v string) {
+	if x == nil {
+		return
+	}
+
+	switch tv := x.(type) {
+	case string:
+		v = tv
+	case rune:
+		if tv != rune(0) {
+			v = string(tv)
+		}
+	}
+
+	return
 }
 
 /*
-getJoinDelim is a private method called during the string representation
-process for list-style Stack instances.
+Delimiter returns the delimiter string value currently set
+within the receiver instance.
 */
-func (r *stack) getJoinDelim() string {
+func (r Stack) Delimiter() string {
+	return r.stack.getListDelimiter()
+}
+
+/*
+setListDelimiter is a private method called by Stack.SetDelimiter
+*/
+func (r *stack) setListDelimiter(x any) {
 	sc, _ := r.config()
-	return sc.ljc
+	sc.setListDelimiter(assertListDelimiter(x))
+}
+
+/*
+getListDelimiter is a private method called by Stack.Delimiter.
+*/
+func (r *stack) getListDelimiter() string {
+	sc, _ := r.config()
+	return sc.getListDelimiter()
 }
 
 /*
@@ -1539,7 +1578,7 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			// Since we're dealing with a simple
 			// list-style stack, use pad char as
 			// the join value.
-			if ljc := r.getJoinDelim(); len(ljc) > 0 {
+			if ljc := r.getListDelimiter(); len(ljc) > 0 {
 				fstr = append(fstr, join(str, ljc))
 			} else {
 				fstr = append(fstr, join(str, pad))

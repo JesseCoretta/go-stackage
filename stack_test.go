@@ -240,7 +240,7 @@ func TestAnd_004(t *testing.T) {
 This example demonstrates ORed stack values using the double pipe (||) symbol
 and custom value encapsulation.
 */
-func ExampleOr_pipes() {
+func ExampleOr_symbolicOr() {
 	or := Or().
 		Paren().                                            // Add parenthesis
 		Symbol(`||`).                                       // Use double pipes for OR
@@ -249,6 +249,19 @@ func ExampleOr_pipes() {
 
 	fmt.Printf("%s\n", or)
 	// Output: ( "cn" || "sn" || "givenName" || "objectClass" || "uid" )
+}
+
+/*
+This example demonstrates ANDed stack values using the double ampersand (&&) symbol.
+*/
+func ExampleAnd_symbolicAnd() {
+	and := And().
+		Paren().                                       // Add parenthesis
+		Symbol(`&&`).                                  // Use double pipes for OR
+		Push(`condition1`, `condition2`, `condition3`) // Push these values now
+
+	fmt.Printf("%s\n", and)
+	// Output: ( condition1 && condition2 && condition3 )
 }
 
 func TestAnd_005_nestedWithTraversal(t *testing.T) {

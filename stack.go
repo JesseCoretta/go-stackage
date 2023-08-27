@@ -1550,7 +1550,13 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			// et al).
 			var tjn string
 			if len(r.getSymbol()) > 0 {
-				tjn = padValue(!r.positive(nspad), join(str, ot))
+				char := string(rune(32)) // by default, use WHSP padding for symbol ops
+				if r.positive(nspad) {
+					char = `` // ... unless user turns it off
+				}
+
+				sympad := padValue(!r.positive(nspad), char)
+				tjn = join(str, sprintf("%s%s%s", sympad, ot, sympad))
 			} else {
 				tjn = join(str, ot)
 			}

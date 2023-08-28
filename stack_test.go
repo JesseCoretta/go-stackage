@@ -635,3 +635,18 @@ func ExampleStack_SetDelimiter() {
 	fmt.Printf("%s", L)
 	// Output: item1,item2
 }
+
+/*
+This example demonstrates the creation of a list stack
+using comma delimitation.
+*/
+func ExampleStack_Delimiter() {
+        // note: one could also use a rune
+        // e.g: ',' or rune(44) for comma.
+        L := List().SetDelimiter(`,`).Push(
+                `item1`,
+                `item2`,
+        )
+	fmt.Printf("%s", L.Delimiter())
+        // Output: ,
+}

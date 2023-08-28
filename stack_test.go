@@ -638,7 +638,8 @@ func ExampleStack_SetDelimiter() {
 
 /*
 This example demonstrates the creation of a list stack
-using comma delimitation.
+using comma delimitation and the retrieval of the same
+delimiter value.
 */
 func ExampleStack_Delimiter() {
 	// note: one could also use a rune

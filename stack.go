@@ -442,6 +442,10 @@ func (r Stack) Reset() {
 reset is a private method called by Stack.Reset.
 */
 func (r *stack) reset() {
+	if r.isZero() {
+		return
+	}
+
 	if r.positive(ronly) {
 		return
 	}

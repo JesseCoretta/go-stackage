@@ -468,6 +468,10 @@ func (r Stack) Remove(idx int) (slice any, ok bool) {
 remove is a private method called by Stack.Remove.
 */
 func (r *stack) remove(idx int) (slice any, ok bool) {
+	if r.isZero() {
+		return
+	}
+
 	if r.positive(ronly) {
 		return
 	}

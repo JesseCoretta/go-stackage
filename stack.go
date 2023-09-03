@@ -1929,7 +1929,7 @@ with an implicit null uint8 value (0x0).
 */
 func (r stack) typ() (kind string, typ stackType) {
 	typ = r.stackType()
-	kind = typ.String()
+	kind = r.kind()
 	if sym := r.getSymbol(); len(sym) > 0 {
 		kind = sym
 	} else if !(typ == list || typ == basic) {

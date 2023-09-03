@@ -85,6 +85,11 @@ func (r stack) stackType() stackType {
 	return sc.stackType()
 }
 
+func (r stack) stackKind() string {
+	sc, _ := r.config()
+	return sc.kind()
+}
+
 func (r nodeConfig) isError() bool {
 	return r.err != nil
 }
@@ -151,11 +156,7 @@ func (r *nodeConfig) kind() (kind string) {
 
 	switch r.typ {
 	case and, or, not, list, cond:
-		kind = r.typ.String()
-	}
-
-	if r.positive(cfold) {
-		kind = lc(kind)
+		kind = foldValue(r.positive(cfold), r.typ.String())
 	}
 
 	return

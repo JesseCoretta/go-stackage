@@ -493,6 +493,7 @@ type Interface interface {
 	String() string
 	Category() string
 
+	Err() error
 	Valid() error
 
 	Logger() *log.Logger

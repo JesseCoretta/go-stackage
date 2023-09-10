@@ -55,6 +55,7 @@ func TestCondition_001(t *testing.T) {
 
 func TestCondition_customKeyword(t *testing.T) {
 	var c Condition
+	c.Init() // always init
 	c.SetKeyword(testKeyword05)
 	c.SetOperator(Gt)
 	c.SetExpression(complex(2, 3))
@@ -72,6 +73,7 @@ func TestCondition_customType(t *testing.T) {
 	cv := customTestValue{Type: `Color`, Value: `Red`}
 
 	var c Condition
+	c.Init() // always init
 	c.SetKeyword(testKeyword05)
 	c.SetOperator(Ne)
 	c.SetExpression(cv)
@@ -105,20 +107,19 @@ func TestCondition_IsParen(t *testing.T) {
 }
 
 func TestCondition_NoNesting(t *testing.T) {
-	var c Condition
+	var c Condition = Cond(`myKeyword`, Eq, `temporary_value`)
 	c.NoNesting(true)
 
 	if c.CanNest() {
 		t.Errorf("%s failed: want '%t', got '%t'", t.Name(), false, true)
+		return
 	}
 
-	c.SetKeyword(`myKeyword`)
-	c.SetOperator(Eq)
 	c.SetExpression(And().Push(`this`, `that`))
 
 	// value should NOT have been assigned.
-	if c.Expression() != nil {
-		t.Errorf("%s failed: want '%t', got '%t' [%T]", t.Name(), false, true, c.Expression())
+	if _, asserted := c.Expression().(string); !asserted {
+		t.Errorf("%s failed: want '%t', got '%t' [%T]", t.Name(), false, asserted, c.Expression())
 	}
 }
 
@@ -132,6 +133,7 @@ func TestCondition_CanNest(t *testing.T) {
 
 func TestCondition_IsNesting(t *testing.T) {
 	var c Condition
+	c.Init() // always init
 	c.SetKeyword(`myKeyword`)
 	c.SetOperator(Eq)
 	c.SetExpression(And().Push(`this`, `that`))
@@ -165,6 +167,7 @@ func ExampleCondition_basic() {
 
 func ExampleCondition_stepByStep() {
 	var c Condition
+	c.Init() // always init
 	c.Paren()
 	c.SetKeyword(`myKeyword`)
 	c.SetOperator(Eq)

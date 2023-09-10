@@ -3,8 +3,11 @@ package stackage
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math/rand" // not for crypto, don't worry :)
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -14,75 +17,48 @@ import (
 frequently-used package import function aliases.
 */
 var (
-	typOf   func(any) reflect.Type            = reflect.TypeOf
-	valOf   func(any) reflect.Value           = reflect.ValueOf
-	printf  func(string, ...any) (int, error) = fmt.Printf
-	sprintf func(string, ...any) string       = fmt.Sprintf
-	eq      func(string, string) bool         = strings.EqualFold
-	lc      func(string) string               = strings.ToLower
-	ilc     func(rune) bool                   = unicode.IsLower
-	uc      func(string) string               = strings.ToUpper
-	iuc     func(rune) bool                   = unicode.IsUpper
-	split   func(string, string) []string     = strings.Split
-	trimS   func(string) string               = strings.TrimSpace
-	join    func([]string, string) string     = strings.Join
-	now     func() time.Time                  = time.Now
+	typOf   func(any) reflect.Type              = reflect.TypeOf
+	valOf   func(any) reflect.Value             = reflect.ValueOf
+	printf  func(string, ...any) (int, error)   = fmt.Printf
+	sprintf func(string, ...any) string         = fmt.Sprintf
+	eq      func(string, string) bool           = strings.EqualFold
+	lc      func(string) string                 = strings.ToLower
+	ilc     func(rune) bool                     = unicode.IsLower
+	uc      func(string) string                 = strings.ToUpper
+	iuc     func(rune) bool                     = unicode.IsUpper
+	rplc    func(string, string, string) string = strings.ReplaceAll
+	qt      func(string) string                 = strconv.Quote
+	uq      func(string) (string, error)        = strconv.Unquote
+	split   func(string, string) []string       = strings.Split
+	trimS   func(string) string                 = strings.TrimSpace
+	join    func([]string, string) string       = strings.Join
+	now     func() time.Time                    = time.Now
 )
 
-/*
-Message is an optional type for use when a user-supplied Message channel has
-been initialized and provided to one (1) or more Stack or Condition instances.
+const (
+	randChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randIDSize = 24
+)
 
-Instances of this type shall contain diagnostic, error and debug information
-pertaining to current operations of the given Stack or Condition instance.
-*/
-type Message struct {
-	ID   string    `json:"id"`
-	Msg  string    `json:"message"`
-	Tag  string    `json:"message_tag"`
-	Type string    `json:"message_type"`
-	Addr string    `json:"memory_address"`
-	Len  int       `json:"current_length"`
-	Cap  int       `json:"maximum_length,omitempty"` // omit if zero, meaning no cap was set.
-	Time time.Time `json:"current_time"`
+func randomID(n int) string {
+	id := make([]byte, n)
+	for i := range id {
+		id[i] = randChars[rand.Int63()%int64(len(randChars))]
+	}
+	return string(id)
 }
 
-/*
-String is a stringer method that returns the string representation
-of the receiver instance.
-*/
-func (r Message) String() string {
-	if !r.Valid() {
-		return ``
-	}
+func timestamp() string {
+	t := now()
 
-	time := sprintf("[%04d%02d%02d%02d%02d%02d]",
-		r.Time.Year(),
-		r.Time.Month(),
-		r.Time.Day(),
-		r.Time.Hour(),
-		r.Time.Minute(),
-		r.Time.Second())
-
-	var msgid string = sprintf("[%s][%s::%s]", time, r.Type, r.Addr)
-	if len(r.ID) > 0 {
-		msgid = sprintf("[%s::%s(%s)]", r.Type, r.ID, msgid)
-	}
-	var lencap string = sprintf("[%d/%d]", r.Len, r.Cap)
-
-	return sprintf("%s%s [%s] %s", msgid, lencap, r.Tag, r.Msg)
-}
-
-/*
-Valid returns a Boolean value indicative of whether the receiver
-is perceived to be valid.
-*/
-func (r Message) Valid() bool {
-	return (r.Type != `UNKNOWN` &&
-		len(r.Addr) > 0 &&
-		!r.Time.IsZero() &&
-		len(r.Msg) > 0 &&
-		len(r.Tag) > 0)
+	return sprintf("%04d%02d%02d%02d%02d%02d.%09d",
+		t.Year(),
+		t.Month(),
+		t.Day(),
+		t.Hour(),
+		t.Minute(),
+		t.Second(),
+		t.Nanosecond())
 }
 
 /*
@@ -176,6 +152,10 @@ of Stack. This will only work if input value u is a type alias of Stack. An
 instance of Stack is returned along with a success-indicative Boolean value.
 */
 func stackTypeAliasConverter(u any) (S Stack, converted bool) {
+	if u == nil {
+		return
+	}
+
 	// If it isn't a Stack alias, but is a
 	// genuine Stack, just pass it back
 	// with a thumbs-up ...
@@ -185,10 +165,19 @@ func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 		return
 	}
 
-	a := typOf(u)       // current (src) type
+	a := typOf(u) // current (src) type
+	v := valOf(u) // current (src) value
+
+	// unwrap any pointers for
+	// maximum compatibility
+	if isPtr(u) {
+		a = a.Elem()
+		v = v.Elem()
+	}
+
 	b := typOf(Stack{}) // target (dest) type
 	if a.ConvertibleTo(b) {
-		X := valOf(u).Convert(b).Interface()
+		X := v.Convert(b).Interface()
 		if assert, ok := X.(Stack); ok {
 			if !assert.IsZero() {
 				if s := assert.String(); s != badStack && len(s) > 0 {
@@ -209,6 +198,10 @@ of Condition. This will only work if input value u is a type alias of Condition.
 instance of Condition is returned along with a success-indicative Boolean value.
 */
 func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
+	if u == nil {
+		return
+	}
+
 	// If it isn't a Condition alias, but is a
 	// genuine Condition, just pass it back
 	// with a thumbs-up ...
@@ -218,10 +211,19 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 		return
 	}
 
-	a := typOf(u)       // current (src) type
-	b := typOf(Stack{}) // target (dest) type
+	a := typOf(u) // current (src) type
+	v := valOf(u) // current (src) value
+
+	// unwrap any pointers for
+	// maximum compatibility
+	if isPtr(u) {
+		a = a.Elem()
+		v = v.Elem()
+	}
+
+	b := typOf(Condition{}) // target (dest) type
 	if a.ConvertibleTo(b) {
-		X := valOf(u).Convert(b).Interface()
+		X := v.Convert(b).Interface()
 		if assert, ok := X.(Condition); ok {
 			if !assert.IsZero() {
 				if s := assert.String(); s != badCond && len(s) > 0 {
@@ -259,11 +261,39 @@ func getStringer(x any) func() string {
 }
 
 /*
+getIDFunc uses reflect to obtain and return a given
+type instance's ID method, if present. If not, a zero
+string is returned.
+*/
+func getIDFromAny(x any) func() string {
+	if x == nil {
+		return nil
+	}
+
+	v := valOf(x)
+	if v.IsZero() {
+		return nil
+	}
+
+	method := v.MethodByName(`ID`)
+	if method.Kind() == reflect.Invalid {
+		return nil
+	}
+
+	if meth, ok := method.Interface().(func() string); ok {
+		return meth
+	}
+
+	return nil
+}
+
+/*
 a quick means of getting the caller name for logging purposes.
 */
 func fmname() string {
 	x, _, _, _ := runtime.Caller(1)
-	return runtime.FuncForPC(x).Name()
+	name := split(runtime.FuncForPC(x).Name(), string(rune(46)))
+	return uc(name[len(name)-1])
 }
 
 /*
@@ -331,6 +361,10 @@ func foldValue(do bool, value string) string {
 }
 
 func isPtr(x any) bool {
+	if x == nil {
+		return false
+	}
+
 	return typOf(x).Kind() == reflect.Ptr
 }
 
@@ -417,4 +451,49 @@ func intStringer(x any) string {
 	}
 
 	return sprintf("%d", x.(int))
+}
+
+/*
+Element is an interface type qualified through instances of the
+following types:
+
+• Stack
+
+• Condition
+
+This interface type offers users an alternative to the tedium of
+repeated type assertion for every Stack and Condition instance they
+encounter. This may be particularly useful in situations where the
+act of traversal is conducted upon a Stack instance that contains
+myriad hierarchies and nested contexts of varying types.
+
+This is not a complete "replacement" for the explicit use of package
+defined types nor their aliased counterparts. The Element interface
+only extends methods that are read-only in nature AND common to both
+of the above types (and any aliased counterparts).
+
+To access the entire breadth of available methods for the underlying
+type instance, manual type assertion shall be necessary.
+
+Users SHOULD adopt this interface signature for use in their solutions
+as needed, though it is not strictly required.
+*/
+type Element interface {
+	Len() int
+
+	IsInit() bool
+	IsZero() bool
+	CanNest() bool
+	IsParen() bool
+	IsEncap() bool
+	IsPadded() bool
+	IsNesting() bool
+
+	ID() string
+	String() string
+	Category() string
+
+	Valid() error
+
+	Logger() *log.Logger
 }

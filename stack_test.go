@@ -285,21 +285,25 @@ func TestAnd_005_nestedWithTraversal(t *testing.T) {
 	want := `top_element_number_0 AND (sub_element_number_0 OR sub_element_number_1) AND NOT (unwanted_element_number_0 OR unwanted_element_number_1)`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	slice, ok := A.Traverse(2, 0, 1)
 	if !ok {
 		t.Errorf("%s failed: got '%T' during traversal, want non-nil", t.Name(), slice)
+		return
 	}
 
 	strAssert, strOK := slice.(string)
 	if !strOK {
 		t.Errorf("%s failed: want '%T', got '%T' during assertion", t.Name(), ``, slice)
+		return
 	}
 
 	want = `unwanted_element_number_1`
 	if want != strAssert {
-		t.Errorf("%s failed: want '%T', got '%T'", t.Name(), want, strAssert)
+		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, strAssert)
+		return
 	}
 }
 
@@ -383,7 +387,6 @@ func TestCustomStack002_ldapFilter(t *testing.T) {
 func TestCustomStack003_nested(t *testing.T) {
 	maker := func(r Stack) Stack {
 		return r.Paren().LeadOnce().NoPadding()
-		//.SetMessageChan(ch)
 	}
 
 	Ands := maker(And().Symbol('&')).Encap(testParens).SetID(`filtery`)
@@ -426,7 +429,7 @@ func ExampleStack_Traverse() {
 
 	// An optional Condition "maker", same logic
 	// as above ...
-	cMaker := func(r *Condition) *Condition {
+	cMaker := func(r Condition) Condition {
 		// encapsulate in parens, no padding between
 		// kw, op and value ...
 		return r.Paren().NoPadding()
@@ -455,8 +458,13 @@ func ExampleStack_Traverse() {
 	// Bool returns shadowed only for brevity.
 	// Generally you should not do that ...
 	slice, _ := filter.Traverse(1, 1)   // Enter coordinates
-	condAssert, _ := slice.(*Condition) // The return is any, so assert to what we expect
-	fmt.Printf("%s", condAssert)        // use its String method automagically
+	condAssert, ok := slice.(Condition) // The return is any, so assert to what we expect
+	if !ok {
+		fmt.Printf("Type Assertion failed: %T is not expected value\n", slice)
+		return
+	}
+
+	fmt.Printf("%s", condAssert) // use its String method automagically
 	// Output: (objectClass=shareholder)
 }
 
@@ -650,4 +658,156 @@ func ExampleStack_Delimiter() {
 	)
 	fmt.Printf("%s", L.Delimiter())
 	// Output: ,
+}
+
+func TestElement(t *testing.T) {
+	var elem Element
+	elem = Cond(`greeting`, Eq, `Hello`)
+	want := `greeting = Hello`
+	got := elem.String()
+	if want != got {
+		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
+	}
+}
+
+func TestStack_Reveal_experimental001(t *testing.T) {
+	thisIsMyNightmare := And().Push(
+		`this1`,
+		Or().Mutex().Push(
+			And().Push(Cond(`keyword`, Eq, "somevalue")),
+			And().Push(
+				`this4`,
+				Not().Mutex().Push(
+					Or().Push(
+						Cond(`dayofweek`, Ne, "Wednesday"),
+						Cond(`ssf`, Ge, "128"),
+					),
+				).Paren(),
+			),
+			And().Push(
+				Or().Push(
+					Cond(`keyword2`, Lt, "someothervalue"),
+				),
+			),
+		).Paren(),
+		`this2`,
+	)
+
+	type row struct {
+		Index int
+		Path  [][]int
+		Want  string
+		Value any
+	}
+
+	table := []row{
+		{0, [][]int{{1, 2, 0, 0}, {1, 2}}, ``, nil},
+		{1, [][]int{{1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}}, ``, nil},
+	}
+
+	// Scan the target values we'll be using for
+	// comparison after processing completes.
+	for idx, tst := range table {
+		slice, _ := thisIsMyNightmare.Traverse(tst.Path[0]...)
+		var c Condition
+		var ok bool
+		if c, ok = slice.(Condition); !ok {
+			t.Errorf("%s failed [idx:%d;pre-mod:path:%v]: unexpected assertion result:\nwant: %T\ngot:  %s",
+				t.Name(), idx, tst.Path[0], c, slice.(string))
+			return
+		}
+		table[idx].Want = c.String()
+		tst.Value = c
+	}
+
+	// save for comparison later
+	var want string = thisIsMyNightmare.String()
+
+	// do reveal recursion
+	thisIsMyNightmare.Reveal()
+
+	// make sure the complete string is identical
+	// before and after.
+	if got := thisIsMyNightmare.String(); want != got {
+		t.Errorf("%s failed [main strcmp]:\nwant '%s'\ngot  '%s',",
+			t.Name(), want, got)
+		return
+	}
+
+	// Scan the updated values at the defined paths
+	// and compare to original target values.
+	for idx, tst := range table {
+		slice, _ := thisIsMyNightmare.Traverse(tst.Path[1]...)
+		val, ok := slice.(Condition)
+		if !ok {
+			t.Errorf("%s failed [idx:%d;post-mod]: unexpected assertion result:\nwant: %T\ngot:  %T",
+				t.Name(), idx, val, slice)
+			return
+		}
+
+		if gval := val.String(); tst.Want != gval {
+			t.Errorf("%s failed [idx:%d;strcmp]:\nwant '%s'\ngot  '%s',",
+				t.Name(), idx, tst.Want, gval)
+		}
+	}
+}
+
+func TestDefrag_experimental_001(t *testing.T) {
+	// this list contains an assortment of
+	// values mixed in with nils.
+	var l Stack = List().Push(
+		`this`,
+		nil,
+		`that`,
+		nil,
+		`those`,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		3.14159,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		nil,
+		`moar`,
+		`moar`,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	offset := 13         // number of nil occurrences
+	beforeLen := l.Len() // record preop len
+
+	// verify no errors resulted from the attempt
+	// to defragment our stack
+	if err := l.Defrag().Err(); err != nil {
+		t.Errorf("%s failed: %v", t.Name(), err)
+		return
+	}
+
+	// verify starting length minus offset is equal
+	// to the result length, meaning <offset> slices
+	// were truncated.
+	offsetLen := beforeLen - offset
+	if afterLen := l.Len(); offsetLen != afterLen {
+		t.Errorf("%s failed: unexpected length; want '%d', got '%d'",
+			t.Name(), offsetLen, afterLen)
+		return
+	}
+}
+
+func init() {
+	//SetDefaultStackLogger(`stdout`)
+	//SetDefaultConditionLogger(`stdout`)
 }

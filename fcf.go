@@ -1,7 +1,8 @@
 package stackage
 
 /*
-fcf.go contains first-class (closure) function signature definitions.
+fcf.go contains first-class (closure) function signature and
+interface definitions.
 */
 
 /*
@@ -36,7 +37,7 @@ Stack additions, unsupported types, etc.
 A PushPolicy function or method is executed for each
 element being added to a Stack via its Push method.
 */
-type PushPolicy func(any) error
+type PushPolicy func(...any) error
 
 /*
 ValidityPolicy is a first-class (closure) function signature
@@ -46,7 +47,7 @@ validity of a stack based on its configuration and/or values.
 A ValidityPolicy function or method is executed via the Stack
 method Valid.
 */
-type ValidityPolicy func(any) error
+type ValidityPolicy func(...any) error
 
 /*
 PresentationPolicy is a first-class (closure) function signature
@@ -59,4 +60,4 @@ String method(s).
 Note that basic Stack instances are ineligible for the process of
 string representation, thus no PresentationPolicy may be set.
 */
-type PresentationPolicy func(any) string
+type PresentationPolicy func(...any) string

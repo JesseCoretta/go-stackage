@@ -1,6 +1,10 @@
 package stackage
 
-import "sync"
+import (
+	"log"
+	"sync"
+	"time"
+)
 
 /*
 nodeConfig contains configuration information that is
@@ -19,7 +23,7 @@ type nodeConfig struct {
 	ppf PushPolicy         // closure filterer
 	vpf ValidityPolicy     // closure validator
 	rpf PresentationPolicy // closure stringer
-	msg chan Message       // optional debug/err chan interface
+	log *log.Logger        // Logging subsystem
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)
@@ -28,6 +32,7 @@ type nodeConfig struct {
 	sym string      // stacks only: user-controlled symbol char(s)
 	ljc string      // [list] stacks only: joining delim
 	mtx *sync.Mutex // stacks only: optional locking system
+	ldr *time.Time  // for lock duration
 }
 
 /*
@@ -35,6 +40,8 @@ cfgFlag contains left-shifted bit values that can represent
 one of several configuration "flag states".
 */
 type cfgFlag uint16
+
+var cfgFlagMap map[cfgFlag]string
 
 /*
 ONE of 'and', 'or', 'not' or 'list'
@@ -71,6 +78,8 @@ func (r stackType) String() string {
 		t = `LIST`
 	case basic:
 		t = `BASIC`
+	case cond:
+		t = `CONDITION` // just for logging
 	}
 
 	return t
@@ -94,12 +103,20 @@ func (r nodeConfig) isError() bool {
 	return r.err != nil
 }
 
-func (r nodeConfig) error() error {
+func (r nodeConfig) getErr() error {
 	return r.err
 }
 
-func (r *nodeConfig) setError(err error) {
+func (r *nodeConfig) setErr(err error) {
 	r.err = err
+}
+
+func (r *nodeConfig) setLogger(logger *log.Logger) {
+	r.log = logger
+}
+
+func (r nodeConfig) getLogger() *log.Logger {
+	return r.log
 }
 
 /*
@@ -176,7 +193,8 @@ func (r *nodeConfig) valid() (err error) {
 		return
 	}
 
-	return r.error()
+	err = r.getErr()
+	return
 }
 
 /*
@@ -345,8 +363,30 @@ func (r *cfgFlag) shift(x cfgFlag) {
 }
 
 /*
-unsetOpt sets the specified cfgFlag to "off" within the receiver's
-opt field.
+   parens cfgFlag = 1 << iota //     1 // current stack (not its values) should be encapsulated it in parenthesis in string representation
+   cfold                      //     2 // fold case of 'AND', 'OR' and 'NOT' to 'and', 'or' and 'not' or vice versa        nspad                      //     4 // don't pad slices with a single space character when represented as a string
+   lonce                      //     8 // only use operator once per stack, and only as the leading element; mainly for LDAP filters
+   negidx                     //    16 // enable negative index support
+   fwdidx                     //    32 // enable forward index support
+   joinl                      //    64 // list joining value
+   ronly                      //   128 // stack is read-only
+   nnest
+*/
+
+func (r cfgFlag) String() (f string) {
+	for k, v := range cfgFlagMap {
+		if k == r {
+			f = v
+			break
+		}
+	}
+
+	return
+}
+
+/*
+setMutex enables the receiver's mutual exclusion
+locking capabilities.
 */
 func (r *nodeConfig) setMutex() {
 	if err := r.valid(); err != nil {
@@ -410,11 +450,33 @@ func (r *cfgFlag) toggle(x cfgFlag) {
 mutex returns the *sync.Mutext instance, alongside a presence-indicative
 Boolean value.
 */
-func (r *stack) mutex() (mutex *sync.Mutex, found bool) {
+func (r *stack) mutex() (*sync.Mutex, bool) {
 	sc, _ := r.config()
 	return sc.mtx, sc.mtx != nil
 }
 
 func (r *nodeConfig) canWriteMessage() bool {
-	return r.msg != nil
+	if err := r.valid(); err != nil {
+		return false
+	}
+
+	if r.log == nil {
+		r.log = devNull
+	}
+
+	return r.log != devNull
+}
+
+func init() {
+	cfgFlagMap = map[cfgFlag]string{
+		parens: `parenthetical`,
+		negidx: `neg_index`,
+		fwdidx: `fwd_index`,
+		cfold:  `case_fold`,
+		nspad:  `no_whsp_pad`,
+		lonce:  `lead_once`,
+		joinl:  `join_list`,
+		ronly:  `read_only`,
+		nnest:  `no_nest`,
+	}
 }

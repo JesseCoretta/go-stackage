@@ -660,8 +660,8 @@ func ExampleStack_Delimiter() {
 	// Output: ,
 }
 
-func TestElement(t *testing.T) {
-	var elem Element
+func TestInterface(t *testing.T) {
+	var elem Interface
 	elem = Cond(`greeting`, Eq, `Hello`)
 	want := `greeting = Hello`
 	got := elem.String()

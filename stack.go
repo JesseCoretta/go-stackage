@@ -2002,7 +2002,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 			// descend into inner slice #0
 			child, _, _ := inner.index(0)
 			cid := getLogID(``)
-			assert, ok := child.(Element)
+			assert, ok := child.(Interface)
 			if ok {
 				cid = getLogID(assert.ID())
 			}
@@ -2134,7 +2134,7 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 			// Stack *OR* a Stack alias, traverse it ...
 			expr := c.Expression()
 			var id string = getLogID(``)
-			if assert, aok := expr.(Element); aok {
+			if assert, aok := expr.(Interface); aok {
 				id = getLogID(assert.ID())
 			}
 			r.debug(sprintf("%s: descending into %T:%d:%s at %v", fname, expr, idx, id, indices))

@@ -500,7 +500,7 @@ return of one (1); this includes slice types, maps, arrays and any other
 type that supports multiple values.
 
 This capability was added to this type to mirror that of the Stack type in
-order to allow additional functionality to be added to the Element interface.
+order to allow additional functionality to be added to the Interface interface.
 */
 func (r Condition) Len() int {
 	if !r.IsInit() {

@@ -490,6 +490,7 @@ type Interface interface {
 	IsNesting() bool
 
 	ID() string
+	Addr() string
 	String() string
 	Category() string
 

@@ -27,30 +27,21 @@ The disposition of the evaluation is expressed through one (1) of
 several ComparisonOperator (op) instances made available through
 this package:
 
-• Eq, or "equal to" (=)
-
-• Ne, or "not equal to" (!=)	!! USE WITH CAUTION !!
-
-• Lt, or "less than" (<)
-
-• Le, or "less than or equal" (<=)
-
-• Gt, or "greater than" (>)
-
-• Ge, or "greater than or equal" (>=)
+  - Eq, or "equal to" (=)
+  - Ne, or "not equal to" (!=)	!! USE WITH CAUTION !!
+  - Lt, or "less than" (<)
+  - Le, or "less than or equal" (<=)
+  - Gt, or "greater than" (>)
+  - Ge, or "greater than or equal" (>=)
 
 ... OR through a user-defined operator that conforms to the package
 defined Operator interface.
 
 By default, permitted expression (ex) values must honor these guidelines:
 
-• Must be a non-zero string, OR ...
-
-• Must be a valid instance of Stack (or an *alias* of Stack that is convertible back
-to the Stack type), OR ...
-
-• Must be a valid instance of any type that exports a stringer method (String())
-intended to produce the Condition's final expression string representation
+  - Must be a non-zero string, OR ...
+  - Must be a valid instance of Stack (or an *alias* of Stack that is convertible back to the Stack type), OR ...
+  - Must be a valid instance of any type that exports a stringer method (String()) intended to produce the Condition's final expression string representation
 
 However when a PushPolicy function or method is added to an instance of this type,
 greater control is afforded to the user in terms of what values will be accepted,
@@ -195,18 +186,15 @@ default package logger.
 
 The following types/values are permitted:
 
-• string: `none`, `off`, `null`, `discard` will turn logging off *
+  - string: `none`, `off`, `null`, `discard` will turn logging off
+  - string: `stdout` will set basic STDOUT logging
+  - string: `stderr` will set basic STDERR logging
+  - int: 0 will turn logging off
+  - int: 1 will set basic STDOUT logging
+  - int: 2 will set basic STDERR logging
+  - *log.Logger: user-defined *log.Logger instance will be set; it should not be nil
 
-• string: `stderr` or `errors` will set basic stderr logging *
-
-• int: 0 will turn logging off
-
-• int: 1 will set basic stderr logging
-
-• *log.Logger: user-defined *log.Logger instance will be set; it
-should not be nil
-
-*Case is not significant in the string matching process.
+Case is not significant in the string matching process.
 
 Logging may also be set globally using the SetDefaultLogger
 package level function. Similar semantics apply.
@@ -489,13 +477,10 @@ Len returns a "perceived" abstract length relating to the content (or lack
 thereof) assigned to the receiver instance:
 
 • An uninitialized or zero instance returns zero (0)
-
 • An initialized instance with no Expression assigned (nil) returns zero (0)
+• A Stack or Stack type alias assigned as the Expression shall impose its own stack length as the return value (even if zero (0))
 
-• A Stack or Stack type alias assigned as the Expression shall impose its
-own stack length as the return value (even if zero (0)).
-
-• All other type instances assigned as an Expression shall result in a
+All other type instances assigned as an Expression shall result in a
 return of one (1); this includes slice types, maps, arrays and any other
 type that supports multiple values.
 
@@ -700,14 +685,13 @@ func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
 Encap accepts input characters for use in controlled condition value
 encapsulation. Acceptable input types are:
 
-• string - a single string value will be used for both L and R
-encapsulation.
+A single string value will be used for both L and R encapsulation.
 
-• string slices - An instance of []string with two (2) values will
-be used for L and R encapsulation using the first and second
-slice values respectively. An instance of []string with only one (1)
-value is identical to providing a single string value, in that both
-L and R will use one value.
+An instance of []string with two (2) values will be used for L and R
+encapsulation using the first and second slice values respectively.
+
+An instance of []string with only one (1) value is identical to the act of
+providing a single string value, in that both L and R will use one value.
 */
 func (r Condition) Encap(x ...any) Condition {
 	if r.condition == nil {

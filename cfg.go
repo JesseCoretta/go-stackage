@@ -33,6 +33,7 @@ type nodeConfig struct {
 	ljc string      // [list] stacks only: joining delim
 	mtx *sync.Mutex // stacks only: optional locking system
 	ldr *time.Time  // for lock duration
+	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
 }
 
 /*

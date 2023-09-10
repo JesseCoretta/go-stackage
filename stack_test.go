@@ -602,6 +602,35 @@ func ExampleBasic_setAsReadOnly() {
 	// Output: first try: 2 vs. second try: 1
 }
 
+func ExampleStack_Pop_lIFO() {
+	b := Basic()
+	b.Push(
+		float64(3.14159),
+		float32(-9.378),
+		-1,
+		`banana`,
+	)
+
+	popped, _ := b.Pop()
+	fmt.Printf("%T, length now: %d", popped, b.Len())
+	// Output: string, length now: 3
+}
+
+func ExampleStack_Pop_fIFO() {
+	b := Basic()
+	b.SetFIFO(true)
+	b.Push(
+		float64(3.14159),
+		float32(-9.378),
+		-1,
+		`banana`,
+	)
+
+	popped, _ := b.Pop()
+	fmt.Printf("%T, length now: %d", popped, b.Len())
+	// Output: float64, length now: 3
+}
+
 /*
 This example demonstrates the creation of a basic stack
 and an enforced capacity constraint.

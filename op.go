@@ -55,17 +55,12 @@ ComparisonOperator is a uint8 enumerated type used for abstract
 representation of the following well-known and package-provided
 operators:
 
-• Equal (=)
-
-• Not Equal (!=)
-
-• Less Than (<)
-
-• Greater Than (>)
-
-• Less Than Or Equal (<=)
-
-• Greater Than Or Equal (>=)
+  - Equal (=)
+  - Not Equal (!=)
+  - Less Than (<)
+  - Greater Than (>)
+  - Less Than Or Equal (<=)
+  - Greater Than Or Equal (>=)
 
 Instances of this type should be passed to Cond as the 'op' value.
 */

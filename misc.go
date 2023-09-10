@@ -455,11 +455,10 @@ func intStringer(x any) string {
 
 /*
 Interface is an interface type qualified through instances of the
-following types:
+following types (whether native, or type-aliased):
 
-• Stack
-
-• Condition
+  - Stack
+  - Condition
 
 This interface type offers users an alternative to the tedium of
 repeated type assertion for every Stack and Condition instance they
@@ -470,13 +469,13 @@ myriad hierarchies and nested contexts of varying types.
 This is not a complete "replacement" for the explicit use of package
 defined types nor their aliased counterparts. The Interface interface
 only extends methods that are read-only in nature AND common to both
-of the above types (and any aliased counterparts).
+of the above categories.
 
 To access the entire breadth of available methods for the underlying
 type instance, manual type assertion shall be necessary.
 
 Users SHOULD adopt this interface signature for use in their solutions
-as needed, though it is not strictly required.
+if and when needed, though it is not a requirement.
 */
 type Interface interface {
 	Len() int

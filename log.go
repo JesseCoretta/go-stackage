@@ -40,15 +40,13 @@ this default package logger.
 
 The following types/values are permitted:
 
-• string: `none`, `off`, `null`, `discard` will turn logging off
-
-• string: `stderr` or `errors` will set basic stderr logging
-
-• int: 0 will turn logging off
-
-• int: 1 will set basic stderr logging
-
-• *log.Logger: user-defined *log.Logger instance will be set
+  - string: `none`, `off`, `null`, `discard` will turn logging off
+  - string: `stdout` will set basic STDOUT logging
+  - string: `stderr` will set basic STDERR logging
+  - int: 0 will turn logging off
+  - int: 1 will set basic STDOUT logging
+  - int: 2 will set basic STDERR logging
+  - *log.Logger: user-defined *log.Logger instance will be set
 
 Case is not significant in the string matching process.
 
@@ -73,15 +71,13 @@ this default package logger.
 
 The following types/values are permitted:
 
-• string: `none`, `off`, `null`, `discard` will turn logging off
-
-• string: `stderr` or `errors` will set basic stderr logging
-
-• int: 0 will turn logging off
-
-• int: 1 will set basic stderr logging
-
-• *log.Logger: user-defined *log.Logger instance will be set
+  - string: `none`, `off`, `null`, `discard` will turn logging off
+  - string: `stdout` will set basic STDOUT logging
+  - string: `stderr` will set basic STDERR logging
+  - int: 0 will turn logging off
+  - int: 1 will set basic STDOUT logging
+  - int: 2 will set basic STDERR logging
+  - *log.Logger: user-defined *log.Logger instance will be set
 
 Case is not significant in the string matching process.
 
@@ -97,15 +93,16 @@ func resolveLogger(logger any) (l *log.Logger) {
 	case *log.Logger:
 		l = tv
 	case int:
-		if tv == 0 {
-			l = devNull
-		} else if tv == 1 {
-			l = stderr
-		}
+		l = intResolveLogger(tv)
 	case string:
 		l = stringResolveLogger(tv)
 	}
 
+	// We need something to fallback to,
+	// regardless of the user's logging
+	// intentions; impose devNull if we
+	// find ourselves with a *log.Logger
+	// instance that is nil.
 	if l == nil || logger == nil {
 		l = devNull
 	}
@@ -113,11 +110,24 @@ func resolveLogger(logger any) (l *log.Logger) {
 	return l
 }
 
+func intResolveLogger(logger int) (l *log.Logger) {
+	switch logger {
+	case 0:
+		l = devNull
+	case 1:
+		l = stdout
+	case 2:
+		l = stderr
+	}
+
+	return
+}
+
 func stringResolveLogger(logger string) (l *log.Logger) {
 	switch lc(logger) {
 	case `none`, `off`, `null`, `discard`:
 		l = devNull
-	case `stderr`, `errors`:
+	case `stderr`:
 		l = stderr
 	case `stdout`:
 		l = stdout

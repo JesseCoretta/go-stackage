@@ -25,7 +25,7 @@ configured as a simple list. Stack instances of this
 design can be delimited using the SetDelimiter method.
 */
 func List(capacity ...int) Stack {
-	return Stack{newStack(list, capacity...)}
+	return Stack{newStack(list, false, capacity...)}
 }
 
 /*
@@ -33,7 +33,7 @@ And initializes and returns a new instance of Stack
 configured as a Boolean ANDed stack.
 */
 func And(capacity ...int) Stack {
-	return Stack{newStack(and, capacity...)}
+	return Stack{newStack(and, false, capacity...)}
 }
 
 /*
@@ -41,7 +41,7 @@ Or initializes and returns a new instance of Stack
 configured as a Boolean ORed stack.
 */
 func Or(capacity ...int) Stack {
-	return Stack{newStack(or, capacity...)}
+	return Stack{newStack(or, false, capacity...)}
 }
 
 /*
@@ -49,7 +49,7 @@ Not initializes and returns a new instance of Stack
 configured as a Boolean NOTed stack.
 */
 func Not(capacity ...int) Stack {
-	return Stack{newStack(not, capacity...)}
+	return Stack{newStack(not, false, capacity...)}
 }
 
 /*
@@ -65,7 +65,7 @@ PresentationPolicy instances cannot be assigned to Stacks
 of this design.
 */
 func Basic(capacity ...int) Stack {
-	return Stack{newStack(basic, capacity...)}
+	return Stack{newStack(basic, false, capacity...)}
 }
 
 /*
@@ -74,7 +74,7 @@ with the kind (t) requested by the user. This function
 should only be executed when creating new instances of
 Stack, which embeds the *stack type.
 */
-func newStack(t stackType, c ...int) *stack {
+func newStack(t stackType, fifo bool, c ...int) *stack {
 	switch t {
 	case and, or, not, list, basic:
 		// ok
@@ -89,7 +89,9 @@ func newStack(t stackType, c ...int) *stack {
 	)
 
 	cfg.typ = t
+	cfg.ord = fifo
 	data[`kind`] = t.String()
+	data[`fifo`] = sprintf("%t", fifo)
 
 	cfg.setLogger(sLogDefault)
 	if !logDiscard(cfg.getLogger()) {
@@ -155,6 +157,68 @@ func (r *stack) addr() string {
 	}
 
 	return sprintf("%p", *r)
+}
+
+/*
+IsFIFO returns a Boolean value indicative of whether the underlying
+receiver instance exhibits First-In-First-Out behavior as it pertains
+to the appending and truncation order of the receiver instance.
+
+A value of false implies Last-In-Last-Out behavior, which is the
+default ordering scheme imposed upon instances of this type.
+*/
+func (r Stack) IsFIFO() bool {
+	if !r.IsInit() {
+		return false
+	}
+	return r.stack.isFIFO()
+}
+
+/*
+isFIFO is a private method called by the Stack.IsFIFO method, et al.
+*/
+func (r stack) isFIFO() bool {
+	if !r.isInit() {
+		return false
+	}
+	sc, err := r.config()
+	if err != nil {
+		return false
+	}
+	return sc.ord
+}
+
+/*
+SetFIFO shall assign the bool instance to the underlying receiver
+configuration, declaring the nature of the append/truncate
+scheme to be honored.
+
+A value of true shall impose the First-In-First-Out scheme, while a
+value of false shall impose the Last-In-First-Out scheme. The default
+is false, meaning LIFO behavior shall be exhibited if a scheme is
+unspecified as a whole.
+
+It is not recommended to change this value during the lifespan
+of the instance; ideally, only one (1) single scheme should be
+honored per instance from cradle to grave.
+*/
+func (r Stack) SetFIFO(fifo bool) Stack {
+	if !r.IsInit() {
+		return r
+	}
+	r.stack.setFIFO(fifo)
+	return r
+}
+
+func (r *stack) setFIFO(fifo bool) {
+	if r.isZero() {
+		return
+	}
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+	sc.ord = fifo
 }
 
 /*
@@ -264,15 +328,11 @@ IsInit returns a Boolean value indicative of whether the
 receiver has been initialized using any of the following
 package-level functions:
 
-• And
-
-• Or
-
-• Not
-
-• List
-
-• Basic
+  - And
+  - Or
+  - Not
+  - List
+  - Basic
 
 This method does not take into account the presence (or
 absence) of any user-provided values (e.g.: a length of
@@ -304,18 +364,15 @@ default package logger.
 
 The following types/values are permitted:
 
-• string: `none`, `off`, `null`, `discard` will turn logging off *
+  - string: `none`, `off`, `null`, `discard` will turn logging off
+  - string: `stdout` will set basic STDOUT logging
+  - string: `stderr` will set basic STDERR logging
+  - int: 0 will turn logging off
+  - int: 1 will set basic STDOUT logging
+  - int: 2 will set basic STDERR logging
+  - *log.Logger: user-defined *log.Logger instance will be set; it should not be nil
 
-• string: `stderr` or `errors` will set basic stderr logging *
-
-• int: 0 will turn logging off
-
-• int: 1 will set basic stderr logging
-
-• *log.Logger: user-defined *log.Logger instance will be set; it
-should not be nil
-
-*Case is not significant in the string matching process.
+Case is not significant in the string matching process.
 
 Logging may also be set globally using the SetDefaultLogger
 package level function. Similar semantics apply.
@@ -358,14 +415,9 @@ contained therein to the destination instance.
 
 The following circumstances will result in a false return:
 
-- Capacity constraints are in-force within the destination
-instance, and the transfer request (if larger than the sum
-number of available slices) cannot proceed as a result
-
-- The destination instance is nil, or has not been properly
-initialized
-
-- The receiver instance (r) contains no slices to transfer
+  - Capacity constraints are in-force within the destination instance, and the transfer request (if larger than the sum number of available slices) cannot proceed as a result
+  - The destination instance is nil, or has not been properly initialized
+  - The receiver instance (r) contains no slices to transfer
 
 The receiver instance (r) is not modified in any way as a
 result of calling this method. If the receiver undergoes a
@@ -726,9 +778,8 @@ When called, this method returns a Boolean value indicative
 of whether the receiver contains one (1) or more slice elements
 that match either of the following conditions:
 
-• Slice type is a stackage.Stack native type instance, OR ...
-
-• Slice type is a stackage.Stack type-aliased instance
+  - Slice type is a stackage.Stack native type instance, OR ...
+  - Slice type is a stackage.Stack type-aliased instance
 
 A return value of true is thrown at the first of either
 occurrence. Length of matched candidates is not significant
@@ -952,16 +1003,16 @@ func (r *stack) getListDelimiter() string {
 
 /*
 Encap accepts input characters for use in controlled stack value
-encapsulation. Acceptable input types are:
-
-• string - a single string value will be used for both L and R
 encapsulation.
 
-• string slices - An instance of []string with two (2) values will
-be used for L and R encapsulation using the first and second
-slice values respectively. An instance of []string with only one (1)
-value is identical to providing a single string value, in that both
-L and R will use one value.
+A single string value will be used for both L and R encapsulation.
+
+An instance of []string with two (2) values will be used for L and R
+encapsulation using the first and second slice values respectively.
+
+An instance of []string with only one (1) value is identical to the
+act of providing a single string value, in that both L and R will use
+one (1) value.
 */
 func (r Stack) Encap(x ...any) Stack {
 	if !r.IsInit() {
@@ -1120,10 +1171,8 @@ func (r *stack) getID() string {
 LeadOnce sets the lead-once bit within the receiver. This
 causes two (2) things to happen:
 
-• Only use the configured operator once in a stack, and ...
-
-• Only use said operator at the very beginning of the
-stack string value.
+  - Only use the configured operator once in a stack, and ...
+  - Only use said operator at the very beginning of the stack string value
 
 Execution without a Boolean input value will *TOGGLE* the
 current state of the lead-once bit (i.e.: true->false and
@@ -1848,13 +1897,9 @@ a success-indicative Boolean value.
 
 The semantics of "traversability" are as follows:
 
-• Any "nesting" instance must be a Stack or Stack type alias
-
-• Condition instances must either be the final requested element, OR must
-contain a Stack or Stack type alias instance through which to continue the
-traversal process
-
-• All other value types are returned as-is
+  - Any "nesting" instance must be a Stack or Stack type alias
+  - Condition instances must either be the final requested element, OR must contain a Stack or Stack type alias instance through which to continue the traversal process
+  - All other value types are returned as-is
 
 If the traversal ended at any given value, it will be returned along with a
 positive ok value letting the user know they arrived at the coordinates they
@@ -2178,7 +2223,7 @@ of a non-nil value.
 This method supports the use of the following index values depending
 on the configuration of the receiver.
 
-• Negatives: When negative index support is enabled, a negative index
+Negatives: When negative index support is enabled, a negative index
 will not panic, rather the index number will be increased such that it
 becomes positive and within the bounds of the stack length, and (perhaps
 most importantly) aligned with the relative (intended) slice. To offer an
@@ -2186,7 +2231,7 @@ example, -2 would return the second-to-last slice. When negative index
 support is NOT enabled, nil is returned for any index out of bounds along
 with a Boolean value of false, although no panic will occur.
 
-• Positives: When forward index support is enabled, an index greater than
+Positives: When forward index support is enabled, an index greater than
 the length of the stack shall be reduced to the highest valid slice index.
 For example, if an index of twenty (20) were used on a stack instance of
 a length of ten (10), the index would transform to nine (9). When forward
@@ -2373,12 +2418,28 @@ func (r *stack) pop() (any, bool) {
 	r.lock()
 	defer r.unlock()
 
-	idx := len(*r) - 1
-	slice := (*r)[idx]
-	r.debug(sprintf("%s: %T:%d:%s; removing idx", fname, r, idx, id))
-	*r = (*r)[:idx]
+	var idx int
+	var slice any
+	var typ string
+
+	if r.isFIFO() {
+		typ = `FIFO`
+		idx = 1
+		slice = (*r)[idx]
+		pres := (*r)[idx+1:]
+		(*r) = (*r)[:idx]
+		*r = append(*r, pres...)
+	} else {
+		typ = `LIFO`
+		idx = len(*r) - 1
+		slice = (*r)[idx]
+		*r = (*r)[:idx]
+	}
+
+	r.debug(sprintf("%s (%s): %T:%d:%s; removing idx", fname, typ, r, idx, id))
 	ok := slice != nil
-	r.debug(sprintf("%s: %T:%d:%s; returning [ok:%t]", fname, r, idx, id, ok))
+
+	r.debug(sprintf("%s: %T:%d:%s; ok:%t", fname, r, idx, id, ok))
 	return slice, slice != nil
 }
 

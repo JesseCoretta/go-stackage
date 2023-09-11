@@ -1,7 +1,6 @@
 package stackage
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -23,7 +22,7 @@ type nodeConfig struct {
 	ppf PushPolicy         // closure filterer
 	vpf ValidityPolicy     // closure validator
 	rpf PresentationPolicy // closure stringer
-	log *log.Logger        // Logging subsystem
+	log *logSystem         // logging subsystem
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)
@@ -110,14 +109,6 @@ func (r nodeConfig) getErr() error {
 
 func (r *nodeConfig) setErr(err error) {
 	r.err = err
-}
-
-func (r *nodeConfig) setLogger(logger *log.Logger) {
-	r.log = logger
-}
-
-func (r nodeConfig) getLogger() *log.Logger {
-	return r.log
 }
 
 /*
@@ -462,10 +453,10 @@ func (r *nodeConfig) canWriteMessage() bool {
 	}
 
 	if r.log == nil {
-		r.log = devNull
+		r.log = newLogSystem(devNull)
 	}
 
-	return r.log != devNull
+	return r.log.log != devNull
 }
 
 func init() {

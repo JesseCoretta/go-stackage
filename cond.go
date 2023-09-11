@@ -86,16 +86,16 @@ func initCondition() (r *condition) {
 
 	r = new(condition)
 	r.cfg = new(nodeConfig)
+	r.cfg.log = newLogSystem(cLogDefault)
 
 	r.cfg.typ = cond
 	data[`type`] = cond.String()
 
-	r.cfg.setLogger(cLogDefault)
-	if !logDiscard(cLogDefault) {
-		data[`laddr`] = sprintf("%p", cLogDefault)
-		data[`lpfx`] = cLogDefault.Prefix()
-		data[`lflags`] = sprintf("%d", cLogDefault.Flags())
-		data[`lwriter`] = sprintf("%T", cLogDefault.Writer())
+	if !logDiscard(r.cfg.log.log) {
+		data[`laddr`] = sprintf("%p", r.cfg.log.log)
+		data[`lpfx`] = r.cfg.log.log.Prefix()
+		data[`lflags`] = sprintf("%d", r.cfg.log.log.Flags())
+		data[`lwriter`] = sprintf("%T", r.cfg.log.log.Writer())
 	}
 
 	r.debug(`ALLOC`, data)
@@ -476,9 +476,9 @@ func (r Condition) SetID(id string) Condition {
 Len returns a "perceived" abstract length relating to the content (or lack
 thereof) assigned to the receiver instance:
 
-• An uninitialized or zero instance returns zero (0)
-• An initialized instance with no Expression assigned (nil) returns zero (0)
-• A Stack or Stack type alias assigned as the Expression shall impose its own stack length as the return value (even if zero (0))
+  - An uninitialized or zero instance returns zero (0)
+  - An initialized instance with no Expression assigned (nil) returns zero (0)
+  - A Stack or Stack type alias assigned as the Expression shall impose its own stack length as the return value (even if zero (0))
 
 All other type instances assigned as an Expression shall result in a
 return of one (1); this includes slice types, maps, arrays and any other
@@ -831,11 +831,11 @@ func (r Condition) IsParen() bool {
 }
 
 func (r *condition) setLogger(logger any) {
-	r.cfg.setLogger(resolveLogger(logger))
+	r.cfg.log.setLogger(logger)
 }
 
 func (r condition) logger() *log.Logger {
-	return r.cfg.getLogger()
+	return r.cfg.log.logger()
 }
 
 func (r *condition) toggleOpt(x cfgFlag) {
@@ -1000,59 +1000,6 @@ func (r condition) string() string {
 	}
 
 	return s
-}
-
-/*
-DECOM me in favor of direct r.msg.
-*/
-func (r condition) wrmsg(m any) {
-	r.msg(m)
-}
-
-func (r condition) msg(x any) {
-	var m Message
-	m.Tag = `UNKNOWN`
-
-	switch tv := x.(type) {
-	case error:
-		if tv != nil {
-			m.Tag = `ERROR`
-			m.Msg = tv.Error()
-		}
-	case string:
-		if len(tv) > 0 {
-			m.Tag = `DEBUG`
-			m.Msg = tv
-		}
-	}
-
-	m.Type = `C`
-	if cat := r.getCat(); len(cat) > 0 {
-		m.Type += sprintf("_%s", cat)
-	}
-
-	t := now()
-	m.Time = sprintf("%04d%02d%02d%02d%02d%02d.%09d",
-		t.Year(),
-		t.Month(),
-		t.Day(),
-		t.Hour(),
-		t.Minute(),
-		t.Second(),
-		t.Nanosecond())
-
-	var id string = `<no_id>`
-	if _id := r.getID(); len(_id) > 0 {
-		id = _id
-	}
-
-	m.ID = id
-	m.Len = -1 // N/A
-	m.Cap = -1 // N/A
-
-	r.logger().Println(m)
-
-	return
 }
 
 func (r *condition) mkmsg(typ string) (Message, bool) {

@@ -785,7 +785,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 func TestDefrag_experimental_001(t *testing.T) {
 	// this list contains an assortment of
 	// values mixed in with nils.
-	var l Stack = List().Push(
+	var l Stack = List().SetLogLevel(LogLevel(45)).Push(
 		`this`,
 		nil,
 		`that`,
@@ -813,7 +813,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
+	).Paren()
 
 	offset := 13         // number of nil occurrences
 	beforeLen := l.Len() // record preop len
@@ -837,6 +837,6 @@ func TestDefrag_experimental_001(t *testing.T) {
 }
 
 func init() {
-	//SetDefaultStackLogger(`stdout`)
+	SetDefaultStackLogger(`stdout`)
 	//SetDefaultConditionLogger(`stdout`)
 }

@@ -87,18 +87,18 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 		cfg  *nodeConfig       = new(nodeConfig)
 		st   stack
 	)
+	cfg.log = newLogSystem(sLogDefault)
 
 	cfg.typ = t
 	cfg.ord = fifo
 	data[`kind`] = t.String()
 	data[`fifo`] = sprintf("%t", fifo)
 
-	cfg.setLogger(sLogDefault)
-	if !logDiscard(cfg.getLogger()) {
-		data[`laddr`] = sprintf("%p", sLogDefault)
-		data[`lpfx`] = sLogDefault.Prefix()
-		data[`lflags`] = sprintf("%d", sLogDefault.Flags())
-		data[`lwriter`] = sprintf("%T", sLogDefault.Writer())
+	if !logDiscard(cfg.log.log) {
+		data[`laddr`] = sprintf("%p", cfg.log.log)
+		data[`lpfx`] = cfg.log.log.Prefix()
+		data[`lflags`] = sprintf("%d", cfg.log.log.Flags())
+		data[`lwriter`] = sprintf("%T", cfg.log.log.Writer())
 	}
 
 	if len(c) > 0 {
@@ -114,7 +114,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 	st = append(st, cfg)
 	instance := &st
 	data[`addr`] = instance.addr()
-	st.debug(`ALLOC`, data)
+	st.trace(`ALLOC`, data)
 
 	return instance
 }
@@ -132,6 +132,70 @@ isZero is a private method called by Stack.IsZero.
 */
 func (r *stack) isZero() bool {
 	return r == nil
+}
+
+/*
+SetLogLevel enables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to accept events for submission
+and transcription to the underlying logger.
+
+Users may also sum the desired bit values manually, and cast the
+product as a LogLevel. For example, if STATE (4), DEBUG (8) and
+TRACE (32) logging were desired, entering LogLevel(44) would be
+the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
+variadic fashion.
+*/
+func (r Stack) SetLogLevel(l ...LogLevel) Stack {
+	cfg, err := r.config()
+	if err != nil {
+		return r
+	}
+
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fmname(), l, l, len(l)))
+
+	cfg.log.shift(l...)
+
+	r.calls(sprintf("%s: out:%T(rcvr)",
+		fmname(), r))
+
+	return r
+}
+
+/*
+LogLevels returns the string representation of a comma-delimited list
+of all active LogLevel values within the receiver.
+*/
+func (r Stack) LogLevels() string {
+	cfg, err := r.config()
+	if err != nil {
+		return `NONE`
+	}
+
+	return cfg.log.lvl.String()
+}
+
+/*
+UnsetLogLevel disables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to discard events submitted for
+transcription to the underlying logger.
+*/
+func (r Stack) UnsetLogLevel(l ...LogLevel) Stack {
+	cfg, err := r.config()
+	if err != nil {
+		return r
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, l, l, len(l)))
+
+	cfg.log.unshift(l...)
+
+	r.calls(sprintf("%s: out:%T(rcvr)",
+		fname, r))
+
+	return r
 }
 
 /*
@@ -156,7 +220,9 @@ func (r *stack) addr() string {
 		return ``
 	}
 
-	return sprintf("%p", *r)
+	addr := sprintf("%p", *r)
+
+	return addr
 }
 
 /*
@@ -185,22 +251,33 @@ func (r stack) isFIFO() bool {
 	if err != nil {
 		return false
 	}
-	return sc.ord
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	result := sc.ord
+	r.calls(sprintf("%s: out:%T(%v)",
+		fmname(), result, result))
+
+	return result
 }
 
 /*
 SetFIFO shall assign the bool instance to the underlying receiver
-configuration, declaring the nature of the append/truncate
-scheme to be honored.
+configuration, declaring the nature of the append/truncate scheme
+to be honored.
 
-A value of true shall impose the First-In-First-Out scheme, while a
-value of false shall impose the Last-In-First-Out scheme. The default
-is false, meaning LIFO behavior shall be exhibited if a scheme is
-unspecified as a whole.
+  - A value of true shall impose First-In-First-Out behavior
+  - A value of false (the default) shall impose Last-In-First-Out behavior
 
-It is not recommended to change this value during the lifespan
-of the instance; ideally, only one (1) single scheme should be
-honored per instance from cradle to grave.
+This setting shall impose no influence on any methods other than
+the Pop method. In other words, Push, Defrag, Remove, Replace, et
+al., will all operate in the same manner regardless.
+
+Once set to the non-default value of true, this setting cannot be
+changed nor toggled ever again for this instance and shall not be
+subject to any override controls.
+
+In short, once you go FIFO, you cannot go back.
 */
 func (r Stack) SetFIFO(fifo bool) Stack {
 	if !r.IsInit() {
@@ -218,7 +295,17 @@ func (r *stack) setFIFO(fifo bool) {
 	if err != nil {
 		return
 	}
-	sc.ord = fifo
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v)", fname, fifo, fifo))
+	if !sc.ord {
+		// can only change it once!
+		r.state(sprintf("%s: %s state change (%t->%t; ok:%t)",
+			fname, `ordering`, sc.ord, fifo, true))
+		sc.ord = fifo
+	}
+	r.calls(sprintf("%s: out:void; result:%t", fname, sc.ord == fifo))
+
 }
 
 /*
@@ -263,17 +350,36 @@ setErr assigns an error instance, whether nil or not, to
 the underlying receiver configuration.
 */
 func (r *stack) setErr(err error) {
-	sc, _ := r.config()
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v)", fname, err, err))
+	r.state(sprintf("%s: %T state change (%v->%v; ok:%t)",
+		fname, err, sc.err, err, true))
 	sc.setErr(err)
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
 getErr returns the instance of error, whether nil or not, from
 the underlying receiver configuration.
 */
-func (r stack) getErr() error {
-	sc, _ := r.config()
-	return sc.getErr()
+func (r stack) getErr() (err error) {
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	err = sc.getErr()
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, err, err == nil))
+
+	return
 }
 
 /*
@@ -281,8 +387,18 @@ kind returns the string representation of the kind value
 set within the receiver's configuration value.
 */
 func (r stack) kind() string {
-	sc, _ := r.config()
-	return sc.kind()
+	sc, err := r.config()
+	if err != nil {
+		return ``
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T:niladic", fname))
+	kind := sc.kind()
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, kind, kind, len(kind)))
+
+	return kind
 }
 
 /*
@@ -297,15 +413,24 @@ func (r Stack) Valid() (err error) {
 		return
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
 	if err = r.stack.valid(); err != nil {
+		r.calls(sprintf("%s: out:%T(%v)",
+			fname, err, err))
 		return
 	}
 
 	// try to see if the user provided a
 	// validity function
 	if meth := r.getValidityPolicy(); meth != nil {
+		r.calls(sprintf("validity_policy: in:%T(len:%d)",
+			r, r.Len()))
 		err = meth(r)
 	}
+
+	r.calls(sprintf("%s: out:%T(%v)",
+		fname, err, err))
 
 	return
 }
@@ -319,7 +444,11 @@ func (r stack) valid() (err error) {
 		return
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
 	_, err = r.config()
+	r.calls(sprintf("%s: out:%T(nil:%t)", fname, err, err == nil))
+
 	return
 }
 
@@ -349,8 +478,13 @@ func (r Stack) IsInit() bool {
 /*
 isInit is a private method called by Stack.IsInit.
 */
-func (r stack) isInit() bool {
-	return r.stackType() != 0x0
+func (r *stack) isInit() bool {
+	if r == nil {
+		return false
+	}
+
+	result := r.stackType() != 0x0
+	return result
 }
 
 /*
@@ -442,15 +576,27 @@ more slices than a non-zero destination capacity allows, the
 operation is canceled outright and false is returned.
 */
 func (r *stack) transfer(dest *stack) bool {
+	if !r.isInit() {
+		return false
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
 
 	if r.ulen() == 0 || dest == nil {
 		// nothing to xfer
+		err := errorf("%s: failed; %T nothing to transfer, or destination %T is not initialized",
+			fname, Stack{}, Stack{})
+		r.trace(err)
 		return false
 	}
 
 	if !r.isInit() {
 		// dest MUST be initialized in some way
 		// or this happens ...
+		err := errorf("%s: failed; %T not initialized",
+			fname, Stack{})
+		r.trace(err)
 		return false
 	}
 
@@ -461,6 +607,9 @@ func (r *stack) transfer(dest *stack) bool {
 			// capacity is in-force, and
 			// there are too many slices
 			// to xfer.
+			err := errorf("%s failed: capacity violation (%d/%d slices added)",
+				fname, r.ulen(), dest.cap()-r.ulen())
+			r.policy(err)
 			return false
 		}
 	}
@@ -471,10 +620,17 @@ func (r *stack) transfer(dest *stack) bool {
 	for i := 0; i < r.ulen(); i++ {
 		sl, _, _ := r.index(i) // cfg offset handled by index method
 		dest.push(sl)
+		r.trace(sprintf("%s: %T:%d:%s :: transferring %T",
+			fname, Stack{}, i, getLogID(r.getID()), sl))
 	}
 
-	// return newly populated stack
-	return dest.ulen() >= r.ulen()
+	// return result
+	result := dest.ulen() >= r.ulen()
+	r.trace(sprintf("%s: %T::%s :: transfer result:%t",
+		fname, Stack{}, getLogID(r.getID()), result))
+	r.calls(sprintf("%s: out:%T(%v)", fname, result, result))
+
+	return result
 }
 
 /*
@@ -501,6 +657,10 @@ func (r *stack) replace(x any, i int) (ok bool) {
 		return
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%t)/%T(%v:%d)",
+		fname, x, x == nil, i, i, i))
+
 	if r.positive(ronly) {
 		return
 	}
@@ -511,6 +671,9 @@ func (r *stack) replace(x any, i int) (ok bool) {
 
 	(*r)[i+1] = x
 	ok = true
+
+	r.calls(sprintf("%s: out:%T(%v)",
+		fname, ok, ok))
 
 	return
 }
@@ -547,7 +710,9 @@ func (r *stack) insert(x any, left int) (ok bool) {
 		return
 	}
 
-	//fname := fmname()
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%t)/%T(%v:%d)",
+		fname, x, x == nil, left, left, left))
 
 	if r.positive(ronly) {
 		return
@@ -559,6 +724,11 @@ func (r *stack) insert(x any, left int) (ok bool) {
 	// bail out if a capacity has been set and
 	// would be breached by this insertion.
 	if u1+1 > r.cap() && r.cap() != 0 {
+		err := errorf("%s failed: capacity violation (%d/%d slices added)",
+			fname, 0, 1)
+		r.policy(err)
+		r.calls(sprintf("%s: out:%T(%v)",
+			fname, ok, ok))
 		return
 	}
 
@@ -571,13 +741,18 @@ func (r *stack) insert(x any, left int) (ok bool) {
 	// to the user length, just push.
 	if u1-1 < left {
 		*r = append(*r, x)
+		r.trace(sprintf("%s: append %T->%T",
+			fname, x, *r))
 
 		// Verify something was added
 		ok = u1+1 == r.ulen()
+		r.calls(sprintf("%s: out:%T(%v); ok:%t",
+			fname, r, r, ok))
 		return
 	}
 
 	var R stack = make(stack, 0)
+	r.trace(sprintf("%s: ALLOC %T", fname, R))
 	left += 1
 
 	// If left is less-than-or-equal to
@@ -591,6 +766,8 @@ func (r *stack) insert(x any, left int) (ok bool) {
 		R = append(R, cfg)
 		R = append(R, x)
 		R = append(R, (*r)[left:]...)
+		r.trace(sprintf("%s: append %T,%T,%T->%T",
+			fname, cfg, x, (*r)[left:]))
 
 		// If left falls within the user length,
 		// append all elements up to and NOT
@@ -601,11 +778,17 @@ func (r *stack) insert(x any, left int) (ok bool) {
 	} else {
 		R = append((*r)[:left+1], (*r)[left:]...)
 		R[left] = x
+		r.trace(sprintf("%s: append %T->%T",
+			fname, (*r)[left:], R))
 	}
 
 	// Verify something was added
 	*r = R
+	r.trace(sprintf("%s: reset ptr %T(%v)->%T(%v)",
+		fname, R, R.addr(), *r, r.addr()))
 	ok = u1+1 == r.ulen()
+	r.calls(sprintf("%s: out:%T(%v); ok:%t",
+		fname, r, r, ok))
 
 	return
 }
@@ -634,12 +817,25 @@ func (r *stack) reset() {
 		return
 	}
 
+	fname := fmname()
+
+	r.calls(sprintf("%s: in:niladic", fname))
+
 	r.lock()
 	defer r.unlock()
 
+	var ct int = 0
+	var plen int = r.ulen()
 	for i := r.ulen(); i > 0; i-- {
+		ct++
+		r.trace(sprintf("%s: erase idx:%d (%d/%d)",
+			fname, i-1, ct/r.ulen()))
 		r.remove(i - 1)
 	}
+	r.debug(sprintf("%s: removed %d/%d slices",
+		fname, ct, plen))
+
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -669,8 +865,10 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	}
 
 	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v)", fname, idx, idx))
 
 	if r.positive(ronly) {
+		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
 		return
 	}
 
@@ -679,7 +877,8 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 
 	slice, index, found := r.index(idx)
 	if !found {
-		r.debug(sprintf("%s: idx %d not found", fname, idx))
+		r.debug(sprintf("%s: idx:%d not found", fname, idx))
+		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
 		return
 	} else if index == 0 {
 		// I'm just paranoid
@@ -694,6 +893,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	// Gather what we want to keep.
 	for i := 1; i < r.len(); i++ {
 		if index != i {
+			r.trace(sprintf("%s: preserving idx:%d (%T)", fname, idx, (*r)[i]))
 			preserved++
 			contents = append(contents, (*r)[i])
 		}
@@ -701,15 +901,13 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 
 	// zero out everything except the config slice
 	cfg, _ := r.config()
-	r.debug(sprintf("%s: ALLOC", fname))
+	r.trace(sprintf("%s: ALLOC", fname))
 
 	var R stack = make(stack, 0)
 	R = append(R, cfg)
 
 	r.debug(sprintf("%s: adding %d preserved elements", fname, preserved))
-
 	R = append(R, contents...)
-
 	r.debug(sprintf("%s: updating PTR contents [%s]", fname, r.addr()))
 
 	*r = R
@@ -718,6 +916,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	// and in the expected integer length change.
 	ok = slice != nil && u1-1 == r.ulen()
 	r.debug(sprintf("%s: updated: %t", fname, ok))
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
 
 	return
 }
@@ -787,9 +986,13 @@ during the matching process.
 */
 func (r stack) isNesting() bool {
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+
 	// start iterating at index #1, thereby
 	// skipping the configuration slice.
 	for i := 1; i < r.len(); i++ {
+		r.trace(sprintf("%s: idx:%d nesting check", fname, i))
 
 		// perform a type switch on the
 		// current index, thereby allowing
@@ -798,6 +1001,8 @@ func (r stack) isNesting() bool {
 
 		// native Stack instance
 		case Stack:
+			r.calls(sprintf("%s: out:%T(%t)",
+				fname, true, true))
 			return true
 
 		// type alias stack instnaces, since
@@ -809,10 +1014,14 @@ func (r stack) isNesting() bool {
 			// If convertible is true, we know the
 			// instance (tv) is a stack alias.
 			if _, convertible := stackTypeAliasConverter(tv); convertible {
+				r.calls(sprintf("%s: out:%T(%t)",
+					fname, convertible, convertible))
 				return convertible
 			}
 		}
 	}
+
+	r.calls(sprintf("%s: out:%T(%t)", fname, false, false))
 
 	return false
 }
@@ -989,16 +1198,32 @@ func (r Stack) Delimiter() string {
 setListDelimiter is a private method called by Stack.SetDelimiter
 */
 func (r *stack) setListDelimiter(x any) {
-	sc, _ := r.config()
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(nil:%t)", fname, x == nil))
 	sc.setListDelimiter(assertListDelimiter(x))
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
 getListDelimiter is a private method called by Stack.Delimiter.
 */
 func (r *stack) getListDelimiter() string {
-	sc, _ := r.config()
-	return sc.getListDelimiter()
+	sc, err := r.config()
+	if err != nil {
+		return ``
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	delim := sc.getListDelimiter()
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, delim, delim, len(delim)))
+	return delim
 }
 
 /*
@@ -1031,8 +1256,15 @@ func (r Stack) Encap(x ...any) Stack {
 setEncap is a private method called by Stack.Encap.
 */
 func (r *stack) setEncap(x ...any) {
-	sc, _ := r.config()
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+	fname := fmname()
+	r.calls(sprintf("%s: in:variadic any (ct:%d)",
+		fname, len(x)))
 	sc.setEncap(x...)
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -1051,9 +1283,18 @@ func (r Stack) IsEncap() bool {
 getEncap returns the current value encapsulation character pattern
 set within the receiver instance.
 */
-func (r *stack) getEncap() [][]string {
-	sc, _ := r.config()
-	return sc.enc
+func (r *stack) getEncap() (encs [][]string) {
+	sc, err := r.config()
+	if err != nil {
+		return [][]string{}
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	encs = sc.enc
+	r.calls(sprintf("%s: out:%T(len:%d)", fname, encs, len(encs)))
+
+	return
 }
 
 /*
@@ -1082,15 +1323,24 @@ func (r Stack) SetID(id string) Stack {
 setID is a private method called by Stack.SetID.
 */
 func (r *stack) setID(id string) {
-	sc, _ := r.config()
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, id, id, len(id)))
 
 	if lc(id) == `_random` {
 		id = randomID(randIDSize)
 	} else if lc(id) == `_addr` {
 		id = sprintf("%s", r.addr())
 	}
+	r.debug(sprintf("%s: setID: %v", fname, id))
 
 	sc.setID(id)
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -1115,8 +1365,16 @@ func (r Stack) SetCategory(cat string) Stack {
 setCat is a private method called by Stack.SetCategory.
 */
 func (r *stack) setCat(cat string) {
-	sc, _ := r.config()
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, cat, cat, len(cat)))
 	sc.setCat(cat)
+	r.calls(sprintf("%s: out:niladic", fname))
 }
 
 /*
@@ -1134,13 +1392,23 @@ func (r Stack) Category() string {
 /*
 getCat is a private method called by Stack.Category.
 */
-func (r *stack) getCat() string {
+func (r *stack) getCat() (cat string) {
 	if !r.isInit() {
-		return ``
+		return
 	}
 
-	sc, _ := r.config()
-	return sc.cat
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	cat = sc.cat
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, cat, cat, len(cat)))
+
+	return
 }
 
 /*
@@ -1158,13 +1426,18 @@ func (r Stack) ID() string {
 /*
 getID is a private method called by Stack.ID.
 */
-func (r *stack) getID() string {
+func (r *stack) getID() (id string) {
 	if !r.isInit() {
-		return ``
+		return
 	}
 
-	sc, _ := r.config()
-	return sc.id
+	sc, err := r.config()
+	if err != nil {
+		return
+	}
+
+	id = sc.id
+	return
 }
 
 /*
@@ -1387,22 +1660,34 @@ func (r *stack) setSymbol(sym string) {
 	if err != nil {
 		return
 	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, sym, sym, len(sym)))
+
 	if sc.typ != list {
 		sc.setSymbol(sym)
 	}
+
+	r.calls(sprintf("%s: out:niladic", fname))
 }
 
 /*
 getSymbol returns the symbol stored within the underlying *nodeConfig
 instance slice.
 */
-func (r stack) getSymbol() string {
+func (r stack) getSymbol() (sym string) {
 	sc, err := r.config()
 	if err != nil {
-		return ``
+		return
 	}
 
-	return sc.sym
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	sym = sc.sym
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, sym, sym, len(sym)))
+	return sym
 }
 
 func (r *stack) setLogger(logger any) {
@@ -1411,16 +1696,24 @@ func (r *stack) setLogger(logger any) {
 		return
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(nil:%t)",
+		fname, logger, logger == nil))
+
 	r.lock()
 	defer r.unlock()
 
-	cfg.setLogger(resolveLogger(logger))
-	r.debug(sprintf("%s: set %T", fmname(), logger))
+	cfg.log.setLogger(logger)
+	r.trace(sprintf("%s: set %T", fmname(), logger))
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 func (r *stack) logger() *log.Logger {
-	cfg, _ := r.config()
-	return cfg.getLogger()
+	cfg, err := r.config()
+	if err != nil {
+		return nil
+	}
+	return cfg.log.logger()
 }
 
 /*
@@ -1434,10 +1727,24 @@ func (r *stack) toggleOpt(x cfgFlag) *stack {
 		return r
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%s)",
+		fname, x, x))
+
 	r.lock()
 	defer r.unlock()
 
+	cur := cfg.positive(x)
 	cfg.toggleOpt(x)
+	after := cfg.positive(x)
+	result := cur != after
+
+	r.state(sprintf("%s: %s state change (%t->%t; ok:%t)",
+		fmname(), x, cur, after, result))
+
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, r, r == nil))
+
 	return r
 }
 
@@ -1450,12 +1757,27 @@ func (r *stack) setOpt(x cfgFlag) *stack {
 	cfg, err := r.config()
 	if err != nil {
 		return r
+
 	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%s)",
+		fname, x, x))
 
 	r.lock()
 	defer r.unlock()
 
+	cur := cfg.positive(x)
 	cfg.setOpt(x)
+	after := cfg.positive(x)
+	result := cur != after
+
+	r.state(sprintf("%s: %s state change (%t->%t; ok:%t)",
+		fmname(), x, cur, after, result))
+
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, r, r == nil))
+
 	return r
 }
 
@@ -1470,10 +1792,24 @@ func (r *stack) unsetOpt(x cfgFlag) *stack {
 		return r
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%s)",
+		fname, x, x))
+
 	r.lock()
 	defer r.unlock()
 
+	cur := cfg.positive(x)
 	cfg.unsetOpt(x)
+	after := cfg.positive(x)
+	result := cur != after
+
+	r.state(sprintf("%s: %s state change (%t->%t; ok:%t)",
+		fmname(), x, cur, after, result))
+
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, r, r == nil))
+
 	return r
 }
 
@@ -1483,21 +1819,30 @@ cfgFlag input value is "on" within the receiver's configuration
 value.
 */
 func (r stack) positive(x cfgFlag) bool {
-	fname := fmname()
-
 	cfg, err := r.config()
 	if err != nil {
 		return false
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%s)",
+		fname, x, x))
 	result := cfg.positive(x)
-	r.debug(sprintf("%s: %s:%t", fname, x, result))
+	r.state(sprintf("%s: %s; positive:%t",
+		fname, x, result))
+	r.calls(sprintf("%s: out:%T(%t)",
+		fname, result, result))
 
 	return result
 }
 
 /*
 Mutex enables the receiver's mutual exclusion locking capabilities.
+
+Subsequent calls of write-related methods, such as Push, Pop, Remove
+and others, shall invoke MuTeX locking at the latest possible state
+of processing, thereby minimizing the duration of a lock as much as
+possible.
 */
 func (r Stack) Mutex() Stack {
 	if !r.IsInit() {
@@ -1519,7 +1864,7 @@ func (r *stack) setMutex() {
 		return
 	}
 
-	r.debug(sprintf("%s: MuTeX implemented", fname))
+	r.state(sprintf("%s: MuTeX implemented", fname))
 	sc.setMutex()
 }
 
@@ -1534,7 +1879,8 @@ func (r Stack) CanMutex() bool {
 		return false
 	}
 
-	return r.stack.canMutex()
+	result := r.stack.canMutex()
+	return result
 }
 
 /*
@@ -1547,7 +1893,7 @@ func (r stack) canMutex() bool {
 	}
 
 	result := sc.mtx != nil
-	r.debug(sprintf("%s:%t", fmname(), result))
+	r.state(sprintf("%s: MuTeX implemented: %t", fmname(), result))
 
 	return sc.mtx != nil
 }
@@ -1568,7 +1914,7 @@ func (r *stack) lock() {
 		sc, _ := r.config()
 		_now := now()
 		sc.ldr = &_now
-		r.debug(sprintf("%s: LOCKING", fname))
+		r.state(sprintf("%s: LOCKING", fname))
 		mutex.Lock()
 	}
 }
@@ -1590,7 +1936,7 @@ func (r *stack) unlock() {
 		sc, _ := r.config()
 		_then := *sc.ldr
 		sc.ldr = nil
-		r.debug(sprintf("%s: UNLOCKING; duration:%.09f sec",
+		r.state(sprintf("%s: UNLOCKING; duration:%.09f sec",
 			fname, now().Sub(_then).Seconds()))
 	}
 }
@@ -1610,8 +1956,8 @@ func (r stack) config() (sc *nodeConfig, err error) {
 
 	var ok bool
 	if sc, ok = r[0].(*nodeConfig); !ok {
-		r.error(err)
 		err = errorf("%T does not contain an expected %T instance; aborting", r, sc)
+		r.error(err)
 		return
 	}
 
@@ -1738,11 +2084,18 @@ func (r stack) string() string {
 		return badStack
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+
 	var str []string
 	ot, oc := r.typ()
 	if oc == 0x0 {
+		r.calls(sprintf("%s: out:%T(%v)",
+			fname, badStack, badStack))
 		return badStack
 	} else if oc == basic {
+		r.calls(sprintf("%s: out:%T(%v)",
+			fname, `basic_incompatible`, `basic_incompatible`))
 		return ``
 	}
 
@@ -1750,22 +2103,35 @@ func (r stack) string() string {
 	// policy, if defined, instead of going any
 	// further.
 	if ppol := r.getPresentationPolicy(); ppol != nil {
-		return ppol(r)
+		r.policy(sprintf("%s: call %T", fname, ppol))
+		output := ppol(r)
+		r.calls(sprintf("%s: out:%T(%v)",
+			fname, output, output))
+		return output
 	}
 
 	// Scan each slice and attempt stringification
 	for i := 1; i < r.len(); i++ {
+		r.trace(sprintf("%s: iterate %T:%d:%s (slice %d/%d)",
+			fname, r[i], i-1, getLogID(``), i-1, r.len()-1))
 		// Handle slice value types through assertion
 		if val := r.stringAssertion(r[i]); len(val) > 0 {
 			// Append the apparently valid
 			// string value ...
+			r.trace(sprintf("%s: %T:%d:%s += %T(%v;len:%d)",
+				fname, r[i], i-1, getLogID(``), val, val, len(val)))
 			str = append(str, val)
 		}
 	}
 
 	// hand off our string slices, along with the outermost
 	// type/code values, to the assembleStringStack worker.
-	return r.assembleStringStack(str, ot, oc)
+	assembled := r.assembleStringStack(str, ot, oc)
+
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, assembled, assembled, len(assembled)))
+
+	return assembled
 }
 
 /*
@@ -1773,17 +2139,29 @@ stringAssertion is the private method called during slice iteration
 during stack.string runs.
 */
 func (r stack) stringAssertion(x any) (value string) {
+	fname := fmname()
+
+	r.calls(sprintf("%s: in:%T(nil:%t)",
+		fname, x, x == nil))
+
 	switch tv := x.(type) {
 	case string:
 		// Slice is a raw string value (which
 		// may be eligible for encapsulation)
 		value = r.encapv(tv)
+		r.trace(sprintf("%s: assert:%T->%T(%v;len:%d)",
+			fname, tv, value, value, len(value)))
 	default:
 		// Catch-all; call defaultAssertionHandler
 		// with the current interface slice as the
 		// input argument (tv).
 		value = r.defaultAssertionHandler(tv)
+		r.trace(sprintf("%s: assert fallback:%T->%T(%v;len:%d)",
+			fname, tv, value, value, len(value)))
 	}
+
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, value, value, len(value)))
 
 	return
 }
@@ -1792,6 +2170,9 @@ func (r stack) stringAssertion(x any) (value string) {
 defaultAssertionHandler is a private method called by stack.string.
 */
 func (r stack) defaultAssertionHandler(x any) (str string) {
+	fname := fmname()
+	r.calls(sprintf("%s: in: %T(nil:%t)", fname, x, x == nil))
+
 	// Whatever it is, it had better be one (1) of the following:
 	// • A Stack, or type alias of Stack, or ...
 	// • A Condition, or type alias of Condition, or ...
@@ -1807,15 +2188,21 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 		} else {
 			str = Xs.String()
 		}
+
 	} else if Xc, ok := conditionTypeAliasConverter(x); ok {
 		str = Xc.String()
+
 	} else if meth := getStringer(x); meth != nil {
 		// whatever it is, it seems to have
 		// a stringer method, at least ...
 		str = padValue(!r.positive(nspad), r.encapv(meth()))
 	}
 
-	r.debug(sprintf("%s: %T produced: %s", fmname(), x, str))
+	r.debug(sprintf("%s: %T produced: %s",
+		fmname(), x, str))
+
+	r.calls(sprintf("%s: out: %T(%v;len:%d)",
+		fname, str, str, len(str)))
 
 	return
 }
@@ -1826,10 +2213,16 @@ reduces the cyclomatic complexity of stack.string() by handling the end-stage
 processing of a request for string representation of the receiver.
 */
 func (r stack) assembleStringStack(str []string, ot string, oc stackType) string {
-
 	// Padding char (or lack thereof)
 	pad := padValue(!r.positive(nspad), ``)
 	fname := fmname()
+
+	r.calls(sprintf("%s: in:%T(%v;len:%d)/%T(%v;len:%d)/%T(%s)",
+		fmname(),
+		str, str, len(str),
+		ot, ot, len(ot),
+		oc, oc,
+		``))
 
 	var fstr []string
 	if r.positive(lonce) {
@@ -1837,13 +2230,13 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 		// so just place the type symbol/word at the
 		// beginning and don't use it as a join value.
 		if oc != list {
-			r.debug(sprintf("%s: [%s] += '%s'", fname, oc, ot))
+			r.trace(sprintf("%s: %s += '%s'", fname, oc, ot))
 			fstr = append(fstr, ot)
 		}
 
 		// Append previous content as-is.
 		fstr = append(fstr, str...)
-		r.debug(sprintf("%s: [%s] += '%v' [PREV]", fname, oc, str))
+		r.trace(sprintf("%s: %s += '%v' (PREV)", fname, oc, str))
 	} else {
 		// We're here because the user wants a symbol
 		// or word to appear between every stack val
@@ -1853,10 +2246,10 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			// list-style stack, use pad char as
 			// the join value.
 			if ljc := r.getListDelimiter(); len(ljc) > 0 {
-				r.debug(sprintf("%s: [%s] += '%s'", fname, oc, ljc))
+				r.trace(sprintf("%s: %s += '%s'", fname, oc, ljc))
 				fstr = append(fstr, join(str, ljc))
 			} else {
-				r.debug(sprintf("%s: [%s] += '%s' [PADDING]", fname, oc, pad))
+				r.trace(sprintf("%s: %s += '%s' pad:%t", fname, oc, pad, !r.positive(nspad)))
 				fstr = append(fstr, join(str, pad))
 			}
 		} else {
@@ -1875,7 +2268,7 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			} else {
 				tjn = join(str, ot)
 			}
-			r.debug(sprintf("%s: [%s] += '%s'", fname, oc, tjn))
+			r.trace(sprintf("%s: %s += '%s'", fname, oc, tjn))
 			fstr = append(fstr, tjn)
 		}
 	}
@@ -1886,7 +2279,8 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 	// to one (1) WHSP char as needed.
 	fpad := sprintf("%s%s%s", pad, join(fstr, pad), pad)
 	result := condenseWHSP(r.paren(fpad))
-	r.debug(sprintf("%s: result: '%s'", fname, result))
+	r.calls(sprintf("%s: out: %T(%v;len:%d)",
+		fname, result, result, len(result)))
 	return result
 }
 
@@ -1925,11 +2319,18 @@ traverse is a private method called by Stack.Traverse.
 */
 func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
+	r.calls(sprintf("%s: in: variadic %T(%v;len:%d)",
+		fname, indices, indices, indices))
+
 	if err := r.valid(); err != nil {
 		r.error(sprintf("%s: %v", fname, err))
+		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+			fname, slice, slice == nil, ok, ok))
 		return
 	} else if len(indices) == 0 {
-		r.error(sprintf("%s: non-traversable %T [NO_PATH]", fname, indices))
+		r.error(sprintf("%s: non-traversable %T (NO_PATH)", fname, indices))
+		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+			fname, slice, slice == nil, ok, ok))
 		return
 	}
 
@@ -1937,11 +2338,11 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 	for i := 0; i < len(indices); i++ {
 
 		current := indices[i] // user-facing index number w/ offset
-		r.debug(sprintf("%s: idx:%d %v", fname, current, indices))
+		r.trace(sprintf("%s: iterate idx:%d %v", fname, current, indices))
 
 		instance, _, found := r.index(current) // don't expose the TRUE index
 		if !found {
-			r.debug(sprintf("%s: idx:%d not found", fname, current))
+			r.trace(sprintf("%s: idx:%d not found", fname, current))
 			break
 		}
 
@@ -1951,13 +2352,16 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 		// values. We'll go as deep as possible, provided each nesting
 		// instance is a Stack/Stack alias, or Condition/Condition alias
 		// containing a Stack/Stack alias value.
-		r.debug(sprintf("%s: descending into idx:%d %T::%s", fname, current, instance, id))
+		r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, current, instance, id))
 
 		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); done {
-			r.debug(sprintf("%s: returned from idx:%d %T::%s", fname, current, instance, id))
+			r.trace(sprintf("%s: returned from idx:%d %T::%s", fname, current, instance, id))
 			break
 		}
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+		fname, slice, slice == nil, ok, ok))
 
 	return
 }
@@ -1980,6 +2384,9 @@ func (r *stack) reveal() (err error) {
 		return
 	}
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+
 	if r.positive(ronly) {
 		return // no error needed
 	}
@@ -1987,12 +2394,11 @@ func (r *stack) reveal() (err error) {
 	r.lock()
 	defer r.unlock()
 
-	fname := fmname()
-
 	// scan each slice (except the config
 	// slice) and analyze its structure.
 	for i := 0; i < r.len(); i++ {
 		sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
+		r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
 		if sl == nil {
 			continue
 		}
@@ -2001,14 +2407,19 @@ func (r *stack) reveal() (err error) {
 		// through recursion.
 		if outer, ook := stackTypeAliasConverter(sl); ook {
 			id := getLogID(outer.getID())
-			r.debug(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
+			r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
 			if err = r.revealDescend(outer, i); err != nil {
 				r.setErr(err)
 				r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
+				r.calls(sprintf("%s: out:%T(nil:%t)",
+					fname, err, err == nil))
 				return
 			}
 		}
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, err, err == nil))
 
 	return
 }
@@ -2034,6 +2445,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	var updated any
 
 	fname := fmname()
+	r.calls(sprintf("%s: in: %T(len:%d)/%T(%d)",
+		fname, inner, inner.Len(), idx, idx))
 
 	id := getLogID(r.getID())
 
@@ -2042,6 +2455,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	if inner.stackType() != not {
 		switch inner.Len() {
 		case 0:
+			r.trace(sprintf("%s: remove zero-length %T at idx:%d", fname, inner, idx))
 			r.remove(idx) // empty stack? remove it from outer (rcvr)
 		case 1:
 			// descend into inner slice #0
@@ -2052,7 +2466,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 				cid = getLogID(assert.ID())
 			}
 
-			r.debug(sprintf("%s: descending into single idx:%d %T::%s", fname, 0, child, cid))
+			r.trace(sprintf("%s: descending into single idx:%d %T::%s", fname, 0, child, cid))
 			if err = r.revealSingle(0); err != nil {
 				r.error(sprintf("%s: %T::%s %v", fname, child, cid, err))
 				break
@@ -2061,7 +2475,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 		default:
 			// begin new top-level reveal of inner
 			// as a whole, scanning all +2 slices
-			r.debug(sprintf("%s: descending into %T::%s", fname, 0, inner, id))
+			r.trace(sprintf("%s: descending into %T::%s", fname, 0, inner, id))
 			if err = inner.reveal(); err != nil {
 				r.error(sprintf("%s: %T::%s %v", fname, inner, id, err))
 				break
@@ -2075,6 +2489,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	// already present at index idx
 	// within the receiver instance.
 	if updated != nil {
+		r.trace(sprintf("%s: replace %T:%d:%s with %T",
+			fname, r, idx, getLogID(r.getID()), updated))
 		r.replace(updated, idx)
 	}
 
@@ -2082,6 +2498,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	// return.
 	err = inner.reveal()
 	r.error(sprintf("%s: %T::%s %v", fname, inner, id, err))
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, err, err == nil))
 
 	return
 }
@@ -2101,27 +2519,41 @@ the slice index indicates, a new top-level stack.reveal recursion is launched in
 directly.
 */
 func (r *stack) revealSingle(idx int) (err error) {
+	fname := fmname()
+	r.trace(sprintf("%s: in:%T(%d)",
+		fname, idx, idx))
+
 	// get slice @ idx, bail if nil ...
 	slice, _, _ := r.index(idx)
 	if slice == nil {
+		r.calls(sprintf("%s: out:%T(nil:%t) (nil slice)",
+			fname, err, err == nil))
 		return
 	}
 
 	// If a condition ...
 	if c, okc := conditionTypeAliasConverter(slice); okc {
+		r.trace(sprintf("%s slice conversion to %T:ok", fname, c))
 		// ... If condition expression is a stack ...
 		if inner, iok := stackTypeAliasConverter(c.Expression()); iok {
+			r.trace(sprintf("%s: slice assertion to %T:ok", fname, inner))
 			// ... recurse into said stack expression
 			if err = inner.reveal(); err == nil {
+				r.trace(sprintf("%s: set expression to %T(len:%d)",
+					fname, inner, inner.Len()))
 				// update the condition w/ new value
 				c.SetExpression(inner)
 			}
 		}
 
 	} else if inner, iok := stackTypeAliasConverter(slice); iok {
+		r.trace(sprintf("%s slice conversion to %T:ok", fname, inner))
 		// If a stack then recurse
 		err = inner.reveal()
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)",
+		fname, err, err == nil))
 
 	return
 }
@@ -2132,20 +2564,23 @@ nested Stack/Stack alias instances that may or may not reside in Condition/Condi
 */
 func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
+	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+		fname, x, x == nil, idx, idx, indices, indices, len(indices)))
+
 	if slice, ok, done = r.traverseStack(x, idx, indices...); ok {
 		// The value was a Stack or Stack type alias.
-		r.debug(sprintf("%s: idx %d: found traversable %T [SLICE]", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found traversable slice %T", fname, idx, x))
 	} else if slice, ok, done = r.traverseStackInCondition(x, idx, indices...); ok {
 		// The value was a Condition, and there MAY be a Stack
 		// or Stack type alias nested within said Condition ...
-		r.debug(sprintf("%s: idx %d: found traversable %T [SLICE]", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found traversable slice %T", fname, idx, x))
 	} else if len(indices) <= 1 {
 		// If we're at the end of the line, just return
 		// whatever is there.
 		slice = x
 		ok = true
 		done = true
-		r.debug(sprintf("%s: idx %d: found %T [SLICE] at end of path", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found slice %T at end of path", fname, idx, x))
 	} else {
 		// If we arrived here with more path elements left,
 		// it would appear the path was invalid, or ill-suited
@@ -2154,8 +2589,11 @@ func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice a
 		// done or ok since it (probably) isn't what they
 		// wanted ...
 		slice = x
-		r.debug(sprintf("%s: path leftovers in non-traversable %T:%d at %v", fname, x, idx, indices))
+		r.error(sprintf("%s: path leftovers in non-traversable %T:%d at %v", fname, x, idx, indices))
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
 }
@@ -2167,13 +2605,17 @@ instance's own value (i.e.: recurse stacks that reside in conditions, etc ...).
 */
 func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
+	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+		fname, u, u == nil, idx, idx, indices, indices, len(indices)))
+
 	if c, cOK := conditionTypeAliasConverter(u); cOK {
+		r.trace(sprintf("%s conversion to %T:ok", fname, c))
 		// End of the line :)
 		if len(indices) <= 1 {
 			slice = c
 			ok = true
 			done = true
-			r.debug(sprintf("%s: found %T:%d [SLICE] at %v", fname, c, idx, indices))
+			r.trace(sprintf("%s: found %T:%d [SLICE] at %v", fname, c, idx, indices))
 		} else {
 			// We have leftovers. If the Condition's value is a
 			// Stack *OR* a Stack alias, traverse it ...
@@ -2182,10 +2624,13 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 			if assert, aok := expr.(Interface); aok {
 				id = getLogID(assert.ID())
 			}
-			r.debug(sprintf("%s: descending into %T:%d:%s at %v", fname, expr, idx, id, indices))
+			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, expr, idx, id, indices))
 			return r.traverseStack(expr, idx, indices...)
 		}
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
 }
@@ -2196,21 +2641,28 @@ method will traverse either a Stack *OR* Stack alias type fashioned by the user.
 */
 func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
+	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+		fname, u, u == nil, idx, idx, indices, indices, len(indices)))
+
 	if s, sOK := stackTypeAliasConverter(u); sOK {
+		r.trace(sprintf("%s conversion to %T:ok", fname, s))
 		// End of the line :)
 		if len(indices) <= 1 {
 			slice = s
 			ok = slice != nil
 			done = true
-			r.debug(sprintf("%s: found %T:%d [SLICE] at %v", fname, s, idx, indices))
+			r.trace(sprintf("%s: found %T:%d [SLICE] at %v", fname, s, idx, indices))
 		} else {
 			// begin new Stack (tv/x) recursion beginning at
 			// the NEXT index ...
 			var id string = getLogID(s.ID())
-			r.debug(sprintf("%s: descending into %T:%d:%s at %v", fname, s, idx, id, indices))
+			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, s, idx, id, indices))
 			return s.stack.traverse(indices[idx+1:]...)
 		}
 	}
+
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
 }
@@ -2256,6 +2708,7 @@ index is a private method called by Stack.Index.
 func (r stack) index(i int) (slice any, idx int, ok bool) {
 	fname := fmname()
 	var id string = getLogID(r.getID())
+	r.calls(sprintf("%s: in:%T(%d)", fname, i, i))
 
 	L := r.ulen()
 	if L == 0 {
@@ -2265,6 +2718,8 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 
 	if i < 0 {
 		if !r.positive(negidx) {
+			r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t) (neg. indices unavailable)",
+				fname, slice, slice == nil, idx, idx, ok, ok))
 			return
 		}
 		// We're negative, so let's increase
@@ -2274,6 +2729,8 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 		i = factorNegIndex(i, L)
 	} else if i > L-1 {
 		if !r.positive(fwdidx) {
+			r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t) (fwd. indices unavailable)",
+				fname, slice, slice == nil, idx, idx, ok, ok))
 			return
 		}
 		// If the user input an index
@@ -2298,6 +2755,9 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 	idx = i
 	ok = slice != nil
 	r.debug(sprintf("%s: %T:%d:%s; found %T [nil:%t]", fname, r, i, id, slice, !ok))
+
+	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t)",
+		fname, slice, slice == nil, idx, idx, ok, ok))
 
 	return
 }
@@ -2383,13 +2843,19 @@ func (r stack) typ() (kind string, typ stackType) {
 }
 
 /*
-Pop removes and returns the final slice value from
-the receiver instance. A Boolean value is returned
-alongside, indicative of whether an actual slice
-value was found. Note that if the receiver is in an
-invalid state, or has a zero length, nothing will
-be removed, and a meaningless value of true will be
-returned alongside a nil slice value.
+Pop removes and returns the requisite slice value from the receiver
+instance. A Boolean value is returned alongside, indicative of whether
+an actual slice value was found.
+
+The requisite slice shall be one (1) of the following, depending on
+ordering mode in effect:
+
+  - In the default mode -- LIFO -- this shall be the final slice (index "Stack.Len() - 1", or the "far right" element)
+  - In the alternative mode -- FIFO -- this shall be the first slice (index 0, or the "far left" element)
+
+Note that if the receiver is in an invalid state, or has a zero length,
+nothing will be removed, and a meaningless value of true will be returned
+alongside a nil slice value.
 */
 func (r Stack) Pop() (any, bool) {
 	if !r.IsInit() {
@@ -2402,25 +2868,28 @@ func (r Stack) Pop() (any, bool) {
 /*
 pop is a private method called by Stack.Pop.
 */
-func (r *stack) pop() (any, bool) {
+func (r *stack) pop() (slice any, ok bool) {
 	fname := fmname()
 	id := getLogID(r.getID())
+	r.calls(sprintf("%s: in:niladic",
+		fname))
 
 	if r.ulen() < 1 {
-		r.error(sprintf("%s: %T:%s; nothing poppable", fname, r, id))
-		return nil, true
+		ok = true
+		r.debug(sprintf("%s: %T:%s; nothing poppable", fname, r, id))
+		return
 	}
 
 	if r.positive(ronly) {
-		return nil, false
+		return
 	}
 
 	r.lock()
 	defer r.unlock()
 
-	var idx int
-	var slice any
+	var idx, plen int
 	var typ string
+	plen = r.len() - 1
 
 	if r.isFIFO() {
 		typ = `FIFO`
@@ -2436,11 +2905,17 @@ func (r *stack) pop() (any, bool) {
 		*r = (*r)[:idx]
 	}
 
-	r.debug(sprintf("%s (%s): %T:%d:%s; removing idx", fname, typ, r, idx, id))
-	ok := slice != nil
+	r.debug(sprintf("%s (%s): %T:%d:%s; executing; len:%d",
+		fname, typ, r, idx, id, plen))
+	ok = slice != nil
 
-	r.debug(sprintf("%s: %T:%d:%s; ok:%t", fname, r, idx, id, ok))
-	return slice, slice != nil
+	r.debug(sprintf("%s (%s): %T:%d:%s; ok:%t, len:%d",
+		fname, typ, r, idx, id, ok, r.ulen()))
+
+	r.calls(sprintf("%s: out: %T(nil:%t),%T(%t)",
+		fname, slice, slice == nil, ok, ok))
+
+	return
 }
 
 /*
@@ -2467,12 +2942,9 @@ func (r *stack) push(x ...any) *stack {
 	fname := fmname()
 	id := getLogID(r.getID())
 
-	if !r.isInit() {
-		return r
-	}
+	r.calls(sprintf("%s: in: variadic any(len:%d)", fname, len(x)))
 
-	if err := r.valid(); err != nil {
-		r.error(sprintf("%s: %T:%s [PAYLOAD:%d]: %v", fname, r, id, len(x), err))
+	if !r.isInit() {
 		return r
 	}
 
@@ -2486,7 +2958,7 @@ func (r *stack) push(x ...any) *stack {
 	// try to see if the user provided a
 	// push verification function
 	if meth := r.getPushPolicy(); meth != nil {
-		r.debug(sprintf("%s: %T::%s; delegating push to %T [PAYLOAD:%d]", fname, r, id, meth, len(x)))
+		r.debug(sprintf("%s: %T::%s; delegating push to %T (payload:%d)", fname, r, id, meth, len(x)))
 		// use the user-provided function to scan
 		// each pushed item for verification.
 		r.methodAppend(meth, x...)
@@ -2494,8 +2966,10 @@ func (r *stack) push(x ...any) *stack {
 	}
 
 	// no push policy was found, just do it.
-	r.debug(sprintf("%s: %T::%s; generic push [PAYLOAD:%d]", fname, r, id, len(x)))
+	r.debug(sprintf("%s: %T::%s; generic push (payload:%d)", fname, r, id, len(x)))
 	r.genericAppend(x...)
+
+	r.calls(sprintf("%s: out %T(rcvr)", fname, r))
 
 	return r
 }
@@ -2545,12 +3019,15 @@ func (r *stack) defrag(max int) {
 
 	fname := fmname()
 	id := getLogID(r.getID())
+	r.calls(sprintf("%s: in: %T(%d)",
+		fname, max))
 
 	var start int = -1
 	var spat []int = make([]int, r.len(), r.len())
 	for i := 0; i < r.len(); i++ {
 		if _, _, ok := r.index(i); !ok {
 			if start == -1 {
+				r.trace(sprintf("%s: starting nil identified - idx:%d", fname, i))
 				start = i // only set once
 			}
 			continue
@@ -2573,8 +3050,12 @@ func (r *stack) defrag(max int) {
 		r.setErr(err)
 	} else if last >= 0 {
 		// chop off the remaining consecutive nil slices
+		r.trace(sprintf("%s: truncating %d/%d slices",
+			fname, len((*r)[:last+1]), len(*r)))
 		(*r) = (*r)[:last+1]
 	}
+
+	r.calls(sprintf("%s: out:void", fname))
 
 	return
 }
@@ -2583,6 +3064,8 @@ func (r stack) verifyImplode(spat, tpat []int) (last int, err error) {
 	last = -1
 	fname := fmname()
 	id := getLogID(r.getID())
+	r.calls(sprintf("%s: in: %T,%T",
+		fname, spat, tpat))
 
 	data := make(map[string]string, len(tpat))
 	var fail bool
@@ -2608,6 +3091,10 @@ func (r stack) verifyImplode(spat, tpat []int) (last int, err error) {
 
 	last--
 
+	r.trace(sprintf("%s: data", data))
+	r.calls(sprintf("%s: out:%T(%d),error(nil:%t)",
+		fname, last, last, err == nil))
+
 	return
 }
 
@@ -2616,13 +3103,17 @@ func (r *stack) implode(start, max int, spat []int) (tpat []int) {
 	tpat = make([]int, len(spat), len(spat))
 	tpat[0] = 1 // cfg slice is exempt
 
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%d),%T(%d),%T(%v;len:%d)",
+		fname, start, start, max, max, spat, spat, len(spat)))
+
 	r.lock()
 	defer r.unlock()
 
-	fname := fmname()
+	r.debug(sprintf("%s: begin implosion target scan", fname))
 
 	for {
-		r.debug(sprintf("%s: %T implosion target scan at %d", fname, r, start))
+		r.trace(sprintf("%s: %T implosion target scan at %d", fname, r, ct))
 
 		if ct >= max || start+ct >= r.ulen() {
 			break
@@ -2633,18 +3124,20 @@ func (r *stack) implode(start, max int, spat []int) (tpat []int) {
 			continue
 		}
 
-		r.debug(sprintf("%s: %T shift overwrite %d with %d", fname, r, start+1, start+ct+1))
+		r.trace(sprintf("%s: %T shift overwrite %d with %d", fname, r, start+1, start+ct+1))
 		(*r)[start+1] = (*r)[start+ct+1]
 
 		tpat[start+ct] = 1
 
-		r.debug(sprintf("%s: %T nullify %d", fname, r, start+ct+1))
+		r.trace(sprintf("%s: %T nullify %d", fname, r, start+ct+1))
 		(*r)[start+ct+1] = nil
 		start = start + 1
 		ct = 0
 	}
 
 	r.debug(sprintf("%s: %T target has imploded", fname, r))
+	r.calls(sprintf("%s: out:%T(%v;len:%d)",
+		fname, tpat, tpat, len(tpat)))
 
 	return
 }
@@ -2674,8 +3167,8 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 		if r.capReached() {
 			// if capacity has been reached,
 			// break out of loop.
-			err = errorf("%T.Push failed: capacity violation (%d/%d slices added)",
-				Stack{}, pct, len(x))
+			err = errorf("%s failed: capacity violation (%d/%d slices added)",
+				fname, pct, len(x))
 			r.setErr(err)
 
 			r.policy(sprintf("%s: +X= %T:%d:%s capacity violation (total:%d > cap:%d)",
@@ -2728,32 +3221,36 @@ that maximum capacity --if one was specified-- is not exceeded.
 func (r *stack) genericAppend(x ...any) *stack {
 	fname := fmname()
 	var pct int
+
+	r.debug(sprintf("%s: begin += %d", fname, len(x)))
+
 	for i := 0; i < len(x); i++ {
+		r.trace(sprintf("%s: += %T (%d)", fname, x[i], i))
+
 		var err error
 		if !r.canPushNester(x[i]) {
-			err = errorf("%T.Push failed: nesting violation (%d/%d slices added)",
-				Stack{}, pct, len(x))
+			err = errorf("%s: failed; nesting violation (%d/%d slices added)",
+				fname, Stack{}, pct, len(x))
 			r.setErr(err)
-
-			r.policy(sprintf("%s: +X= %T [%d]: nesting violation",
-				fname, x[i], i))
+			r.policy(err)
 			continue
 		}
 
 		if r.capReached() {
-			err = errorf("%T.Push failed: capacity violation (%d/%d slices added)",
-				Stack{}, pct, len(x))
+			err = errorf("%s: failed; capacity violation (%d/%d slices added)",
+				fname, Stack{}, pct, len(x))
 			r.setErr(err)
+			r.policy(err)
 
-			r.policy(sprintf("%s: +X= %T [%d]: capacity violation (total:%d > cap:%d)",
-				fname, x[i], i, r.len()+len(x), r.cap()))
 			break
 		}
 
-		r.debug(sprintf("%s: += %T [%d]", fname, x[i], i))
+		r.trace(sprintf("%s: += %T (%d); ok:true", fname, x[i], i))
 		*r = append(*r, x[i])
 		pct++
 	}
+
+	r.debug(sprintf("%s: complete: %d/%d slices added", fname, pct, len(x)))
 
 	return r
 }
@@ -2787,7 +3284,7 @@ func (r *stack) setPushPolicy(ppol PushPolicy) *stack {
 		r.setErr(err)
 		return r
 	}
-	r.policy(sprintf("%s: %T registered", fname, ppol))
+	r.state(sprintf("%s: %T registered", fname, ppol))
 	rc.ppf = ppol
 	return r
 }
@@ -2840,7 +3337,7 @@ func (r *stack) setPresentationPolicy(ppol PresentationPolicy) *stack {
 		return r
 	}
 
-	r.policy(sprintf("%s: %T registered", fname, ppol))
+	r.state(sprintf("%s: %T registered", fname, ppol))
 	rc.rpf = ppol
 	return r
 }
@@ -2883,7 +3380,7 @@ func (r *stack) setValidityPolicy(vpol ValidityPolicy) *stack {
 	}
 
 	fname := fmname()
-	r.policy(sprintf("%s: %T registered", fname, vpol))
+	r.state(sprintf("%s: %T registered", fname, vpol))
 	rc.vpf = vpol
 	return r
 }
@@ -2912,7 +3409,12 @@ func (r *stack) mkmsg(typ string) (Message, bool) {
 	}, true
 }
 
+/*
+error conditions that are fatal.
+*/
 func (r stack) fatal(x any, data ...map[string]string) {
+	// fatal events cannot be ignored
+
 	m, ok := r.mkmsg(`FATAL`)
 	if !ok {
 		return
@@ -2931,7 +3433,16 @@ func (r stack) fatal(x any, data ...map[string]string) {
 	r.logger().Fatalln(m)
 }
 
+/*
+error conditions that are not fatal.
+*/
 func (r stack) error(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+	if !(cfg.log.positive(LogLevel5) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
 	m, ok := r.mkmsg(`ERROR`)
 	if !ok {
 		return
@@ -2951,6 +3462,12 @@ func (r stack) error(x any, data ...map[string]string) {
 }
 
 func (r stack) debug(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+	if !(cfg.log.positive(LogLevel4) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
 	m, ok := r.mkmsg(`DEBUG`)
 	if !ok {
 		return
@@ -2969,8 +3486,90 @@ func (r stack) debug(x any, data ...map[string]string) {
 	r.logger().Println(m)
 }
 
+func (r stack) trace(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+
+	if !(cfg.log.positive(LogLevel6) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
+	m, ok := r.mkmsg(`TRACE`)
+	if !ok {
+		return
+	}
+
+	if ok = m.setText(x); !ok {
+		return
+	}
+
+	if len(data) > 0 {
+		if data[0] != nil {
+			m.Data = data[0]
+		}
+	}
+
+	r.logger().Println(m)
+}
+
 func (r stack) policy(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+	if !(cfg.log.positive(LogLevel2) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
 	m, ok := r.mkmsg(`POLICY`)
+	if !ok {
+		return
+	}
+
+	if ok = m.setText(x); !ok {
+		return
+	}
+
+	if len(data) > 0 {
+		if data[0] != nil {
+			m.Data = data[0]
+		}
+	}
+
+	r.logger().Println(m)
+}
+
+func (r stack) calls(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+	if !(cfg.log.positive(LogLevel1) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
+	m, ok := r.mkmsg(`CALL`)
+	if !ok {
+		return
+	}
+
+	if ok = m.setText(x); !ok {
+		return
+	}
+
+	if len(data) > 0 {
+		if data[0] != nil {
+			m.Data = data[0]
+		}
+	}
+
+	r.logger().Println(m)
+}
+
+func (r stack) state(x any, data ...map[string]string) {
+	cfg, _ := r.config()
+	if !(cfg.log.positive(LogLevel3) ||
+		cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
+	m, ok := r.mkmsg(`STATE`)
 	if !ok {
 		return
 	}

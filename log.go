@@ -15,17 +15,202 @@ var (
 	cLogDefault *log.Logger
 )
 
-type logLevel uint16
+type logSystem struct {
+	lvl logLevels
+	log *log.Logger
+}
+
+/*
+LogLevel is a uint16 type alias used to define compound logging
+verbosity configuration values.
+
+LogLevel consts zero (0) through four (4) are as follows:
+
+  - NoLogLevels defines the lack of any logging level
+  - LogLevel1 defines basic function and method call event logging
+  - LogLevel2 defines the logging of events relating to configuration state changes
+  - LogLevel3
+  - LogLevel4
+*/
+type LogLevel uint16
+
+const NoLogLevels LogLevel = 0 // silent
+
 type logLevels uint16
 
-const (
-	logCalls  logLevel = 1 << iota // log func/meth calls and their returns
-	logPolErr                      // log errors thrown by policies, cap, r/o
-	logNCfg                        // log state changes to underlying nodeCfg
-	logInt                         // log internals (very verbose!)
+var logLevelNames map[LogLevel]string
 
-	logNone logLevel = 0 // log nothing
+const (
+	LogLevel1      LogLevel = 1 << iota //     1 :: builtin: calls
+	LogLevel2                           //     2 :: builtin: policy
+	LogLevel3                           //     4 :: builtin: state
+	LogLevel4                           //     8 :: builtin: debug
+	LogLevel5                           //    16 :: builtin: errors
+	LogLevel6                           //    32 :: builtin: trace
+	UserLogLevel1                       //    64 :: user-defined
+	UserLogLevel2                       //   128 :: user-defined
+	UserLogLevel3                       //   256 :: user-defined
+	UserLogLevel4                       //   512 :: user-defined
+	UserLogLevel5                       //  1024 :: user-defined
+	UserLogLevel6                       //  2048 :: user-defined
+	UserLogLevel7                       //  4096 :: user-defined
+	UserLogLevel8                       //  8192 :: user-defined
+	UserLogLevel9                       // 16384 :: user-defined
+	UserLogLevel10                      // 32768 :: user-defined
+
+	AllLogLevels LogLevel = ^LogLevel(0) // 65535 :: log all of the above unconditionally (!!)
 )
+
+func (r logLevels) String() string {
+	if LogLevel(r) == AllLogLevels {
+		return `ALL`
+	} else if LogLevel(r) == NoLogLevels {
+		return `NONE`
+	}
+
+	var levels []string
+	for i := 0; i < 16; i++ {
+		lvl := LogLevel(1 << i)
+		if r.positive(lvl) {
+			if name, found := logLevelNames[lvl]; found {
+				levels = append(levels, name)
+			}
+		}
+	}
+
+	return join(levels, `,`)
+}
+
+/*
+shift shall left-shift the bit value of the receiver to include
+the addition of one (1) or more LogLevel instances (l) in variadic
+fashion.
+
+If any of l's values are NoLogLevels, the receiver shall be set to
+zero (0) and any remaining shifts shall be discarded. In this context,
+"shift nothing" translates to "log nothing".
+
+Conversely, if any of l's values are LogLevel16, the receiver shall be set
+to ^LogLevel(0) (uint16(65535)) and any remaining shifts shall be discarded.
+*/
+func (r *logSystem) shift(l ...LogLevel) *logSystem {
+	if r == nil {
+		r = newLogSystem(devNull)
+	}
+	r.lvl.shift(l...)
+	return r
+}
+
+func (r *logLevels) shift(l ...LogLevel) *logLevels {
+	for i := 0; i < len(l); i++ {
+		if l[i] == NoLogLevels {
+			*r = logLevels(NoLogLevels)
+			return r
+		} else if l[i] == AllLogLevels {
+			*r = logLevels(AllLogLevels)
+			return r
+		}
+
+		*r |= logLevels(l[i])
+	}
+
+	return r
+}
+
+/*
+unshift shall right-shift the bit value of the receiver to effect
+the removal of one (1) or more logLevel instances (l) in variadic
+fashion.
+
+If any of l's values are NoLogLevels, the loop shall call continue, as
+nothing can be done logically with that value here, though it is
+not fatal, nor should it terminate processing.
+
+If any of l's values are LogLevel16, the receiver shall be set to zero
+(0) and any remaining shifts shall be discarded, as "unshift all"
+in this context translates to "log nothing".
+*/
+func (r *logSystem) unshift(l ...LogLevel) *logSystem {
+	if r.isZero() {
+		r = newLogSystem(devNull)
+		return r
+	}
+
+	r.lvl.unshift(l...)
+	return r
+}
+
+func (r *logLevels) unshift(l ...LogLevel) *logLevels {
+	for i := 0; i < len(l); i++ {
+		if LogLevel(l[i]) == NoLogLevels {
+			continue // WAT.
+		} else if LogLevel(l[i]) == AllLogLevels {
+			*r = logLevels(AllLogLevels)
+			return r
+		}
+
+		*r = (*r &^ logLevels(l[i]))
+	}
+	return r
+}
+
+/*
+positive returns a Boolean value indicative of whether the receiver
+contains the bit value for the specified logLevel. In context, this
+means "logLevel <X>" is either active (true) or not (false).
+*/
+func (r logSystem) positive(l LogLevel) bool {
+	if r.isZero() {
+		return false
+	}
+
+	return r.lvl.positive(l)
+}
+
+func (r logLevels) positive(l LogLevel) bool {
+	if r == logLevels(0) {
+		return false
+	} else if r == ^logLevels(0) {
+		return true
+	}
+
+	result := (r & logLevels(l)) != 0
+
+	return result
+}
+
+func (r *logSystem) isZero() bool {
+	if r == nil {
+		return true
+	}
+
+	return r.log == nil && r.lvl == logLevels(NoLogLevels)
+}
+
+func (r logSystem) logger() *log.Logger {
+	if r.isZero() {
+		return nil
+	}
+
+	return r.log
+}
+
+func (r *logSystem) setLogger(logger any) *logSystem {
+	r.log = resolveLogger(logger)
+	return r
+}
+
+func newLogSystem(logger any, l ...LogLevel) (lsys *logSystem) {
+	lgr := devNull
+	if logger != nil {
+		lgr = resolveLogger(logger)
+	}
+	lsys = new(logSystem)
+	lsys.log = lgr
+	lsys.lvl = *new(logLevels).shift(l...)
+
+	return
+}
 
 /*
 SetDefaultConditionLogger is a package-level function that will define
@@ -242,7 +427,7 @@ func (r Message) Valid() bool {
 }
 
 func getLogID(elem string) (id string) {
-	id = `[no_id]`
+	id = `no_identifier`
 	if _id := elem; len(_id) > 0 {
 		id = elem
 	}
@@ -255,4 +440,25 @@ func init() {
 	devNull = log.New(io.Discard, ``, 0)
 	sLogDefault = devNull
 	cLogDefault = devNull
+
+	logLevelNames = map[LogLevel]string{
+		NoLogLevels:    `NONE`,
+		LogLevel1:      `CALLS`,
+		LogLevel2:      `POLICY`,
+		LogLevel3:      `STATE`,
+		LogLevel4:      `DEBUG`,
+		LogLevel5:      `ERRORS`,
+		LogLevel6:      `TRACE`,
+		UserLogLevel1:  `USER1`,
+		UserLogLevel2:  `USER2`,
+		UserLogLevel3:  `USER3`,
+		UserLogLevel4:  `USER4`,
+		UserLogLevel5:  `USER5`,
+		UserLogLevel6:  `USER6`,
+		UserLogLevel7:  `USER7`,
+		UserLogLevel8:  `USER8`,
+		UserLogLevel9:  `USER9`,
+		UserLogLevel10: `USER10`,
+		AllLogLevels:   `ALL`,
+	}
 }

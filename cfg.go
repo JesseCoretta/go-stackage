@@ -26,13 +26,115 @@ type nodeConfig struct {
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)
+	aux Auxiliary          // auxiliary admin-related object storage, user managed
 
 	typ stackType   // stacks only: defines the typ/kind of stack
 	sym string      // stacks only: user-controlled symbol char(s)
 	ljc string      // [list] stacks only: joining delim
 	mtx *sync.Mutex // stacks only: optional locking system
-	ldr *time.Time  // for lock duration
+	ldr *time.Time  // for lock duration; ephemeral, nil if not locked / no locking capabilities
 	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
+}
+
+/*
+Auxiliary is a map[string]any type alias extended by this package. It
+can be created within any Stack instance when [re]initialized using
+the SetAuxiliary method extended through instances of the Stack type,
+and can be accessed using the Auxiliary() method in similar fashion.
+
+The Auxiliary type extends four (4) methods: Get, Set, Len and Unset.
+These are purely for convenience. Given that instances of this type
+can easily be cast to standard map[string]any by the user, the use of
+these methods is entirely optional.
+
+The Auxiliary map instance is available to be leveraged in virtually
+any way deemed appropriate by the user. Its primary purpose is for
+storage of any instance(s) pertaining to the *administration of the
+stack*, as opposed to the storage of content normally submitted *into*
+said stack.
+
+Examples of suitable instance types for storage within the Auxiliary
+map include, but are certainly not limited to:
+
+  - HTTP server listener / mux
+  - HTTP client, agent
+  - Graphviz node data
+  - Go Metrics meters, gauges, etc.
+  - Redis cache
+  - bytes.Buffer
+  - ANTLR parser
+  - text/template instances
+  - channels
+
+Which instances are considered suitable for storage within Auxiliary map
+instances is entirely up to the user. This package shall not impose ANY
+controls or restrictions regarding the content within this instances of
+this type, nor its behavior.
+*/
+type Auxiliary map[string]any
+
+/*
+Len returns the integer length of the receiver, defining the number of
+key/value pairs present.
+*/
+func (r Auxiliary) Len() int {
+	if r == nil {
+		return 0
+	}
+	return len(r)
+}
+
+/*
+Get returns the value associated with key, alongside a presence-indicative
+Boolean value (ok).
+
+Even if found within the receiver instance, if value is nil, ok shall be
+explicitly set to false prior to return.
+
+Case is significant in the matching process.
+*/
+func (r Auxiliary) Get(key string) (value any, ok bool) {
+	if r == nil {
+		return
+	}
+
+	if value, ok = r[key]; value == nil {
+		ok = false
+	}
+
+	return
+}
+
+/*
+Set associates key with value, and assigns to receiver instance. See
+also the Unset method.
+
+If the receiver is not initialized, a new allocation is made.
+*/
+func (r Auxiliary) Set(key string, value any) Auxiliary {
+	if r == nil {
+		return r
+	}
+
+	r[key] = value
+	return r
+}
+
+/*
+Unset removes the key/value pair, identified by key, from the receiver
+instance, if found. See also the Set method.
+
+This method internally calls the following builtin:
+
+  delete(*rcvr,key)
+
+Case is significant in the matching process.
+*/
+func (r Auxiliary) Unset(key string) Auxiliary {
+	if _, found := r[key]; found {
+		delete(r, key)
+	}
+	return r
 }
 
 /*
@@ -127,7 +229,7 @@ const (
 	joinl                      //    64 // list joining value
 	ronly                      //   128 // stack is read-only
 	nnest                      //   256 // stack/condition does not allow stack/stack alias instances as slice members or expression value
-	_                          //   512
+	etrav                      //   512 // enhanced traversal support (slices, int-keyed maps)
 	_                          //  1024
 	_                          //  2048
 	_                          //  4096
@@ -354,17 +456,6 @@ func (r *cfgFlag) shift(x cfgFlag) {
 	*r |= x
 }
 
-/*
-   parens cfgFlag = 1 << iota //     1 // current stack (not its values) should be encapsulated it in parenthesis in string representation
-   cfold                      //     2 // fold case of 'AND', 'OR' and 'NOT' to 'and', 'or' and 'not' or vice versa        nspad                      //     4 // don't pad slices with a single space character when represented as a string
-   lonce                      //     8 // only use operator once per stack, and only as the leading element; mainly for LDAP filters
-   negidx                     //    16 // enable negative index support
-   fwdidx                     //    32 // enable forward index support
-   joinl                      //    64 // list joining value
-   ronly                      //   128 // stack is read-only
-   nnest
-*/
-
 func (r cfgFlag) String() (f string) {
 	for k, v := range cfgFlagMap {
 		if k == r {
@@ -470,5 +561,6 @@ func init() {
 		joinl:  `join_list`,
 		ronly:  `read_only`,
 		nnest:  `no_nest`,
+		etrav:  `enhanced_traversal`,
 	}
 }

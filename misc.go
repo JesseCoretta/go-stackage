@@ -61,6 +61,31 @@ func timestamp() string {
 		t.Nanosecond())
 }
 
+func isETravEligible(ok bool, x any) bool {
+	return ( isIntKeyedMap(x) || isSliceType(x) ) && ok
+}
+
+func isIntKeyedMap(x any) bool {
+	typ := typOf(x)
+	if isPtr(x) {
+		typ = typ.Elem()
+	}
+
+	if typ.Kind() != reflect.Map {
+		return false
+	}
+	return typ.Key().Kind() == reflect.Int
+}
+
+func isSliceType(x any) bool {
+	typ := reflect.TypeOf(x)
+	if isPtr(x) {
+		typ = typ.Elem()
+	}
+
+	return typ.Kind() == reflect.Slice
+}
+
 /*
 errorf wraps errors.New and returns a non-nil instance of error
 based upon a non-nil/non-zero msg input value with optional args.
@@ -180,11 +205,9 @@ func stackTypeAliasConverter(u any) (S Stack, converted bool) {
 		X := v.Convert(b).Interface()
 		if assert, ok := X.(Stack); ok {
 			if !assert.IsZero() {
-				if s := assert.String(); s != badStack && len(s) > 0 {
-					S = assert
-					converted = true
-					return
-				}
+				S = assert
+				converted = true
+				return
 			}
 		}
 	}
@@ -226,11 +249,9 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 		X := v.Convert(b).Interface()
 		if assert, ok := X.(Condition); ok {
 			if !assert.IsZero() {
-				if s := assert.String(); s != badCond && len(s) > 0 {
-					C = assert
-					converted = true
-					return
-				}
+				C = assert
+				converted = true
+				return
 			}
 		}
 	}
@@ -388,6 +409,27 @@ func isStringPrimitive(x any) bool {
 	return false
 }
 
+func isBoolPrimitive(x any) bool {
+	switch x.(type) {
+	case bool:
+		return true
+	}
+
+	return false
+}
+
+func isKnownPrimitive(x any) bool {
+	if isStringPrimitive(x) {
+		return true
+	} else if isNumberPrimitive(x) {
+		return true
+	} else if isBoolPrimitive(x) {
+		return true
+	}
+
+	return false
+}
+
 func numberStringer(x any) string {
 	switch tv := x.(type) {
 	case float32, float64:
@@ -400,7 +442,28 @@ func numberStringer(x any) string {
 		return uintStringer(tv)
 	}
 
-	return `<invalid_number>`
+	return `NaN`
+}
+
+func primitiveStringer(x any) string {
+	if !isKnownPrimitive(x) {
+		return ``
+	}
+	if isBoolPrimitive(x) {
+		return boolStringer(x)
+	}
+	if isNumberPrimitive(x) {
+		return numberStringer(x)
+	}
+	if isStringPrimitive(x) {
+		return x.(string)
+	}
+
+	return `unsupported_stringer_type`
+}
+
+func boolStringer(x any) string {
+	return sprintf("%t", x.(bool))
 }
 
 func floatStringer(x any) string {

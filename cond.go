@@ -366,16 +366,12 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 		// a stringer method, at least ...
 		X = x
 
-	} else if isNumberPrimitive(x) {
+	} else if isKnownPrimitive(x) {
 		// value is one of go's builtin
 		// numerical primitives, which
 		// are string represented using
 		// sprintf.
-		X = numberStringer(x)
-
-	} else if isStringPrimitive(x) {
-		// value is a simple string
-		X = x.(string)
+		X = primitiveStringer(x)
 	}
 
 	return

@@ -103,8 +103,8 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 
 	if len(c) > 0 {
 		if c[0] > 0 {
-			st = make(stack, 0, c[0]+1) // 1 for cfg slice offset
-			cfg.cap = c[0] + 1
+			cfg.cap = c[0] + 1	// 1 for cfg slice offset
+			st = make(stack, 0, cfg.cap)
 			data[`capacity`] = sprintf("%d", cfg.cap)
 		}
 	} else {
@@ -223,6 +223,100 @@ func (r *stack) addr() string {
 	addr := sprintf("%p", *r)
 
 	return addr
+}
+
+/*
+SetAuxiliary assigns aux, as initialized and optionally populated as
+needed by the user, to the receiver instance. The aux input value may
+be nil.
+
+If no variadic input is provided, the default Auxiliary allocation
+shall occur.
+
+Note that this method shall obliterate any instance that may already
+be present, regardless of the state of the input value aux.
+*/
+func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
+	if !r.IsInit() {
+		return r
+	}
+
+	r.stack.setAuxiliary(aux...)
+	return r
+}
+
+/*
+setAuxiliary is a private method called by Stack.SetAuxiliary.
+*/
+func (r *stack) setAuxiliary(aux ...Auxiliary) {
+	if r.isZero() {
+		return
+	}
+
+	cfg, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in: variadic %T(len:%d)",
+		fname, aux, len(aux)))
+
+	var _aux Auxiliary
+	if len(aux) == 0 {
+		r.trace(sprintf("%s: ALLOC %T (no variadic input)",
+			fname, _aux))
+		_aux = make(Auxiliary, 0)
+	} else {
+		if aux[0] == nil {
+			r.trace(sprintf("%s: ALLOC %T (nil variadic slice)",
+				fname, _aux))
+			_aux = make(Auxiliary, 0)
+		} else {
+			r.trace(sprintf("%s: assign user %T(len:%d)",
+				fname, _aux, _aux.Len()))
+			_aux = aux[0]
+		}
+	}
+
+	cfg.aux = _aux
+	r.debug(sprintf("%s: registered %T(len:%d)",
+		fname, cfg.aux, cfg.aux.Len()))
+	r.calls(sprintf("%s: out:void", fname))
+}
+
+/*
+Auxiliary returns the instance of Auxiliary from within the receiver.
+*/
+func (r Stack) Auxiliary() Auxiliary {
+	if !r.IsInit() {
+		return nil
+	}
+	return r.stack.auxiliary()
+}
+
+/*
+auxiliary is a private method called by Stack.Auxiliary.
+*/
+func (r stack) auxiliary() (aux Auxiliary) {
+	if r.isZero() {
+		return
+	}
+
+	cfg, err := r.config()
+	if err != nil {
+		return
+	}
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	aux = cfg.aux
+	r.debug(sprintf("%s: get %T(len:%d)",
+		fname, cfg.aux, cfg.aux.Len()))
+	r.calls(sprintf("%s: out:%T(%d)",
+		fname, aux, aux.Len()))
+
+	return
 }
 
 /*
@@ -658,7 +752,7 @@ func (r *stack) replace(x any, i int) (ok bool) {
 	}
 
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T(%t)/%T(%v:%d)",
+	r.calls(sprintf("%s: in:%T(%t),%T(%v:%d)",
 		fname, x, x == nil, i, i, i))
 
 	if r.positive(ronly) {
@@ -711,7 +805,7 @@ func (r *stack) insert(x any, left int) (ok bool) {
 	}
 
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T(%t)/%T(%v:%d)",
+	r.calls(sprintf("%s: in:%T(%t),%T(%v:%d)",
 		fname, x, x == nil, left, left, left))
 
 	if r.positive(ronly) {
@@ -868,7 +962,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	r.calls(sprintf("%s: in:%T(%v)", fname, idx, idx))
 
 	if r.positive(ronly) {
-		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
+		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
 		return
 	}
 
@@ -878,7 +972,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	slice, index, found := r.index(idx)
 	if !found {
 		r.debug(sprintf("%s: idx:%d not found", fname, idx))
-		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
+		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
 		return
 	} else if index == 0 {
 		// I'm just paranoid
@@ -916,7 +1010,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	// and in the expected integer length change.
 	ok = slice != nil && u1-1 == r.ulen()
 	r.debug(sprintf("%s: updated: %t", fname, ok))
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)", fname, slice, slice == nil, ok, ok))
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
 
 	return
 }
@@ -1986,20 +2080,49 @@ func (r Stack) Len() int {
 }
 
 /*
-cat is a private method called during various string representation
-processes.
+cap is a private method called during a variety of processes,
+returning the integer representation of the capacity limit
+imposed upon the receiver instance.
+
+Note that this method returns the "true" capacity, which includes
+the cfg slice offset value (+1) summed with the user-input capacity
+limit figure. The exported Cap method, however, does NOT report this
+figure, and only recognizes the user-input value. Don't confuse the
+user :)
 */
 func (r stack) cap() int {
-	sc, _ := r.config()
-	return sc.cap
-}
-
-func (r Stack) Cap() int {
-	if !r.IsInit() {
+	sc, err := r.config()
+	if err != nil {
 		return 0
 	}
 
-	return r.cap()
+	return sc.cap
+}
+
+/*
+Cap returns the integer representation of a capacity limit imposed upon
+the receiver. The return values shall be interpreted as follows:
+
+  - A zero (0) value indicates that the receiver has NO capacity, as the instance is not properly initialized
+  - A positive non-zero value (e.g.: >=1) reflects the capacity limit imposed upon the receiver instance
+  - A minus one (-1) value indicates infinite capacity is available; no limit is imposed
+*/
+func (r Stack) Cap() (c int) {
+	if !r.IsInit() {
+		return 0	// zero really means bogus
+	}
+
+	offset := -1
+	switch _c := r.cap(); _c {
+	case 0:
+		c = offset	// interpret zero as minus 1
+	default:
+		// handle the cfg slice offset here, as
+		// the value is +non-zero
+		c = _c + offset	// cfg.cap minus 1
+	}
+
+	return
 }
 
 /*
@@ -2217,7 +2340,7 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 	pad := padValue(!r.positive(nspad), ``)
 	fname := fmname()
 
-	r.calls(sprintf("%s: in:%T(%v;len:%d)/%T(%v;len:%d)/%T(%s)",
+	r.calls(sprintf("%s: in:%T(%v;len:%d),%T(%v;len:%d),%T(%s)",
 		fmname(),
 		str, str, len(str),
 		ot, ot, len(ot),
@@ -2324,12 +2447,12 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 
 	if err := r.valid(); err != nil {
 		r.error(sprintf("%s: %v", fname, err))
-		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
 			fname, slice, slice == nil, ok, ok))
 		return
 	} else if len(indices) == 0 {
 		r.error(sprintf("%s: non-traversable %T (NO_PATH)", fname, indices))
-		r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
 			fname, slice, slice == nil, ok, ok))
 		return
 	}
@@ -2354,13 +2477,13 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 		// containing a Stack/Stack alias value.
 		r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, current, instance, id))
 
-		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); done {
+		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); ok && done {
 			r.trace(sprintf("%s: returned from idx:%d %T::%s", fname, current, instance, id))
 			break
 		}
 	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%t)",
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
 		fname, slice, slice == nil, ok, ok))
 
 	return
@@ -2445,7 +2568,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	var updated any
 
 	fname := fmname()
-	r.calls(sprintf("%s: in: %T(len:%d)/%T(%d)",
+	r.calls(sprintf("%s: in: %T(len:%d),%T(%d)",
 		fname, inner, inner.Len(), idx, idx))
 
 	id := getLogID(r.getID())
@@ -2455,7 +2578,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	if inner.stackType() != not {
 		switch inner.Len() {
 		case 0:
-			r.trace(sprintf("%s: remove zero-length %T at idx:%d", fname, inner, idx))
+			r.trace(sprintf("%s: remove zero-length %T at idx:%d",
+				fname, inner, idx))
 			r.remove(idx) // empty stack? remove it from outer (rcvr)
 		case 1:
 			// descend into inner slice #0
@@ -2466,18 +2590,22 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 				cid = getLogID(assert.ID())
 			}
 
-			r.trace(sprintf("%s: descending into single idx:%d %T::%s", fname, 0, child, cid))
+			r.trace(sprintf("%s: descending into single idx:%d %T::%s",
+				fname, 0, child, cid))
 			if err = r.revealSingle(0); err != nil {
-				r.error(sprintf("%s: %T::%s %v", fname, child, cid, err))
+				r.error(sprintf("%s: %T::%s %v",
+					fname, child, cid, err))
 				break
 			}
 			updated = child
 		default:
 			// begin new top-level reveal of inner
 			// as a whole, scanning all +2 slices
-			r.trace(sprintf("%s: descending into %T::%s", fname, 0, inner, id))
+			r.trace(sprintf("%s: descending into %T::%s",
+				fname, 0, inner, id))
 			if err = inner.reveal(); err != nil {
-				r.error(sprintf("%s: %T::%s %v", fname, inner, id, err))
+				r.error(sprintf("%s: %T::%s %v",
+					fname, inner, id, err))
 				break
 			}
 			updated = inner
@@ -2497,7 +2625,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	// Begin second pass-over before
 	// return.
 	err = inner.reveal()
-	r.error(sprintf("%s: %T::%s %v", fname, inner, id, err))
+	r.error(sprintf("%s: %T::%s %v",
+		fname, inner, id, err))
 	r.calls(sprintf("%s: out:%T(nil:%t)",
 		fname, err, err == nil))
 
@@ -2564,23 +2693,26 @@ nested Stack/Stack alias instances that may or may not reside in Condition/Condi
 */
 func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+	r.calls(sprintf("%s: in:%T(nil:%t),%T(%d),%T(%v;len:%d)",
 		fname, x, x == nil, idx, idx, indices, indices, len(indices)))
 
 	if slice, ok, done = r.traverseStack(x, idx, indices...); ok {
 		// The value was a Stack or Stack type alias.
-		r.debug(sprintf("%s: idx %d: found traversable slice %T", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found traversable slice %T",
+			fname, idx, slice))
 	} else if slice, ok, done = r.traverseStackInCondition(x, idx, indices...); ok {
 		// The value was a Condition, and there MAY be a Stack
 		// or Stack type alias nested within said Condition ...
-		r.debug(sprintf("%s: idx %d: found traversable slice %T", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found traversable slice %T",
+			fname, idx, slice))
 	} else if len(indices) <= 1 {
 		// If we're at the end of the line, just return
 		// whatever is there.
 		slice = x
 		ok = true
 		done = true
-		r.debug(sprintf("%s: idx %d: found slice %T at end of path", fname, idx, x))
+		r.debug(sprintf("%s: idx %d: found slice %T at end of path",
+			fname, idx, x))
 	} else {
 		// If we arrived here with more path elements left,
 		// it would appear the path was invalid, or ill-suited
@@ -2588,11 +2720,12 @@ func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice a
 		// sense. Return the last slice, but don't declare
 		// done or ok since it (probably) isn't what they
 		// wanted ...
-		slice = x
-		r.error(sprintf("%s: path leftovers in non-traversable %T:%d at %v", fname, x, idx, indices))
+		slice = nil
+		r.error(sprintf("%s: path leftovers in non-traversable %T:%d at %v",
+			fname, x, idx, indices))
 	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(ok:%t),%T(done:%t)",
 		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
@@ -2605,7 +2738,7 @@ instance's own value (i.e.: recurse stacks that reside in conditions, etc ...).
 */
 func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+	r.calls(sprintf("%s: in:%T(nil:%t),%T(%d),%T(%v;len:%d)",
 		fname, u, u == nil, idx, idx, indices, indices, len(indices)))
 
 	if c, cOK := conditionTypeAliasConverter(u); cOK {
@@ -2615,7 +2748,8 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 			slice = c
 			ok = true
 			done = true
-			r.trace(sprintf("%s: found %T:%d [SLICE] at %v", fname, c, idx, indices))
+			r.trace(sprintf("%s: found slice %T:%d at path %v",
+				fname, c, idx, indices))
 		} else {
 			// We have leftovers. If the Condition's value is a
 			// Stack *OR* a Stack alias, traverse it ...
@@ -2629,7 +2763,7 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 		}
 	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(ok:%t),%T(done:%t)",
 		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
@@ -2641,27 +2775,29 @@ method will traverse either a Stack *OR* Stack alias type fashioned by the user.
 */
 func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, done bool) {
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T(nil:%t)/%T(%d)/%T(%v;len:%d)",
+	r.calls(sprintf("%s: in:%T(nil:%t),%T(%d),%T(%v;len:%d)",
 		fname, u, u == nil, idx, idx, indices, indices, len(indices)))
 
 	if s, sOK := stackTypeAliasConverter(u); sOK {
 		r.trace(sprintf("%s conversion to %T:ok", fname, s))
 		// End of the line :)
 		if len(indices) <= 1 {
-			slice = s
-			ok = slice != nil
+			slice = u
+			ok = sOK
+			//, _, ok = s.index(indices[idx])
+			//ok = slice != nil
 			done = true
 			r.trace(sprintf("%s: found %T:%d [SLICE] at %v", fname, s, idx, indices))
 		} else {
 			// begin new Stack (tv/x) recursion beginning at
 			// the NEXT index ...
 			var id string = getLogID(s.ID())
-			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, s, idx, id, indices))
-			return s.stack.traverse(indices[idx+1:]...)
+			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, s, indices[idx], id, indices[idx:]))
+			return s.stack.traverse(indices[1:]...)
 		}
 	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(ok:%t)/%T(done:%t)",
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(ok:%t),%T(done:%t)",
 		fname, slice, slice == nil, ok, ok, done, done))
 
 	return
@@ -2718,7 +2854,7 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 
 	if i < 0 {
 		if !r.positive(negidx) {
-			r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t) (neg. indices unavailable)",
+			r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (neg. indices unavailable)",
 				fname, slice, slice == nil, idx, idx, ok, ok))
 			return
 		}
@@ -2729,7 +2865,7 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 		i = factorNegIndex(i, L)
 	} else if i > L-1 {
 		if !r.positive(fwdidx) {
-			r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t) (fwd. indices unavailable)",
+			r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (fwd. indices unavailable)",
 				fname, slice, slice == nil, idx, idx, ok, ok))
 			return
 		}
@@ -2756,7 +2892,7 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 	ok = slice != nil
 	r.debug(sprintf("%s: %T:%d:%s; found %T [nil:%t]", fname, r, i, id, slice, !ok))
 
-	r.calls(sprintf("%s: out:%T(nil:%t)/%T(%d)/%T(done:%t)",
+	r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t)",
 		fname, slice, slice == nil, idx, idx, ok, ok))
 
 	return
@@ -3020,7 +3156,7 @@ func (r *stack) defrag(max int) {
 	fname := fmname()
 	id := getLogID(r.getID())
 	r.calls(sprintf("%s: in: %T(%d)",
-		fname, max))
+		fname, max, max))
 
 	var start int = -1
 	var spat []int = make([]int, r.len(), r.len())

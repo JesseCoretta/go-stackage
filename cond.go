@@ -87,6 +87,7 @@ func initCondition() (r *condition) {
 	r = new(condition)
 	r.cfg = new(nodeConfig)
 	r.cfg.log = newLogSystem(cLogDefault)
+	r.cfg.log.lvl = logLevels(cLogLevelDefault)
 
 	r.cfg.typ = cond
 	data[`type`] = cond.String()

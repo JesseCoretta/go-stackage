@@ -62,7 +62,7 @@ func timestamp() string {
 }
 
 func isETravEligible(ok bool, x any) bool {
-	return ( isIntKeyedMap(x) || isSliceType(x) ) && ok
+	return (isIntKeyedMap(x) || isSliceType(x)) && ok
 }
 
 func isIntKeyedMap(x any) bool {

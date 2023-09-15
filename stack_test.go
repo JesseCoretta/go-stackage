@@ -19,30 +19,36 @@ func ExampleStack_SetAuxiliary() {
 	// Always alloc stack somehow, in this
 	// case just use List because its simple
 	// and (unlike Basic) it is feature-rich.
-        var list Stack = List()
+	var list Stack = List()
 
-        // alloc map
-        aux := make(Auxiliary,0)
+	// alloc map
+	aux := make(Auxiliary, 0)
 
-        // populate map
-        aux.Set(`somethingWeNeed`, struct{
-                Type string
-                Value []string
-        }{
-                Type: `L`,
-                Value: []string{
-                        `abc`,
-                        `def`,
-                },
-        })
+	// populate map
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
+		Value []string
+	}{
+		Type: `L`,
+		Value: []string{
+			`abc`,
+			`def`,
+		},
+	})
 
-        // assign map to stack rcvr
-        list.SetAuxiliary(aux)
+	// assign map to stack rcvr
+	list.SetAuxiliary(aux)
 
 	// verify presence
-        call := list.Auxiliary()
+	call := list.Auxiliary()
 	fmt.Printf("%T found, length:%d", call, call.Len())
 	// Output: stackage.Auxiliary found, length:1
+}
+
+func ExampleStack_Kind() {
+	var myStack Stack = And()
+	fmt.Printf("Kind: '%s'", myStack.Kind())
+	// Output: Kind: 'AND'
 }
 
 /*
@@ -55,11 +61,11 @@ UserInit or ByTypeCast examples.
 */
 func ExampleStack_Auxiliary_noInit() {
 
-        var list Stack = List()
-        aux := list.Auxiliary()
-        fmt.Printf("%T found, length:%d",
-		aux, aux.Set(`testing`,`123`).Len())
-        // Output: stackage.Auxiliary found, length:0
+	var list Stack = List()
+	aux := list.Auxiliary()
+	fmt.Printf("%T found, length:%d",
+		aux, aux.Set(`testing`, `123`).Len())
+	// Output: stackage.Auxiliary found, length:0
 }
 
 /*
@@ -69,13 +75,13 @@ outcome is achieved.
 */
 func ExampleStack_Auxiliary_withInit() {
 
-        var list Stack = List().SetAuxiliary() // no args triggers auto-init
-        aux := list.Auxiliary()
-        fmt.Printf("%T found, length was:%d, is now:%d",
-                aux,
-		aux.Len(),			// check initial (pre-set) length
-		aux.Set(`testing`,`123`).Len())	// fluent Set/Len in one shot
-        // Output: stackage.Auxiliary found, length was:0, is now:1
+	var list Stack = List().SetAuxiliary() // no args triggers auto-init
+	aux := list.Auxiliary()
+	fmt.Printf("%T found, length was:%d, is now:%d",
+		aux,
+		aux.Len(),                       // check initial (pre-set) length
+		aux.Set(`testing`, `123`).Len()) // fluent Set/Len in one shot
+	// Output: stackage.Auxiliary found, length was:0, is now:1
 }
 
 /*
@@ -85,19 +91,19 @@ populated by the user in a traditional fashion.
 */
 func ExampleStack_Auxiliary_userInit() {
 
-        var list Stack = List()
+	var list Stack = List()
 	aux := make(Auxiliary, 0)
 
 	// user opts to just use standard map
 	// key/val set procedure, and avoids
 	// use of the convenience methods.
 	// This is totally fine.
-	aux[`value1`] = []int{1,2,3,4,5}
+	aux[`value1`] = []int{1, 2, 3, 4, 5}
 	aux[`value2`] = [2]any{float64(7.014), rune('#')}
 
 	list.SetAuxiliary(aux)
-        fmt.Printf("%T length:%d", aux, len(aux))
-        // Output: stackage.Auxiliary length:2
+	fmt.Printf("%T length:%d", aux, len(aux))
+	// Output: stackage.Auxiliary length:2
 }
 
 /*
@@ -106,25 +112,25 @@ form (map[string]any) before being type cast to Auxiliary.
 */
 func ExampleStack_Auxiliary_byTypeCast() {
 
-        var list Stack = List()
-        proto := make(map[string]any, 0)
-        proto[`value1`] = []int{1,2,3,4,5}
-        proto[`value2`] = [2]any{float64(7.014), rune('#')}
-        list.SetAuxiliary(Auxiliary(proto))	// cast proto and assign to stack
-	aux := list.Auxiliary()			// call map to variable
-        fmt.Printf("%T length:%d", aux, aux.Len())
-        // Output: stackage.Auxiliary length:2
+	var list Stack = List()
+	proto := make(map[string]any, 0)
+	proto[`value1`] = []int{1, 2, 3, 4, 5}
+	proto[`value2`] = [2]any{float64(7.014), rune('#')}
+	list.SetAuxiliary(Auxiliary(proto)) // cast proto and assign to stack
+	aux := list.Auxiliary()             // call map to variable
+	fmt.Printf("%T length:%d", aux, aux.Len())
+	// Output: stackage.Auxiliary length:2
 }
 
 func TestStack_SetAuxiliary(t *testing.T) {
 	var list Stack = List()
 
 	// alloc map
-	aux := make(Auxiliary,0)
+	aux := make(Auxiliary, 0)
 
 	// populate map
-	aux.Set(`somethingWeNeed`, struct{
-		Type string
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
 		Value []string
 	}{
 		Type: `L`,
@@ -958,7 +964,8 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 
 func TestDefrag_experimental_001(t *testing.T) {
 	// this list contains an assortment of
-	// values mixed in with nils.
+	// values mixed in with nils and a couple
+	// hierarchies tossed in, too.
 	var l Stack = List().SetLogLevel(LogLevel(45)).Push(
 		`this`,
 		nil,
@@ -966,7 +973,12 @@ func TestDefrag_experimental_001(t *testing.T) {
 		nil,
 		`those`,
 		nil,
-		nil,
+		List().Push(
+			nil, nil, nil, `other`, `level`, `of`, nil, nil, `stuff`,
+			And().Push(
+				`yet`, nil, nil, nil, nil, `more`, `JUNK`,
+			),
+		),
 		nil,
 		nil,
 		nil,

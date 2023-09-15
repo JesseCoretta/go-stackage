@@ -88,6 +88,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 		st   stack
 	)
 	cfg.log = newLogSystem(sLogDefault)
+	cfg.log.lvl = logLevels(sLogLevelDefault)
 
 	cfg.typ = t
 	cfg.ord = fifo
@@ -103,7 +104,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 
 	if len(c) > 0 {
 		if c[0] > 0 {
-			cfg.cap = c[0] + 1	// 1 for cfg slice offset
+			cfg.cap = c[0] + 1 // 1 for cfg slice offset
 			st = make(stack, 0, cfg.cap)
 			data[`capacity`] = sprintf("%d", cfg.cap)
 		}
@@ -145,7 +146,7 @@ TRACE (32) logging were desired, entering LogLevel(44) would be
 the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
 variadic fashion.
 */
-func (r Stack) SetLogLevel(l ...LogLevel) Stack {
+func (r Stack) SetLogLevel(l ...any) Stack {
 	cfg, err := r.config()
 	if err != nil {
 		return r
@@ -156,7 +157,7 @@ func (r Stack) SetLogLevel(l ...LogLevel) Stack {
 
 	cfg.log.shift(l...)
 
-	r.calls(sprintf("%s: out:%T(rcvr)",
+	r.calls(sprintf("%s: out:%T(self)",
 		fmname(), r))
 
 	return r
@@ -180,7 +181,7 @@ UnsetLogLevel disables the specified LogLevel instance(s), thereby
 instructing the logging subsystem to discard events submitted for
 transcription to the underlying logger.
 */
-func (r Stack) UnsetLogLevel(l ...LogLevel) Stack {
+func (r Stack) UnsetLogLevel(l ...any) Stack {
 	cfg, err := r.config()
 	if err != nil {
 		return r
@@ -192,7 +193,7 @@ func (r Stack) UnsetLogLevel(l ...LogLevel) Stack {
 
 	cfg.log.unshift(l...)
 
-	r.calls(sprintf("%s: out:%T(rcvr)",
+	r.calls(sprintf("%s: out:%T(self)",
 		fname, r))
 
 	return r
@@ -487,7 +488,7 @@ func (r stack) kind() string {
 	}
 
 	fname := fmname()
-	r.calls(sprintf("%s: in:%T:niladic", fname))
+	r.calls(sprintf("%s: in:niladic", fname))
 	kind := sc.kind()
 	r.calls(sprintf("%s: out:%T(%v;len:%d)",
 		fname, kind, kind, len(kind)))
@@ -507,41 +508,39 @@ func (r Stack) Valid() (err error) {
 		return
 	}
 
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-	if err = r.stack.valid(); err != nil {
-		r.calls(sprintf("%s: out:%T(%v)",
-			fname, err, err))
-		return
-	}
-
-	// try to see if the user provided a
-	// validity function
-	if meth := r.getValidityPolicy(); meth != nil {
-		r.calls(sprintf("validity_policy: in:%T(len:%d)",
-			r, r.Len()))
-		err = meth(r)
-	}
-
-	r.calls(sprintf("%s: out:%T(%v)",
-		fname, err, err))
-
+	err = r.stack.valid()
 	return
 }
 
 /*
 valid is a private method called by Stack.Valid.
 */
-func (r stack) valid() (err error) {
+func (r *stack) valid() (err error) {
 	if !r.isInit() {
-		err = errorf("%T instance is not initialized", Stack{})
+		err = errorf("stack instance is not initialized")
 		return
 	}
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
-	_, err = r.config()
-	r.calls(sprintf("%s: out:%T(nil:%t)", fname, err, err == nil))
+
+	if _, err = r.config(); err != nil {
+		r.error(err)
+		r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
+		return
+	}
+
+	// try to see if the user provided a
+	// validity function
+	stk := Stack{r}
+	if meth := stk.getValidityPolicy(); meth != nil {
+		r.calls(sprintf("%s: executing validity_policy", fname))
+		if err = meth(r); err != nil {
+			r.policy(sprintf("%s: error: %v", fname, err))
+		}
+	}
+
+	r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
 
 	return
 }
@@ -2109,17 +2108,17 @@ the receiver. The return values shall be interpreted as follows:
 */
 func (r Stack) Cap() (c int) {
 	if !r.IsInit() {
-		return 0	// zero really means bogus
+		return 0 // zero really means bogus
 	}
 
 	offset := -1
 	switch _c := r.cap(); _c {
 	case 0:
-		c = offset	// interpret zero as minus 1
+		c = offset // interpret zero as minus 1
 	default:
 		// handle the cfg slice offset here, as
 		// the value is +non-zero
-		c = _c + offset	// cfg.cap minus 1
+		c = _c + offset // cfg.cap minus 1
 	}
 
 	return
@@ -2249,7 +2248,8 @@ func (r stack) string() string {
 
 	// hand off our string slices, along with the outermost
 	// type/code values, to the assembleStringStack worker.
-	assembled := r.assembleStringStack(str, ot, oc)
+	doPad := !r.positive(nspad) && r.getSymbol() == ``
+	assembled := r.assembleStringStack(str, padValue(doPad, ot), oc)
 
 	r.calls(sprintf("%s: out:%T(%v;len:%d)",
 		fname, assembled, assembled, len(assembled)))
@@ -2380,8 +2380,8 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			// char (e.g.: '&&', '||', 'AND',
 			// et al).
 			var tjn string
+			char := string(rune(32)) // by default, use WHSP padding for symbol ops
 			if len(r.getSymbol()) > 0 {
-				char := string(rune(32)) // by default, use WHSP padding for symbol ops
 				if r.positive(nspad) {
 					char = `` // ... unless user turns it off
 				}
@@ -2389,7 +2389,8 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 				sympad := padValue(!r.positive(nspad), char)
 				tjn = join(str, sprintf("%s%s%s", sympad, ot, sympad))
 			} else {
-				tjn = join(str, ot)
+				sympad := padValue(true, char)
+				tjn = join(str, sprintf("%s%s%s", sympad, ot, sympad))
 			}
 			r.trace(sprintf("%s: %s += '%s'", fname, oc, tjn))
 			fstr = append(fstr, tjn)
@@ -2475,10 +2476,10 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 		// values. We'll go as deep as possible, provided each nesting
 		// instance is a Stack/Stack alias, or Condition/Condition alias
 		// containing a Stack/Stack alias value.
-		r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, current, instance, id))
+		r.trace(sprintf("%s: attempting descent into idx:%d of %T::%s", fname, current, instance, id))
 
-		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); ok && done {
-			r.trace(sprintf("%s: returned from idx:%d %T::%s", fname, current, instance, id))
+		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); done {
+			r.trace(sprintf("%s: returned from idx:%d of %T::%s", fname, current, instance, id))
 			break
 		}
 	}
@@ -2580,7 +2581,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 		case 0:
 			r.trace(sprintf("%s: remove zero-length %T at idx:%d",
 				fname, inner, idx))
-			r.remove(idx) // empty stack? remove it from outer (rcvr)
+			r.remove(idx) // empty stack? remove it from outer (self)
 		case 1:
 			// descend into inner slice #0
 			child, _, _ := inner.index(0)
@@ -2744,6 +2745,7 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 	if c, cOK := conditionTypeAliasConverter(u); cOK {
 		r.trace(sprintf("%s conversion to %T:ok", fname, c))
 		// End of the line :)
+		var id string = getLogID(``)
 		if len(indices) <= 1 {
 			slice = c
 			ok = true
@@ -2754,11 +2756,10 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 			// We have leftovers. If the Condition's value is a
 			// Stack *OR* a Stack alias, traverse it ...
 			expr := c.Expression()
-			var id string = getLogID(``)
 			if assert, aok := expr.(Interface); aok {
 				id = getLogID(assert.ID())
 			}
-			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, expr, idx, id, indices))
+			r.trace(sprintf("%s: descending into %T:%d:%s of %T at %v", fname, expr, idx, id, r, indices))
 			return r.traverseStack(expr, idx, indices...)
 		}
 	}
@@ -2779,20 +2780,20 @@ func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, don
 		fname, u, u == nil, idx, idx, indices, indices, len(indices)))
 
 	if s, sOK := stackTypeAliasConverter(u); sOK {
-		r.trace(sprintf("%s conversion to %T:ok", fname, s))
+		s.trace(sprintf("%s conversion to %T:ok", fname, s))
 		// End of the line :)
+		var id string = getLogID(s.ID())
 		if len(indices) <= 1 {
 			slice = u
 			ok = sOK
 			//, _, ok = s.index(indices[idx])
 			//ok = slice != nil
 			done = true
-			r.trace(sprintf("%s: found %T:%d [SLICE] at %v", fname, s, idx, indices))
+			s.trace(sprintf("%s: found slice %T:%d:%s of %T at %v", fname, s, idx, id, u, indices))
 		} else {
 			// begin new Stack (tv/x) recursion beginning at
 			// the NEXT index ...
-			var id string = getLogID(s.ID())
-			r.trace(sprintf("%s: descending into %T:%d:%s at %v", fname, s, indices[idx], id, indices[idx:]))
+			s.trace(sprintf("%s: descending into %T:%d:%s of %T at %v", fname, s, indices[idx], id, u, indices[idx:]))
 			return s.stack.traverse(indices[1:]...)
 		}
 	}
@@ -2971,8 +2972,8 @@ func (r stack) typ() (kind string, typ stackType) {
 	kind = r.kind()
 	if sym := r.getSymbol(); len(sym) > 0 {
 		kind = sym
-	} else if !(typ == list || typ == basic) {
-		kind = padValue(true, kind) // TODO: make this better
+		//} else if !(typ == list || typ == basic) {
+		//kind = padValue(true, kind) // TODO: make this better
 	}
 
 	return
@@ -3105,7 +3106,7 @@ func (r *stack) push(x ...any) *stack {
 	r.debug(sprintf("%s: %T::%s; generic push (payload:%d)", fname, r, id, len(x)))
 	r.genericAppend(x...)
 
-	r.calls(sprintf("%s: out %T(rcvr)", fname, r))
+	r.calls(sprintf("%s: out %T(self)", fname, r))
 
 	return r
 }
@@ -3130,13 +3131,67 @@ as other corner-cases currently inconceivable.
 The max integer, which defaults to fifty (50) when unset, shall result in the scan being terminated
 when the number of nil slices encountered consecutively reaches the maximum. This is to prevent the
 process from looping into eternity.
+
+If run on a Stack or Stack type-alias that is currently in possession of one (1) or more nested Stack
+or Stack type-alias instances, Defrag shall hierarchically traverse the structure and process it no
+differently than the top-level instance. This applies to such Stack values nested with an instance of
+Condition or Condition type-alias as well.
+
+This is potentially a destructive method and is still very much considered EXPERIMENTAL. While all
+tests yield expected results, those who use this method are advised to exercise extreme caution. The
+most obvious note of caution pertains to the volatility of index numbers, which shall shift according
+to the defragmentation's influence on the instance in question.  By necessity, Len return values shall
+also change accordingly.
 */
 func (r Stack) Defrag(max ...int) Stack {
-	var m int = 50
 	if !r.IsInit() {
 		return r
 	}
 
+	// determine appropriate maximum nil sequence
+	// to break defrag loop.
+	m := calculateDefragMax(max...)
+
+	r.stack.defrag(m) // defrag the stack itself
+
+	// If the receiver instance is judged as nesting, we'll
+	// recurse through stack, and defrag any other suitable
+	// candidates for the operation. Targets are any Stack
+	// or Condition instances, OR their aliased equivalents.
+	if !r.IsNesting() {
+		return r
+	}
+
+	for i := 0; i < r.Len(); i++ {
+		slice, _ := r.Index(i)
+
+		if sub, ok := stackTypeAliasConverter(slice); ok {
+			// Instance is Stack/Stack alias
+			sub.Defrag(m)
+
+		} else if cub, ok := conditionTypeAliasConverter(slice); ok {
+			// Instance is Condition/Condition alias
+			if !cub.IsNesting() {
+				continue
+			}
+
+			if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
+				// Condition expression contains a Stack/Stack alias
+				sub.Defrag(m)
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+calculateDefragMax is a private function executed exclusively by Stack.Defrag, and
+exists simply to keep cyclomatics factors <=9 in the caller.
+*/
+func calculateDefragMax(max ...int) (m int) {
+	var _m int = 50
+	m = _m
 	if len(max) > 0 {
 		if max[0] > 0 {
 			m = max[0]
@@ -3144,11 +3199,10 @@ func (r Stack) Defrag(max ...int) Stack {
 	}
 
 	if m <= 0 {
-		return r
+		m = _m
 	}
 
-	r.stack.defrag(m)
-	return r
+	return
 }
 
 func (r *stack) defrag(max int) {
@@ -3541,7 +3595,7 @@ func (r *stack) mkmsg(typ string) (Message, bool) {
 		Type: sprintf("%T", *r),
 		Time: timestamp(),
 		Len:  r.ulen(),
-		Cap:  r.cap(),
+		Cap:  Stack{r}.Cap(), // user-facing cap is preferred
 	}, true
 }
 

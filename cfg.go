@@ -126,7 +126,7 @@ instance, if found. See also the Set method.
 
 This method internally calls the following builtin:
 
-  delete(*rcvr,key)
+	delete(*rcvr,key)
 
 Case is significant in the matching process.
 */
@@ -266,7 +266,7 @@ func (r *nodeConfig) kind() (kind string) {
 	}
 
 	switch r.typ {
-	case and, or, not, list, cond:
+	case and, or, not, list, cond, basic:
 		kind = foldValue(r.positive(cfold), r.typ.String())
 	}
 
@@ -364,12 +364,9 @@ func (r *nodeConfig) setEncap(x ...any) {
 setListDelimiter is a private method invoked by stack.setListDelimiter.
 */
 func (r *nodeConfig) setListDelimiter(x string) {
-	if !eq(r.kind(), `list`) {
-		// don't set if stack is not a list
-		return
+	if r.typ == list {
+		r.ljc = x
 	}
-
-	r.ljc = x
 }
 
 /*

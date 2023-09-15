@@ -2551,7 +2551,7 @@ func (r *stack) reveal() (err error) {
 }
 
 /*
-revealDescent is a private method called by stack.reveal. It engages the second
+revealDescend is a private method called by stack.reveal. It engages the second
 level of processing of the provided inner Stack instance.
 
 Its first order of business is to determine the length of the inner Stack instance
@@ -2576,8 +2576,7 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 
 	id := getLogID(r.getID())
 
-	// TODO: Still mulling the best way
-	// to handle NOTs.
+	// TODO: Still mulling the best way to handle NOTs.
 	if inner.stackType() != not {
 		switch inner.Len() {
 		case 0:
@@ -2592,26 +2591,34 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 			if ok {
 				cid = getLogID(assert.ID())
 			}
+			if assert.IsParen() || inner.IsParen() {
+				break
+			}
 
 			r.trace(sprintf("%s: descending into single idx:%d %T::%s",
 				fname, 0, child, cid))
-			if err = r.revealSingle(0); err != nil {
-				r.error(sprintf("%s: %T::%s %v",
-					fname, child, cid, err))
-				break
-			}
+
+			err = r.revealSingle(0)
+
+			r.error(sprintf("%s: %T::%s %v",
+				fname, child, cid, err))
+
 			updated = child
 		default:
 			// begin new top-level reveal of inner
 			// as a whole, scanning all +2 slices
 			r.trace(sprintf("%s: descending into %T::%s",
 				fname, 0, inner, id))
-			if err = inner.reveal(); err != nil {
-				r.error(sprintf("%s: %T::%s %v",
-					fname, inner, id, err))
-				break
-			}
+
+			err = inner.reveal()
+
+			r.error(sprintf("%s: %T::%s %v",
+				fname, inner, id, err))
 			updated = inner
+		}
+
+		if err != nil {
+			return
 		}
 	}
 

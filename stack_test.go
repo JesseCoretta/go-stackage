@@ -892,14 +892,14 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 						Cond(`dayofweek`, Ne, "Wednesday"),
 						Cond(`ssf`, Ge, "128"),
 					),
-				).Paren(),
+				),
 			),
 			And().Push(
 				Or().Push(
 					Cond(`keyword2`, Lt, "someothervalue"),
 				),
 			),
-		).Paren(),
+		),
 		`this2`,
 	)
 

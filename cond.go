@@ -28,7 +28,7 @@ several ComparisonOperator (op) instances made available through
 this package:
 
   - Eq, or "equal to" (=)
-  - Ne, or "not equal to" (!=)	!! USE WITH CAUTION !!
+  - Ne, or "not equal to" (!=)
   - Lt, or "less than" (<)
   - Le, or "less than or equal" (<=)
   - Gt, or "greater than" (>)
@@ -68,7 +68,7 @@ type condition struct {
 }
 
 /*
-newCondition initializes, (optionally sets) and returns a new instance of
+newCondition obtains, (optionally sets) and returns a new instance of
 *condition in one shot.
 */
 func newCondition(kw any, op Operator, ex any) (r *condition) {
@@ -81,6 +81,11 @@ func newCondition(kw any, op Operator, ex any) (r *condition) {
 	return
 }
 
+/*
+initCondition is the central initializer function for an instance
+of *condition, which is the embedded type instance found within
+(properly initialized) Condition instances.
+*/
 func initCondition() (r *condition) {
 	var data map[string]string = make(map[string]string, 0)
 
@@ -210,10 +215,15 @@ func (r Condition) SetLogger(logger any) Condition {
 }
 
 /*
-Logger returns the *log.Logger instance. It is not recommended to
-modify the return instance for the purpose of disabling logging
-outright (see Stack.SetLogger method as well as the SetDefaultLogger
-package-level function for ways of doing this easily).
+Logger returns the *log.Logger instance. This can be used for quick
+access to the log.Logger type's methods in a manner such as:
+
+	r.Logger().Fatalf("We died")
+
+It is not recommended to modify the return instance for the purpose
+of disabling logging outright (see Stack.SetLogger method as well
+as the SetDefaultConditionLogger package-level function for ways of
+doing this easily).
 */
 func (r Condition) Logger() *log.Logger {
 	if r.IsZero() {

@@ -61,8 +61,8 @@ for string representation, value encaps, delimitation, and
 other presentation-related string methods. As such, a zero
 string (“) shall be returned should String() be executed.
 
-PresentationPolicy instances cannot be assigned to Stacks
-of this design.
+PresentationPolicy instances cannot be assigned to Stack
+instances of this design.
 */
 func Basic(capacity ...int) Stack {
 	return Stack{newStack(basic, false, capacity...)}
@@ -72,7 +72,8 @@ func Basic(capacity ...int) Stack {
 newStack initializes a new instance of *stack, configured
 with the kind (t) requested by the user. This function
 should only be executed when creating new instances of
-Stack, which embeds the *stack type.
+Stack (or a Stack type alias), which embeds the *stack
+type instance.
 */
 func newStack(t stackType, fifo bool, c ...int) *stack {
 	switch t {
@@ -87,6 +88,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 		cfg  *nodeConfig       = new(nodeConfig)
 		st   stack
 	)
+
 	cfg.log = newLogSystem(sLogDefault)
 	cfg.log.lvl = logLevels(sLogLevelDefault)
 
@@ -625,8 +627,8 @@ access to the log.Logger type's methods in a manner such as:
 
 It is not recommended to modify the return instance for the purpose
 of disabling logging outright (see Stack.SetLogger method as well
-as the SetDefaultLogger package-level function for ways of doing
-this easily).
+as the SetDefaultStackLogger package-level function for ways of
+doing this easily).
 */
 func (r Stack) Logger() *log.Logger {
 	if !r.IsInit() {
@@ -638,7 +640,7 @@ func (r Stack) Logger() *log.Logger {
 
 /*
 Transfer will iterate the receiver (r) and add all slices
-contained therein to the destination instance.
+contained therein to the destination instance (dest).
 
 The following circumstances will result in a false return:
 
@@ -647,10 +649,11 @@ The following circumstances will result in a false return:
   - The receiver instance (r) contains no slices to transfer
 
 The receiver instance (r) is not modified in any way as a
-result of calling this method. If the receiver undergoes a
-call to its Reset() method, only the receiver instance will
-be emptied, and the transferred slices within the submitted
-destination instance shall remain.
+result of calling this method. If the receiver (source) should
+undergo a call to its Reset() method following a call to the
+Transfer method, only the source will be emptied, and of the
+slices that have since been transferred instance shall remain
+in the destination instance.
 */
 func (r Stack) Transfer(dest Stack) bool {
 	return r.transfer(dest.stack)
@@ -2416,7 +2419,7 @@ a success-indicative Boolean value.
 The semantics of "traversability" are as follows:
 
   - Any "nesting" instance must be a Stack or Stack type alias
-  - Condition instances must either be the final requested element, OR must contain a Stack or Stack type alias instance through which to continue the traversal process
+  - Condition instances must either be the final requested element, OR must contain a Stack or Stack type alias instance through which the traversal process may continue
   - All other value types are returned as-is
 
 If the traversal ended at any given value, it will be returned along with a
@@ -2424,8 +2427,7 @@ positive ok value letting the user know they arrived at the coordinates they
 defined and that "something" was found.
 
 If, however, any path elements remained and further traversal was NOT possible,
-the last slice is returned but ok is not set positive, thereby letting the user
-know they took a wrong turn somewhere.
+the last slice is returned as nil.
 
 As the return type is any, the slice value must be manually type asserted.
 */
@@ -2712,7 +2714,7 @@ func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice a
 		slice = x
 		ok = true
 		done = true
-		r.debug(sprintf("%s: idx %d: found slice %T at end of path",
+		r.debug(sprintf("%s: idx %d: found target slice %T at end of path",
 			fname, idx, x))
 	} else {
 		// If we arrived here with more path elements left,

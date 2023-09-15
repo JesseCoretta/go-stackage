@@ -1023,6 +1023,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 }
 
 func init() {
+	// just used for testing, etc.
 	//SetDefaultStackLogger(`stdout`)
 	//SetDefaultConditionLogger(`stdout`)
 }

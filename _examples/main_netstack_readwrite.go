@@ -121,11 +121,24 @@ hypothetical app, in essence.
 */
 func main() {
 	log.SetFlags(0)
-	stackage.SetDefaultStackLogLevel(`ALL`)
-	stackage.SetDefaultStackLogger(`stdout`)
 
-	stackage.SetDefaultConditionLogLevel(`ALL`)
-	stackage.SetDefaultConditionLogger(`stdout`)
+	// By default logging is disabled both
+	// in terms of io.Writer as well as in
+	// terms of active loglevels.
+	//
+	// Changing these settings will effect
+	// changes in log output for stdout (or
+	// whatever io.Writer a user might input
+	// by way of a custom log.Logger instance).
+	// See the docs for details.
+
+	// STACK LOGGER
+	//stackage.SetDefaultStackLogLevel(`ALL`)
+	//stackage.SetDefaultStackLogger(`stdout`)
+
+	// CONDITION LOGGER
+	//stackage.SetDefaultConditionLogLevel(`ALL`)
+	//stackage.SetDefaultConditionLogger(`stdout`)
 
 	// create signal channel to gracefully
 	// receive CTRL+C (^C) sequences. Note
@@ -151,8 +164,9 @@ func main() {
 	<-quit
 
 	// ... until you receive a signal, at which
-	// point, shutdown gracefully (Shutdown) by
-	// feeding it a background Context instance.
+	// point, terminate gracefully by feeding a
+	// Context instance to the Shutdown method
+	// designed for this demo.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	if err := stack.Shutdown(ctx); err != nil {
@@ -195,7 +209,7 @@ func MakeStack() MyStack {
 		)),
 		MyStack(stackage.And().SetID(`_random`).Push(
 			MyStack(stackage.Or().SetID(`_random`).Push(
-				stackage.Cond(`name`, stackage.Eq, `Mike`),
+				stackage.Cond(`name`, stackage.Eq, `H̷̠͙̖̜͓͍̓̑̽̒́̑̀̈̔̒̚͘͠Ė̸̢̮̟̰̭̭͖̤̠̰̙͔̺͙̝̈́̓̾͐́̋͗̋͐͆̀̄̆̅̚͜͠L̸̡̹̮͎̫̏̀̏̀͌̑̀̃͋̃̕̚͝P̴̝̑̄̆̀̈́̾͋̂̾̄͗͐͗̈̃͘͝ ̸͕͉͚̘͓̺͍̱̪̟̻̠̦͔͇̆̾͂͐̐͋͑͑̚M̴̢̧̧͍̬̰̞̖̭̫̦̣͍̩̩̘͛͆ͅE̷͔͎̩̼͂͛̃̋̊͋̋̉̉͋`),
 				stackage.Cond(`name`, stackage.Eq, `Courtney`),
 			)),
 			MyStack(stackage.Not().SetID(`negations`).Push(

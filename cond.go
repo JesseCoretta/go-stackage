@@ -785,6 +785,44 @@ func (r condition) isNesting() bool {
 }
 
 /*
+IsFIFO returns a Boolean value indicative of whether the underlying
+receiver instance's Expression value represents a Stack (or Stack
+type alias) instance which exhibits First-In-First-Out behavior as
+it pertains to the act of appending and truncating the receiver's
+slices.
+
+A value of false implies that no such Stack instance is set as the
+expression, OR that the Stack exhibits Last-In-Last-Out behavior,
+which is the default ingress/egress scheme imposed upon instances
+of this type.
+*/
+func (r Condition) IsFIFO() bool {
+	if r.condition == nil {
+		r.condition = initCondition()
+		return false
+	}
+	return r.condition.isFIFO()
+}
+
+/*
+isFIFO is a private method called by the Condition.IsFIFO method.
+*/
+func (r condition) isFIFO() (result bool) {
+
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+
+	if stk, ok := stackTypeAliasConverter(r.ex); ok {
+		result = stk.IsFIFO()
+	}
+
+	r.calls(sprintf("%s: out:%T(%v)",
+		fmname(), result, result))
+
+	return
+}
+
+/*
 Paren sets the string-encapsulation bit for parenthetical
 expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
@@ -999,6 +1037,10 @@ func (r condition) string() string {
 	return s
 }
 
+/*
+mkmsg is the private method called by eventDispatch for the
+purpose of Message assembly prior to submission to a logger.
+*/
 func (r *condition) mkmsg(typ string) (Message, bool) {
 	if r.isZero() || len(typ) == 0 {
 		return Message{}, false
@@ -1015,65 +1057,70 @@ func (r *condition) mkmsg(typ string) (Message, bool) {
 	}, true
 }
 
+/*
+error conditions that are fatal and always serious
+*/
 func (r condition) fatal(x any, data ...map[string]string) {
-	m, ok := r.mkmsg(`FATAL`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Fatalln(m)
+	r.eventDispatch(x, LogLevel5, `FATAL`, data...)
 }
 
+/*
+error conditions that are not fatal but potentially serious
+*/
 func (r condition) error(x any, data ...map[string]string) {
-	m, ok := r.mkmsg(`ERROR`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel5, `ERROR`, data...)
 }
 
+/*
+extreme depth operational details
+*/
+func (r condition) trace(x any, data ...map[string]string) {
+	r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+}
+
+/*
+relatively deep operational details
+*/
 func (r condition) debug(x any, data ...map[string]string) {
-	m, ok := r.mkmsg(`DEBUG`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
 }
 
+/*
+policy method operational details, as well as caps, r/o, etc.
+*/
 func (r condition) policy(x any, data ...map[string]string) {
-	m, ok := r.mkmsg(`POLICY`)
+	r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+}
+
+/*
+calls records in/out signatures and realtime meta-data regarding
+individual method runtimes.
+*/
+func (r condition) calls(x any, data ...map[string]string) {
+	r.eventDispatch(x, LogLevel1, `CALL`, data...)
+}
+
+/*
+state records interrogations of, and changes to, the underlying
+configuration value.
+*/
+func (r condition) state(x any, data ...map[string]string) {
+	r.eventDispatch(x, LogLevel3, `STATE`, data...)
+}
+
+/*
+eventDispatch is the main dispatcher of events of any severity.
+A severity of FATAL (in any case) will result in a logger-driven
+call of os.Exit.
+*/
+func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...map[string]string) {
+	if !(r.cfg.log.positive(ll) ||
+		eq(severity, `FATAL`) ||
+		r.cfg.log.lvl == logLevels(AllLogLevels)) {
+		return
+	}
+
+	m, ok := r.mkmsg(severity)
 	if !ok {
 		return
 	}
@@ -1086,6 +1133,10 @@ func (r condition) policy(x any, data ...map[string]string) {
 		if data[0] != nil {
 			m.Data = data[0]
 		}
+	}
+
+	if eq(severity, `fatal`) {
+		r.logger().Fatalln(m)
 	}
 
 	r.logger().Println(m)

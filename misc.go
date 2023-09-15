@@ -541,23 +541,135 @@ Users SHOULD adopt this interface signature for use in their solutions
 if and when needed, though it is not a requirement.
 */
 type Interface interface {
+	// Stack: Len returns an integer that represents the number of
+	// slices present within.
+	//
+	// Condition: Len returns a one (1) if properly initialized
+	// and set with a value that is not a Stack. Len returns a
+	// zero (0) if invalid or otherwise not properly initialized.
+	// Len returns the value of Stack.Len in deference, should the
+	// expression itself be a Stack.
 	Len() int
 
+	// IsInit returns a Boolean value indicative of whether the
+	// receiver instance is considered 'properly initialized'
 	IsInit() bool
+
+	// Stack: IsFIFO returns a Boolean value indicative of whether
+	// the Stack instance exhibits First-In-First-Out behavior as it
+	// pertains to the ingress and egress order of slices. See the
+	// Stack.SetFIFO method for details on setting this behavior.
+	//
+	// Condition: IsFIFO returns a Boolean value indicative of whether
+	// the receiver's Expression value contains a Stack instance AND
+	// that Stack exhibits First-In-First-Out behavior as it pertains
+	// to the ingress and egress order of slices. If no Stack value is
+	// present within the Condition, false is always returned.
+	IsFIFO() bool
+
+	// IsZero returns a Boolean value indicative of whether the receiver
+	// instance is considered nil, or unset.
 	IsZero() bool
+
+	// Stack: CanNest returns a Boolean value indicative of whether the
+	// receiver is allowed to append (Push) additional Stack instances
+	// into its collection of slices.
+	//
+	// Condition: CanNest returns a Boolean value indicative of whether
+	// the receiver is allowed to set a Stack instance as its Expression
+	// value.
+	//
+	// See also the NoNesting and IsNesting methods for either of these
+	// types.
 	CanNest() bool
+
+	// IsParen returns a Boolean value indicative of whether the receiver
+	// instance, when represented as a string value, shall encapsulate in
+	// parenthetical L [(] and R [)] characters.
+	//
+	// See also the Paren method for Condition and Stack instances.
 	IsParen() bool
+
+	// IsEncap returns a Boolean value indicative of whether the receiver
+	// instance, when represented as a string value, shall encapsulate the
+	// effective value within user-defined quotation characters.
+	//
+	// See also the Encap method for Condition and Stack instances.
 	IsEncap() bool
+
+	// Stack: IsPadded returns a Boolean value indicative of whether WHSP
+	// (ASCII #32) padding shall be applied to the outermost ends of the
+	// string representation of the receiver (but within parentheticals).
+	//
+	// Condition: IsPadded returns a Boolean value indicative of whether
+	// WHSP (ASCII #32) padding shall be applied to the outermost ends of
+	// the string representation of the receiver, as well as around it's
+	// comparison operator, when applicable.
+	//
+	// See also the NoPadding method for either of these types.
 	IsPadded() bool
+
+	// Stack: IsNesting returns a Boolean value indicative of whether the
+	// receiver contains one (1) or more slices that are Stack instances.
+	//
+	// Condition: IsNesting returns a Boolean value indicative of whether
+	// the Expression value set within the receiver is a Stack instance.
+	//
+	// See also the NoNesting and CanNest method for either of these types.
 	IsNesting() bool
 
+	// ID returns the identifier assigned to the receiver, if set. This
+	// may be anything the user chooses to set, or it may be auto-assigned
+	// using the `_addr` or `_random` input keywords.
+	//
+	// See also the SetID method for Condition and Stack instances.
 	ID() string
+
+	// Addr returns the string representation of the pointer address of
+	// the embedded receiver instance. This is mainly useful in cases
+	// where debugging/troubleshooting may be underway, and the ability
+	// to distinguish unnamed instances would be beneficial. It may also
+	// be used as an alternative to the tedium of manually naming objects.
 	Addr() string
+
+	// String returns the string representation of the receiver. Note that
+	// if the receiver is a BASIC Stack, string representation shall not be
+	// possible.
 	String() string
+
+	// Stack: Category returns the categorical string label assigned to the
+	// receiver instance during initialization. This will be one of AND, OR,
+	// NOT, LIST and BASIC (these values may be folded case-wise depending
+	// on the state of the Fold bit, as set by the user).
+	//
+	// Condition: Category returns the categorical string label assigned to
+	// the receiver instance by the user at any time. Condition categorical
+	// labels are entirely user-controlled.
+	//
+	// See also the SetCategory method for either of these types.
 	Category() string
 
+	// Err returns the most recently set instance of error within the receiver.
+	// This is particularly useful for users who dislike fluent-style method
+	// execution and would prefer to operate in the traditional "if err != nil ..."
+	// style.
+	//
+	// See also the SetErr method for Condition and Stack instances.
 	Err() error
+
+	// Valid returns an instance of error resulting from a cursory review of the
+	// receiver without any special context. Nilness, quality-of-initialization
+	// and other rudiments are checked.
+	//
+	// This method is most useful when users apply a ValidityPolicy method or
+	// function to the receiver instance, allowing full control over what they
+	// deem "valid". See the SetValidityPolicy method for Condition and Stack
+	// instances for details.
 	Valid() error
 
+	// Logger returns the underlying instance of *log.Logger, which may be set by
+	// the package by defaults, or supplied by the user in a piecemeal manner.
+	//
+	// See also the SetLogger method for Condition and Stack instances.
 	Logger() *log.Logger
 }

@@ -159,13 +159,37 @@ func TestCondition_IsEncap(t *testing.T) {
 	}
 }
 
-func ExampleCondition_basic() {
-	c := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
+/*
+This example demonstrates the act of a one-shot creation of an instance
+of Condition using the Cond package-level function. All values must be
+non-zero/non-nil. This is useful in cases where users have all of the
+information they need and simply want to fashion a Condition quickly.
+
+Note: line-breaks added for readability; no impact on functionality,
+so long as dot sequence "connectors" (.) are honored where required.
+*/
+func ExampleCondition_oneShot() {
+	c := Cond(`person`, Eq, `Jesse`).
+		Paren().
+		Encap(`"`).
+		NoPadding()
+
 	fmt.Printf("%s", c)
 	// Output: (person="Jesse")
 }
 
-func ExampleCondition_stepByStep() {
+/*
+This example demonstrates the act of procedural assembly of an instance
+of Condition. The variable c is defined and not initialized. Its values
+are not set until "later" in the users code, and are set independently
+of one another.
+
+Note that with this technique a manual call of the Init method is always
+required as the first action following variable declaration. When using
+the "one-shot" technique by way of the Cond package-level function, the
+process of initialization is handled automatically for the user.
+*/
+func ExampleCondition_procedural() {
 	var c Condition
 	c.Init() // always init
 	c.Paren()
@@ -175,4 +199,21 @@ func ExampleCondition_stepByStep() {
 
 	fmt.Printf("%s", c)
 	// Output: ( myKeyword = value123 )
+}
+
+/*
+This example demonstrates use of the Addr method to obtain the string
+representation of the memory address for the underlying embedded receiver
+instance.
+
+NOTE: Since the address will usually be something different each runtime,
+we can't reliably test this in literal fashion, so we do a simple prefix
+check as an alternative.
+*/
+func ExampleCondition_Addr() {
+	var c Condition
+	c.Init()
+
+	fmt.Printf("Address prefix valid: %t", c.Addr()[:2] == `0x`)
+	// Address prefix valid: true
 }

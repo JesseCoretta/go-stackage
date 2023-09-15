@@ -3583,6 +3583,10 @@ func (r *stack) getValidityPolicy() ValidityPolicy {
 	return rc.vpf
 }
 
+/*
+mkmsg is the private method called by eventDispatch for the
+purpose of Message assembly prior to submission to a logger.
+*/
 func (r *stack) mkmsg(typ string) (Message, bool) {
 	if r.isZero() || len(typ) == 0 {
 		return Message{}, false
@@ -3600,166 +3604,70 @@ func (r *stack) mkmsg(typ string) (Message, bool) {
 }
 
 /*
-error conditions that are fatal.
+error conditions that are fatal and always serious
 */
 func (r stack) fatal(x any, data ...map[string]string) {
-	// fatal events cannot be ignored
-
-	m, ok := r.mkmsg(`FATAL`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Fatalln(m)
+	r.eventDispatch(x, LogLevel5, `FATAL`, data...)
 }
 
 /*
-error conditions that are not fatal.
+error conditions that are not fatal but potentially serious
 */
 func (r stack) error(x any, data ...map[string]string) {
-	cfg, _ := r.config()
-	if !(cfg.log.positive(LogLevel5) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	m, ok := r.mkmsg(`ERROR`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel5, `ERROR`, data...)
 }
 
+/*
+relatively deep operational details
+*/
 func (r stack) debug(x any, data ...map[string]string) {
-	cfg, _ := r.config()
-	if !(cfg.log.positive(LogLevel4) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	m, ok := r.mkmsg(`DEBUG`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
 }
 
+/*
+extreme depth operational details
+*/
 func (r stack) trace(x any, data ...map[string]string) {
-	cfg, _ := r.config()
-
-	if !(cfg.log.positive(LogLevel6) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	m, ok := r.mkmsg(`TRACE`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel6, `TRACE`, data...)
 }
 
+/*
+policy method operational details, as well as caps, r/o, etc.
+*/
 func (r stack) policy(x any, data ...map[string]string) {
-	cfg, _ := r.config()
-	if !(cfg.log.positive(LogLevel2) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	m, ok := r.mkmsg(`POLICY`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel2, `POLICY`, data...)
 }
 
+/*
+calls records in/out signatures and realtime meta-data regarding
+individual method runtimes.
+*/
 func (r stack) calls(x any, data ...map[string]string) {
-	cfg, _ := r.config()
-	if !(cfg.log.positive(LogLevel1) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	m, ok := r.mkmsg(`CALL`)
-	if !ok {
-		return
-	}
-
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
-		}
-	}
-
-	r.logger().Println(m)
+	r.eventDispatch(x, LogLevel1, `CALL`, data...)
 }
 
+/*
+state records interrogations of, and changes to, the underlying
+configuration value.
+*/
 func (r stack) state(x any, data ...map[string]string) {
+	r.eventDispatch(x, LogLevel3, `STATE`, data...)
+}
+
+/*
+eventDispatch is the main dispatcher of events of any severity.
+A severity of FATAL (in any case) will result in a logger-driven
+call of os.Exit.
+*/
+func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[string]string) {
 	cfg, _ := r.config()
-	if !(cfg.log.positive(LogLevel3) ||
+	if !(cfg.log.positive(ll) ||
+		eq(severity, `FATAL`) ||
 		cfg.log.lvl == logLevels(AllLogLevels)) {
 		return
 	}
 
-	m, ok := r.mkmsg(`STATE`)
+	m, ok := r.mkmsg(severity)
 	if !ok {
 		return
 	}
@@ -3772,6 +3680,10 @@ func (r stack) state(x any, data ...map[string]string) {
 		if data[0] != nil {
 			m.Data = data[0]
 		}
+	}
+
+	if eq(severity, `fatal`) {
+		r.logger().Fatalln(m)
 	}
 
 	r.logger().Println(m)

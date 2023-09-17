@@ -362,7 +362,7 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 
 	// no push policy, so we'll see if the basic
 	// guidelines were satisfied, at least ...
-	if v, ok := stackTypeAliasConverter(x); ok {
+	if _, ok := stackTypeAliasConverter(x); ok {
 		if r.positive(nnest) {
 			return
 		}
@@ -370,7 +370,7 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 		// a user-created type alias of Stack
 		// was converted back to Stack without
 		// any issues ...
-		X = v
+		X = x
 
 	} else if meth := getStringer(x); meth != nil {
 		// whatever it is, it seems to have

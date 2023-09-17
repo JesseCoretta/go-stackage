@@ -265,6 +265,10 @@ type instance's String ("stringer") method, if present.
 If not, nil is returned.
 */
 func getStringer(x any) func() string {
+	if x == nil {
+		return nil
+	}
+
 	v := valOf(x)
 	if v.IsZero() {
 		return nil

@@ -1,6 +1,9 @@
 package stackage
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 /*
 nodeConfig contains configuration information that is
@@ -19,15 +22,119 @@ type nodeConfig struct {
 	ppf PushPolicy         // closure filterer
 	vpf ValidityPolicy     // closure validator
 	rpf PresentationPolicy // closure stringer
-	msg chan Message       // optional debug/err chan interface
+	log *logSystem         // logging subsystem
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)
+	aux Auxiliary          // auxiliary admin-related object storage, user managed
 
 	typ stackType   // stacks only: defines the typ/kind of stack
 	sym string      // stacks only: user-controlled symbol char(s)
 	ljc string      // [list] stacks only: joining delim
 	mtx *sync.Mutex // stacks only: optional locking system
+	ldr *time.Time  // for lock duration; ephemeral, nil if not locked / no locking capabilities
+	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
+}
+
+/*
+Auxiliary is a map[string]any type alias extended by this package. It
+can be created within any Stack instance when [re]initialized using
+the SetAuxiliary method extended through instances of the Stack type,
+and can be accessed using the Auxiliary() method in similar fashion.
+
+The Auxiliary type extends four (4) methods: Get, Set, Len and Unset.
+These are purely for convenience. Given that instances of this type
+can easily be cast to standard map[string]any by the user, the use of
+these methods is entirely optional.
+
+The Auxiliary map instance is available to be leveraged in virtually
+any way deemed appropriate by the user. Its primary purpose is for
+storage of any instance(s) pertaining to the *administration of the
+stack*, as opposed to the storage of content normally submitted *into*
+said stack.
+
+Examples of suitable instance types for storage within the Auxiliary
+map include, but are certainly not limited to:
+
+  - HTTP server listener / mux
+  - HTTP client, agent
+  - Graphviz node data
+  - Go Metrics meters, gauges, etc.
+  - Redis cache
+  - bytes.Buffer
+  - ANTLR parser
+  - text/template instances
+  - channels
+
+Which instances are considered suitable for storage within Auxiliary map
+instances is entirely up to the user. This package shall not impose ANY
+controls or restrictions regarding the content within this instances of
+this type, nor its behavior.
+*/
+type Auxiliary map[string]any
+
+/*
+Len returns the integer length of the receiver, defining the number of
+key/value pairs present.
+*/
+func (r Auxiliary) Len() int {
+	if r == nil {
+		return 0
+	}
+	return len(r)
+}
+
+/*
+Get returns the value associated with key, alongside a presence-indicative
+Boolean value (ok).
+
+Even if found within the receiver instance, if value is nil, ok shall be
+explicitly set to false prior to return.
+
+Case is significant in the matching process.
+*/
+func (r Auxiliary) Get(key string) (value any, ok bool) {
+	if r == nil {
+		return
+	}
+
+	if value, ok = r[key]; value == nil {
+		ok = false
+	}
+
+	return
+}
+
+/*
+Set associates key with value, and assigns to receiver instance. See
+also the Unset method.
+
+If the receiver is not initialized, a new allocation is made.
+*/
+func (r Auxiliary) Set(key string, value any) Auxiliary {
+	if r == nil {
+		return r
+	}
+
+	r[key] = value
+	return r
+}
+
+/*
+Unset removes the key/value pair, identified by key, from the receiver
+instance, if found. See also the Set method.
+
+This method internally calls the following builtin:
+
+	delete(*rcvr,key)
+
+Case is significant in the matching process.
+*/
+func (r Auxiliary) Unset(key string) Auxiliary {
+	if _, found := r[key]; found {
+		delete(r, key)
+	}
+	return r
 }
 
 /*
@@ -35,6 +142,8 @@ cfgFlag contains left-shifted bit values that can represent
 one of several configuration "flag states".
 */
 type cfgFlag uint16
+
+var cfgFlagMap map[cfgFlag]string
 
 /*
 ONE of 'and', 'or', 'not' or 'list'
@@ -71,6 +180,8 @@ func (r stackType) String() string {
 		t = `LIST`
 	case basic:
 		t = `BASIC`
+	case cond:
+		t = `CONDITION` // just for logging
 	}
 
 	return t
@@ -94,11 +205,11 @@ func (r nodeConfig) isError() bool {
 	return r.err != nil
 }
 
-func (r nodeConfig) error() error {
+func (r nodeConfig) getErr() error {
 	return r.err
 }
 
-func (r *nodeConfig) setError(err error) {
+func (r *nodeConfig) setErr(err error) {
 	r.err = err
 }
 
@@ -118,7 +229,7 @@ const (
 	joinl                      //    64 // list joining value
 	ronly                      //   128 // stack is read-only
 	nnest                      //   256 // stack/condition does not allow stack/stack alias instances as slice members or expression value
-	_                          //   512
+	etrav                      //   512 // enhanced traversal support (slices, int-keyed maps)
 	_                          //  1024
 	_                          //  2048
 	_                          //  4096
@@ -155,7 +266,7 @@ func (r *nodeConfig) kind() (kind string) {
 	}
 
 	switch r.typ {
-	case and, or, not, list, cond:
+	case and, or, not, list, cond, basic:
 		kind = foldValue(r.positive(cfold), r.typ.String())
 	}
 
@@ -176,7 +287,8 @@ func (r *nodeConfig) valid() (err error) {
 		return
 	}
 
-	return r.error()
+	err = r.getErr()
+	return
 }
 
 /*
@@ -252,12 +364,9 @@ func (r *nodeConfig) setEncap(x ...any) {
 setListDelimiter is a private method invoked by stack.setListDelimiter.
 */
 func (r *nodeConfig) setListDelimiter(x string) {
-	if !eq(r.kind(), `list`) {
-		// don't set if stack is not a list
-		return
+	if r.typ == list {
+		r.ljc = x
 	}
-
-	r.ljc = x
 }
 
 /*
@@ -344,9 +453,20 @@ func (r *cfgFlag) shift(x cfgFlag) {
 	*r |= x
 }
 
+func (r cfgFlag) String() (f string) {
+	for k, v := range cfgFlagMap {
+		if k == r {
+			f = v
+			break
+		}
+	}
+
+	return
+}
+
 /*
-unsetOpt sets the specified cfgFlag to "off" within the receiver's
-opt field.
+setMutex enables the receiver's mutual exclusion
+locking capabilities.
 */
 func (r *nodeConfig) setMutex() {
 	if err := r.valid(); err != nil {
@@ -410,11 +530,34 @@ func (r *cfgFlag) toggle(x cfgFlag) {
 mutex returns the *sync.Mutext instance, alongside a presence-indicative
 Boolean value.
 */
-func (r *stack) mutex() (mutex *sync.Mutex, found bool) {
+func (r *stack) mutex() (*sync.Mutex, bool) {
 	sc, _ := r.config()
 	return sc.mtx, sc.mtx != nil
 }
 
 func (r *nodeConfig) canWriteMessage() bool {
-	return r.msg != nil
+	if err := r.valid(); err != nil {
+		return false
+	}
+
+	if r.log == nil {
+		r.log = newLogSystem(devNull)
+	}
+
+	return r.log.log != devNull
+}
+
+func init() {
+	cfgFlagMap = map[cfgFlag]string{
+		parens: `parenthetical`,
+		negidx: `neg_index`,
+		fwdidx: `fwd_index`,
+		cfold:  `case_fold`,
+		nspad:  `no_whsp_pad`,
+		lonce:  `lead_once`,
+		joinl:  `join_list`,
+		ronly:  `read_only`,
+		nnest:  `no_nest`,
+		etrav:  `enhanced_traversal`,
+	}
 }

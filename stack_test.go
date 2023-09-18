@@ -14,6 +14,151 @@ func (r customStack) String() string {
 	return Stack(r).String()
 }
 
+func ExampleStack_SetAuxiliary() {
+
+	// Always alloc stack somehow, in this
+	// case just use List because its simple
+	// and (unlike Basic) it is feature-rich.
+	var list Stack = List()
+
+	// alloc map
+	aux := make(Auxiliary, 0)
+
+	// populate map
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
+		Value []string
+	}{
+		Type: `L`,
+		Value: []string{
+			`abc`,
+			`def`,
+		},
+	})
+
+	// assign map to stack rcvr
+	list.SetAuxiliary(aux)
+
+	// verify presence
+	call := list.Auxiliary()
+	fmt.Printf("%T found, length:%d", call, call.Len())
+	// Output: stackage.Auxiliary found, length:1
+}
+
+func ExampleStack_Kind() {
+	var myStack Stack = And()
+	fmt.Printf("Kind: '%s'", myStack.Kind())
+	// Output: Kind: 'AND'
+}
+
+/*
+This example demonstrates the call and (failed) set of an
+uninitialized Auxiliary instance. While no panic ensues,
+the map instance is not writable.
+
+The user must instead follow the procedures in the WithInit,
+UserInit or ByTypeCast examples.
+*/
+func ExampleStack_Auxiliary_noInit() {
+
+	var list Stack = List()
+	aux := list.Auxiliary()
+	fmt.Printf("%T found, length:%d",
+		aux, aux.Set(`testing`, `123`).Len())
+	// Output: stackage.Auxiliary found, length:0
+}
+
+/*
+This example continues the concepts within the NoInit example,
+except in this case proper initialization occurs and a desirable
+outcome is achieved.
+*/
+func ExampleStack_Auxiliary_withInit() {
+
+	var list Stack = List().SetAuxiliary() // no args triggers auto-init
+	aux := list.Auxiliary()
+	fmt.Printf("%T found, length was:%d, is now:%d",
+		aux,
+		aux.Len(),                       // check initial (pre-set) length
+		aux.Set(`testing`, `123`).Len()) // fluent Set/Len in one shot
+	// Output: stackage.Auxiliary found, length was:0, is now:1
+}
+
+/*
+This example demonstrates a scenario similar to that of the WithInit
+example, except in this case the map instance is entirely created and
+populated by the user in a traditional fashion.
+*/
+func ExampleStack_Auxiliary_userInit() {
+
+	var list Stack = List()
+	aux := make(Auxiliary, 0)
+
+	// user opts to just use standard map
+	// key/val set procedure, and avoids
+	// use of the convenience methods.
+	// This is totally fine.
+	aux[`value1`] = []int{1, 2, 3, 4, 5}
+	aux[`value2`] = [2]any{float64(7.014), rune('#')}
+
+	list.SetAuxiliary(aux)
+	fmt.Printf("%T length:%d", aux, len(aux))
+	// Output: stackage.Auxiliary length:2
+}
+
+/*
+This example demonstrates building of the Auxiliary map in its generic
+form (map[string]any) before being type cast to Auxiliary.
+*/
+func ExampleStack_Auxiliary_byTypeCast() {
+
+	var list Stack = List()
+	proto := make(map[string]any, 0)
+	proto[`value1`] = []int{1, 2, 3, 4, 5}
+	proto[`value2`] = [2]any{float64(7.014), rune('#')}
+	list.SetAuxiliary(Auxiliary(proto)) // cast proto and assign to stack
+	aux := list.Auxiliary()             // call map to variable
+	fmt.Printf("%T length:%d", aux, aux.Len())
+	// Output: stackage.Auxiliary length:2
+}
+
+func TestStack_SetAuxiliary(t *testing.T) {
+	var list Stack = List()
+
+	// alloc map
+	aux := make(Auxiliary, 0)
+
+	// populate map
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
+		Value []string
+	}{
+		Type: `L`,
+		Value: []string{
+			`abc`,
+			`def`,
+		},
+	})
+
+	// assign map to stack rcvr
+	list.SetAuxiliary(aux)
+
+	// test that it was assigned properly
+	var call Auxiliary = list.Auxiliary()
+	if call == nil {
+		t.Errorf("%s failed: %T nil", t.Name(), call)
+		return
+	}
+
+	// make sure the contents are present
+	want := 1
+	if length := call.Len(); length != want {
+		t.Errorf("%s failed: unexpected length; want %d, got %d",
+			t.Name(), want, length)
+		return
+	}
+}
+
 func TestStack_noInit(t *testing.T) {
 	var x Stack
 	x.Push(`well?`) // first off, this should not panic
@@ -22,12 +167,14 @@ func TestStack_noInit(t *testing.T) {
 	// did not work ...
 	if length := x.Len(); length != 0 {
 		t.Errorf("%s failed [noInit]: want '%d' elements, got '%d'", t.Name(), 0, length)
+		return
 	}
 
 	// lastly, we should definitely see an indication
 	// of this issue during validity checks ...
 	if err := x.Valid(); err == nil {
 		t.Errorf("%s failed [noInit]: want 'error', got '%T'", t.Name(), nil)
+		return
 	}
 }
 
@@ -41,6 +188,7 @@ func TestStack_And001(t *testing.T) {
 	want := `( testing1 and testing2 and testing3 )`
 	if got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -56,18 +204,21 @@ func TestStack_Insert(t *testing.T) {
 	want := `( testing0 and testing1 and testing2 and testing3 )`
 	if got.String() != want {
 		t.Errorf("%s.1 failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	got.Insert(`testing2.5`, 3)
 	want = `( testing0 and testing1 and testing2 and testing2.5 and testing3 )`
 	if got.String() != want {
 		t.Errorf("%s.2 failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	got.Insert(`testing4`, 15)
 	want = `( testing0 and testing1 and testing2 and testing2.5 and testing3 and testing4 )`
 	if got.String() != want {
 		t.Errorf("%s.3 failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -83,10 +234,12 @@ func TestStack_Replace(t *testing.T) {
 	got := s.String()
 	if want != got {
 		t.Errorf("%s.1 failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	if ok := s.Replace(`testingX`, 6); ok {
 		t.Errorf("%s.2 failed: want '%t', got '%t'", t.Name(), false, ok)
+		return
 	}
 
 }
@@ -100,6 +253,7 @@ func TestStack_IsParen(t *testing.T) {
 
 	if got := stk.IsParen(); !got {
 		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
+		return
 	}
 }
 
@@ -113,12 +267,14 @@ func TestStack_Transfer(t *testing.T) {
 	or := Or()
 	if ok := stk.Transfer(or); or.Len() != 3 || !ok {
 		t.Errorf("%s failed [post-transfer len comparisons]: want len:%d, got len:%d", t.Name(), stk.Len(), or.Len())
+		return
 	}
 
 	stk.Reset() // reset source, removing all slices
 	if or.Len() != 3 && stk.Len() != 0 {
 		t.Errorf("%s failed [post-transfer src reset]: want slen:%d; dlen:%d, got slen:%d; dlen:%d",
 			t.Name(), 0, 3, stk.Len(), or.Len())
+		return
 	}
 }
 
@@ -131,6 +287,7 @@ func TestStack_IsPadded(t *testing.T) {
 
 	if got := stk.IsPadded(); !got {
 		t.Errorf("%s failed: want 'true', got '%t'", t.Name(), got)
+		return
 	}
 }
 
@@ -147,6 +304,7 @@ func TestStackAnd_001(t *testing.T) {
 	want := `( top_element_number_0 AND ( sub_element_number_0 OR sub_element_number_1 ) )`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -164,6 +322,7 @@ func TestStack_IsNesting(t *testing.T) {
 	got := A.IsNesting()
 	if want != got {
 		t.Errorf("%s failed [isNesting]: want '%t', got '%t'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -183,10 +342,12 @@ func TestAnd_002(t *testing.T) {
 	want := `( top_element_number_0 AND ( "<sub_element_number_0>" OR "<sub_element_number_1>" ) )`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	if !O.IsEncap() {
 		t.Errorf("%s failed [IsEncap]: want '%t', got '%t'", t.Name(), true, false)
+		return
 	}
 }
 
@@ -204,6 +365,7 @@ func TestAnd_003(t *testing.T) {
 	want := `(&(top_element_number_0)(|(sub_element_number_0)(sub_element_number_1)))`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -233,6 +395,7 @@ func TestAnd_004(t *testing.T) {
 	want := `(&(top_element_number_0)(|(sub_element_number_0)(sub_element_number_1))(!(unwanted_element_number_0)(unwanted_element_number_1)))`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -285,21 +448,25 @@ func TestAnd_005_nestedWithTraversal(t *testing.T) {
 	want := `top_element_number_0 AND (sub_element_number_0 OR sub_element_number_1) AND NOT (unwanted_element_number_0 OR unwanted_element_number_1)`
 	if got := A; got.String() != want {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 
 	slice, ok := A.Traverse(2, 0, 1)
 	if !ok {
 		t.Errorf("%s failed: got '%T' during traversal, want non-nil", t.Name(), slice)
+		return
 	}
 
 	strAssert, strOK := slice.(string)
 	if !strOK {
 		t.Errorf("%s failed: want '%T', got '%T' during assertion", t.Name(), ``, slice)
+		return
 	}
 
 	want = `unwanted_element_number_1`
 	if want != strAssert {
-		t.Errorf("%s failed: want '%T', got '%T'", t.Name(), want, strAssert)
+		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, strAssert)
+		return
 	}
 }
 
@@ -383,7 +550,6 @@ func TestCustomStack002_ldapFilter(t *testing.T) {
 func TestCustomStack003_nested(t *testing.T) {
 	maker := func(r Stack) Stack {
 		return r.Paren().LeadOnce().NoPadding()
-		//.SetMessageChan(ch)
 	}
 
 	Ands := maker(And().Symbol('&')).Encap(testParens).SetID(`filtery`)
@@ -426,7 +592,7 @@ func ExampleStack_Traverse() {
 
 	// An optional Condition "maker", same logic
 	// as above ...
-	cMaker := func(r *Condition) *Condition {
+	cMaker := func(r Condition) Condition {
 		// encapsulate in parens, no padding between
 		// kw, op and value ...
 		return r.Paren().NoPadding()
@@ -455,8 +621,13 @@ func ExampleStack_Traverse() {
 	// Bool returns shadowed only for brevity.
 	// Generally you should not do that ...
 	slice, _ := filter.Traverse(1, 1)   // Enter coordinates
-	condAssert, _ := slice.(*Condition) // The return is any, so assert to what we expect
-	fmt.Printf("%s", condAssert)        // use its String method automagically
+	condAssert, ok := slice.(Condition) // The return is any, so assert to what we expect
+	if !ok {
+		fmt.Printf("Type Assertion failed: %T is not expected value\n", slice)
+		return
+	}
+
+	fmt.Printf("%s", condAssert) // use its String method automagically
 	// Output: (objectClass=shareholder)
 }
 
@@ -501,19 +672,31 @@ func TestBasic(t *testing.T) {
 	}
 	if want != got.(float64) {
 		t.Errorf("%s failed: want '%f', got: '%f'", t.Name(), want, got.(float64))
+		return
 	}
 }
 
 func TestBasic_withCapacity(t *testing.T) {
 	b := Basic(2)
+
+	// make sure the instance correctly
+	// reflects the capacity imposed.
+	if got := b.Cap(); got != 2 {
+		t.Errorf("%s failed: unexpected capacity value found; want %d, got %d", t.Name(), 2, got)
+		return
+	}
+
+	// try to push one too many slices
 	b.Push(
 		float64(3.14159),
 		float64(-9.378),
 		float64(139.104),
 	)
 
+	// make sure only two (2) made it in
 	if b.Len() != 2 || !b.CapReached() {
-		t.Errorf("%s failed: maximum capacity not honored; want len:%d, got len:%d", t.Name(), 2, b.Len())
+		t.Errorf("%s failed: maximum capacity (%d) not honored; want len:%d, got len:%d", t.Name(), b.Cap(), 2, b.Len())
+		return
 	}
 }
 
@@ -527,11 +710,13 @@ func TestBasic_availableCapacity(t *testing.T) {
 
 	if b.Avail() != 0 {
 		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
+		return
 	}
 
 	b = Basic(5)
 	if b.Avail() != 5 {
 		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
+		return
 	}
 }
 
@@ -544,6 +729,7 @@ func TestReset(t *testing.T) {
 	)
 	if b.Len() != 3 {
 		t.Errorf("%s failed: want '%d', got: '%d' [%s]", t.Name(), 3, b.Len(), b)
+		return
 	}
 
 	b.Reset()
@@ -551,6 +737,7 @@ func TestReset(t *testing.T) {
 	if b.Len() != 0 {
 		sl, _ := b.Index(0)
 		t.Errorf("%s failed: want '%d', got: '%d' [%#v]", t.Name(), 0, b.Len(), sl)
+		return
 	}
 }
 
@@ -594,6 +781,35 @@ func ExampleBasic_setAsReadOnly() {
 	// Output: first try: 2 vs. second try: 1
 }
 
+func ExampleStack_Pop_lIFO() {
+	b := Basic()
+	b.Push(
+		float64(3.14159),
+		float32(-9.378),
+		-1,
+		`banana`,
+	)
+
+	popped, _ := b.Pop()
+	fmt.Printf("%T, length now: %d", popped, b.Len())
+	// Output: string, length now: 3
+}
+
+func ExampleStack_Pop_fIFO() {
+	b := Basic()
+	b.SetFIFO(true)
+	b.Push(
+		float64(3.14159),
+		float32(-9.378),
+		-1,
+		`banana`,
+	)
+
+	popped, _ := b.Pop()
+	fmt.Printf("%T, length now: %d", popped, b.Len())
+	// Output: float64, length now: 3
+}
+
 /*
 This example demonstrates the creation of a basic stack
 and an enforced capacity constraint.
@@ -618,6 +834,7 @@ func TestList_Join(t *testing.T) {
 	got := L.String()
 	if want != got {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
 	}
 }
 
@@ -650,4 +867,163 @@ func ExampleStack_Delimiter() {
 	)
 	fmt.Printf("%s", L.Delimiter())
 	// Output: ,
+}
+
+func TestInterface(t *testing.T) {
+	var elem Interface
+	elem = Cond(`greeting`, Eq, `Hello`)
+	want := `greeting = Hello`
+	got := elem.String()
+	if want != got {
+		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
+		return
+	}
+}
+
+func TestStack_Reveal_experimental001(t *testing.T) {
+	thisIsMyNightmare := And().Push(
+		`this1`,
+		Or().Mutex().Push(
+			And().Push(Cond(`keyword`, Eq, "somevalue")),
+			And().Push(
+				`this4`,
+				Not().Mutex().Push(
+					Or().Push(
+						Cond(`dayofweek`, Ne, "Wednesday"),
+						Cond(`ssf`, Ge, "128"),
+					),
+				),
+			),
+			And().Push(
+				Or().Push(
+					Cond(`keyword2`, Lt, "someothervalue"),
+				),
+			),
+		),
+		`this2`,
+	)
+
+	type row struct {
+		Index int
+		Path  [][]int
+		Want  string
+		Value any
+	}
+
+	table := []row{
+		{0, [][]int{{1, 2, 0, 0}, {1, 2}}, ``, nil},
+		{1, [][]int{{1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}}, ``, nil},
+	}
+
+	// Scan the target values we'll be using for
+	// comparison after processing completes.
+	for idx, tst := range table {
+		slice, _ := thisIsMyNightmare.Traverse(tst.Path[0]...)
+		var c Condition
+		var ok bool
+		if c, ok = slice.(Condition); !ok {
+			t.Errorf("%s failed [idx:%d;pre-mod:path:%v]: unexpected assertion result:\nwant: %T\ngot:  %s",
+				t.Name(), idx, tst.Path[0], c, slice.(string))
+			return
+		}
+		table[idx].Want = c.String()
+		tst.Value = c
+	}
+
+	// save for comparison later
+	var want string = thisIsMyNightmare.String()
+
+	// do reveal recursion
+	thisIsMyNightmare.Reveal()
+
+	// make sure the complete string is identical
+	// before and after.
+	if got := thisIsMyNightmare.String(); want != got {
+		t.Errorf("%s failed [main strcmp]:\nwant '%s'\ngot  '%s',",
+			t.Name(), want, got)
+		return
+	}
+
+	// Scan the updated values at the defined paths
+	// and compare to original target values.
+	for idx, tst := range table {
+		slice, _ := thisIsMyNightmare.Traverse(tst.Path[1]...)
+		val, ok := slice.(Condition)
+		if !ok {
+			t.Errorf("%s failed [idx:%d;post-mod]: unexpected assertion result:\nwant: %T\ngot:  %T",
+				t.Name(), idx, val, slice)
+			return
+		}
+
+		if gval := val.String(); tst.Want != gval {
+			t.Errorf("%s failed [idx:%d;strcmp]:\nwant '%s'\ngot  '%s',",
+				t.Name(), idx, tst.Want, gval)
+		}
+	}
+}
+
+func TestDefrag_experimental_001(t *testing.T) {
+	// this list contains an assortment of
+	// values mixed in with nils and a couple
+	// hierarchies tossed in, too.
+	var l Stack = List().SetLogLevel(LogLevel(45)).Push(
+		`this`,
+		nil,
+		`that`,
+		nil,
+		`those`,
+		nil,
+		List().Push(
+			nil, nil, nil, `other`, `level`, `of`, nil, nil, `stuff`,
+			And().Push(
+				`yet`, nil, nil, nil, nil, `more`, `JUNK`,
+			),
+		),
+		nil,
+		nil,
+		nil,
+		nil,
+		3.14159,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		`moar`,
+		nil,
+		`moar`,
+		`moar`,
+		nil,
+		nil,
+		nil,
+		nil,
+	).Paren()
+
+	offset := 13         // number of nil occurrences
+	beforeLen := l.Len() // record preop len
+
+	// verify no errors resulted from the attempt
+	// to defragment our stack
+	if err := l.Defrag().Err(); err != nil {
+		t.Errorf("%s failed: %v", t.Name(), err)
+		return
+	}
+
+	// verify starting length minus offset is equal
+	// to the result length, meaning <offset> slices
+	// were truncated.
+	offsetLen := beforeLen - offset
+	if afterLen := l.Len(); offsetLen != afterLen {
+		t.Errorf("%s failed: unexpected length; want '%d', got '%d'",
+			t.Name(), offsetLen, afterLen)
+		return
+	}
+}
+
+func init() {
+	// just used for testing, etc.
+	//SetDefaultStackLogger(`stdout`)
+	//SetDefaultConditionLogger(`stdout`)
 }

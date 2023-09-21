@@ -240,11 +240,9 @@ Note that this method shall obliterate any instance that may already
 be present, regardless of the state of the input value aux.
 */
 func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.stack.setAuxiliary(aux...)
 	}
-
-	r.stack.setAuxiliary(aux...)
 	return r
 }
 
@@ -252,10 +250,6 @@ func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
 setAuxiliary is a private method called by Stack.SetAuxiliary.
 */
 func (r *stack) setAuxiliary(aux ...Auxiliary) {
-	if r.isZero() {
-		return
-	}
-
 	cfg, err := r.config()
 	if err != nil {
 		return
@@ -291,21 +285,17 @@ func (r *stack) setAuxiliary(aux ...Auxiliary) {
 /*
 Auxiliary returns the instance of Auxiliary from within the receiver.
 */
-func (r Stack) Auxiliary() Auxiliary {
-	if !r.IsInit() {
-		return nil
+func (r Stack) Auxiliary() (aux Auxiliary) {
+	if r.IsInit() {
+		aux = r.stack.auxiliary()
 	}
-	return r.stack.auxiliary()
+	return
 }
 
 /*
 auxiliary is a private method called by Stack.Auxiliary.
 */
 func (r stack) auxiliary() (aux Auxiliary) {
-	if r.isZero() {
-		return
-	}
-
 	cfg, err := r.config()
 	if err != nil {
 		return
@@ -330,20 +320,17 @@ to the appending and truncation order of the receiver instance.
 A value of false implies Last-In-Last-Out behavior, which is the
 default ordering scheme imposed upon instances of this type.
 */
-func (r Stack) IsFIFO() bool {
-	if !r.IsInit() {
-		return false
+func (r Stack) IsFIFO() (is bool) {
+	if r.IsInit() {
+		is = r.stack.isFIFO()
 	}
-	return r.stack.isFIFO()
+	return
 }
 
 /*
 isFIFO is a private method called by the Stack.IsFIFO method, et al.
 */
 func (r stack) isFIFO() bool {
-	if !r.isInit() {
-		return false
-	}
 	sc, err := r.config()
 	if err != nil {
 		return false
@@ -377,17 +364,13 @@ subject to any override controls.
 In short, once you go FIFO, you cannot go back.
 */
 func (r Stack) SetFIFO(fifo bool) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.stack.setFIFO(fifo)
 	}
-	r.stack.setFIFO(fifo)
 	return r
 }
 
 func (r *stack) setFIFO(fifo bool) {
-	if r.isZero() {
-		return
-	}
 	sc, err := r.config()
 	if err != nil {
 		return
@@ -418,11 +401,11 @@ shall potentially obscure error conditions along the way,
 as each successive method may happily overwrite any error
 instance already present.
 */
-func (r Stack) Err() error {
-	if !r.IsInit() {
-		return nil
+func (r Stack) Err() (err error) {
+	if r.IsInit() {
+		err = r.getErr()
 	}
-	return r.getErr()
+	return
 }
 
 /*
@@ -434,11 +417,9 @@ to extend this type by aliasing, and wish to control the
 handling of error conditions in another manner.
 */
 func (r Stack) SetErr(err error) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.stack.setErr(err)
 	}
-
-	r.stack.setErr(err)
 	return r
 }
 
@@ -573,13 +554,11 @@ func (r Stack) IsInit() bool {
 /*
 isInit is a private method called by Stack.IsInit.
 */
-func (r *stack) isInit() bool {
-	if r == nil {
-		return false
+func (r *stack) isInit() (is bool) {
+	if r != nil {
+		is = r.stackType() != 0x0
 	}
-
-	result := r.stackType() != 0x0
-	return result
+	return
 }
 
 /*
@@ -607,15 +586,11 @@ Logging may also be set globally using the SetDefaultLogger
 package level function. Similar semantics apply.
 */
 func (r Stack) SetLogger(logger any) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.stack.positive(ronly) {
+			r.stack.setLogger(logger)
+		}
 	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setLogger(logger)
 	return r
 }
 
@@ -630,12 +605,12 @@ of disabling logging outright (see Stack.SetLogger method as well
 as the SetDefaultStackLogger package-level function for ways of
 doing this easily).
 */
-func (r Stack) Logger() *log.Logger {
-	if !r.IsInit() {
-		return nil
+func (r Stack) Logger() (l *log.Logger) {
+	if r.IsInit() {
+		l = r.stack.logger()
 	}
+	return
 
-	return r.stack.logger()
 }
 
 /*
@@ -745,31 +720,20 @@ func (r Stack) Replace(x any, idx int) bool {
 }
 
 func (r *stack) replace(x any, i int) (ok bool) {
-	// bail out if receiver or
-	// input value is nil
-	if r == nil || x == nil {
-		return
-	} else if !r.isInit() {
-		return
+	if r != nil {
+		if !r.positive(ronly) {
+			fname := fmname()
+			r.calls(sprintf("%s: in:%T(%t),%T(%v:%d)",
+				fname, x, x == nil, i, i, i))
+
+			if ok = i+1 <= r.ulen(); ok {
+				(*r)[i+1] = x
+			}
+
+			r.calls(sprintf("%s: out:%T(%t)",
+				fname, ok, ok))
+		}
 	}
-
-	fname := fmname()
-	r.calls(sprintf("%s: in:%T(%t),%T(%v:%d)",
-		fname, x, x == nil, i, i, i))
-
-	if r.positive(ronly) {
-		return
-	}
-
-	if i+1 > r.ulen() {
-		return
-	}
-
-	(*r)[i+1] = x
-	ok = true
-
-	r.calls(sprintf("%s: out:%T(%v)",
-		fname, ok, ok))
 
 	return
 }
@@ -895,10 +859,9 @@ the receiver, leaving it unpopulated but still retaining its
 active configuration. Nothing is returned.
 */
 func (r Stack) Reset() {
-	if !r.IsInit() {
-		return
+	if r.IsInit() {
+		r.stack.reset()
 	}
-	r.stack.reset()
 }
 
 /*
@@ -945,11 +908,10 @@ shall immediately be "collapsed" using the subsequent slices
 available.
 */
 func (r Stack) Remove(idx int) (slice any, ok bool) {
-	if !r.IsInit() {
-		return
+	if r.IsInit() {
+		slice, ok = r.stack.remove(idx)
 	}
-
-	return r.stack.remove(idx)
+	return
 }
 
 /*
@@ -1031,24 +993,7 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Paren(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(parens)
-		} else {
-			r.stack.unsetOpt(parens)
-		}
-	} else {
-		r.stack.toggleOpt(parens)
-	}
-
+	r.setState(parens, state...)
 	return r
 }
 
@@ -1058,12 +1003,12 @@ at least one (1) slice member is either a Stack or Stack
 type alias. If true, this indicates the relevant slice
 descends into another hierarchical (nested) context.
 */
-func (r Stack) IsNesting() bool {
-	if !r.IsInit() {
-		return false
+func (r Stack) IsNesting() (is bool) {
+	if r.IsInit() {
+		is = r.stack.isNesting()
 	}
+	return
 
-	return r.stack.isNesting()
 }
 
 /*
@@ -1127,11 +1072,7 @@ IsParen returns a Boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Stack) IsParen() bool {
-	if !r.IsInit() {
-		return false
-	}
-
-	return r.stack.positive(parens)
+	return r.getState(parens)
 }
 
 /*
@@ -1147,24 +1088,7 @@ current state of the case-folding bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) Fold(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(cfold)
-		} else {
-			r.stack.unsetOpt(cfold)
-		}
-	} else {
-		r.stack.toggleOpt(cfold)
-	}
-
+	r.setState(cfold, state...)
 	return r
 }
 
@@ -1179,24 +1103,7 @@ current state of the negative indices bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) NegativeIndices(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(negidx)
-		} else {
-			r.stack.unsetOpt(negidx)
-		}
-	} else {
-		r.stack.toggleOpt(negidx)
-	}
-
+	r.setState(negidx, state...)
 	return r
 }
 
@@ -1211,24 +1118,7 @@ current state of the forward indices bit (i.e.: true->false
 and false->true)
 */
 func (r Stack) ForwardIndices(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(fwdidx)
-		} else {
-			r.stack.unsetOpt(fwdidx)
-		}
-	} else {
-		r.stack.toggleOpt(fwdidx)
-	}
-
+	r.setState(fwdidx, state...)
 	return r
 }
 
@@ -1435,6 +1325,9 @@ func (r *stack) setID(id string) {
 	}
 	r.debug(sprintf("%s: setID: %v", fname, id))
 
+	r.lock()
+	defer r.unlock()
+
 	sc.setID(id)
 	r.calls(sprintf("%s: out:void", fname))
 }
@@ -1548,24 +1441,7 @@ current state of the lead-once bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) LeadOnce(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(lonce)
-		} else {
-			r.stack.unsetOpt(lonce)
-		}
-	} else {
-		r.stack.toggleOpt(lonce)
-	}
-
+	r.setState(lonce, state...)
 	return r
 }
 
@@ -1580,24 +1456,7 @@ current state of the padding bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoPadding(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(nspad)
-		} else {
-			r.stack.unsetOpt(nspad)
-		}
-	} else {
-		r.stack.toggleOpt(nspad)
-	}
-
+	r.setState(nspad, state...)
 	return r
 }
 
@@ -1624,20 +1483,7 @@ current state of the nesting bit (i.e.: true->false and
 false->true)
 */
 func (r Stack) NoNesting(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(nnest)
-		} else {
-			r.stack.unsetOpt(nnest)
-		}
-	} else {
-		r.stack.toggleOpt(nnest)
-	}
-
+	r.setState(nnest, state...)
 	return r
 }
 
@@ -1649,11 +1495,7 @@ of Stack and/or Stack type alias instances.
 See also the IsNesting method.
 */
 func (r Stack) CanNest() bool {
-	if !r.IsInit() {
-		return false
-	}
-
-	return !r.stack.positive(nnest)
+	return r.getState(nnest)
 }
 
 /*
@@ -1661,11 +1503,7 @@ IsPadded returns a Boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
 func (r Stack) IsPadded() bool {
-	if !r.IsInit() {
-		return false
-	}
-
-	return r.stack.positive(parens)
+	return !r.getState(nspad)
 }
 
 /*
@@ -1674,20 +1512,7 @@ This will prevent any writes to the receiver or its underlying
 configuration.
 */
 func (r Stack) ReadOnly(state ...bool) Stack {
-	if !r.IsInit() {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.stack.setOpt(ronly)
-		} else {
-			r.stack.unsetOpt(ronly)
-		}
-	} else {
-		r.stack.toggleOpt(ronly)
-	}
-
+	r.setState(ronly, state...)
 	return r
 }
 
@@ -1696,11 +1521,7 @@ IsReadOnly returns a Boolean value indicative of whether the
 receiver is set as read-only.
 */
 func (r Stack) IsReadOnly() bool {
-	if !r.IsInit() {
-		return false
-	}
-
-	return r.stack.positive(ronly)
+	return r.getState(ronly)
 }
 
 /*
@@ -1724,7 +1545,7 @@ func (r Stack) Symbol(c ...any) Stack {
 		return r
 	}
 
-	if r.stack.positive(ronly) {
+	if r.getState(ronly) {
 		return r
 	}
 
@@ -1762,6 +1583,8 @@ func (r *stack) setSymbol(sym string) {
 		fname, sym, sym, len(sym)))
 
 	if sc.typ != list {
+		r.lock()
+		defer r.unlock()
 		sc.setSymbol(sym)
 	}
 
@@ -1810,6 +1633,29 @@ func (r *stack) logger() *log.Logger {
 		return nil
 	}
 	return cfg.log.logger()
+}
+
+func (r Stack) getState(cf cfgFlag) (state bool) {
+	if r.IsInit() {
+		state = r.stack.positive(cf)
+	}
+	return
+}
+
+func (r Stack) setState(cf cfgFlag, state ...bool) {
+	if r.IsInit() {
+		if !r.getState(ronly) || cf == ronly {
+			if len(state) > 0 {
+				if state[0] {
+					r.stack.setOpt(cf)
+				} else {
+					r.stack.unsetOpt(cf)
+				}
+			} else {
+				r.stack.toggleOpt(cf)
+			}
+		}
+	}
 }
 
 /*

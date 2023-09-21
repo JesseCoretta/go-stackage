@@ -69,6 +69,17 @@ func TestCondition_customKeyword(t *testing.T) {
 	}
 }
 
+func TestComparisonOperator_String(t *testing.T) {
+	for _, cop := range []ComparisonOperator{
+		Eq, Ne, Lt, Gt, Le, Ge,
+	} {
+		if str := cop.String(); str == badOp {
+			t.Errorf("%s failed: got '%s' (unexpected)", t.Name(), str)
+			return
+		}
+	}
+}
+
 func TestCondition_customType(t *testing.T) {
 	cv := customTestValue{Type: `Color`, Value: `Red`}
 

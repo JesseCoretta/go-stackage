@@ -61,31 +61,6 @@ func timestamp() string {
 		t.Nanosecond())
 }
 
-func isETravEligible(ok bool, x any) bool {
-	return (isIntKeyedMap(x) || isSliceType(x)) && ok
-}
-
-func isIntKeyedMap(x any) bool {
-	typ := typOf(x)
-	if isPtr(x) {
-		typ = typ.Elem()
-	}
-
-	if typ.Kind() != reflect.Map {
-		return false
-	}
-	return typ.Key().Kind() == reflect.Int
-}
-
-func isSliceType(x any) bool {
-	typ := reflect.TypeOf(x)
-	if isPtr(x) {
-		typ = typ.Elem()
-	}
-
-	return typ.Kind() == reflect.Slice
-}
-
 /*
 errorf wraps errors.New and returns a non-nil instance of error
 based upon a non-nil/non-zero msg input value with optional args.
@@ -264,52 +239,17 @@ getStringer uses reflect to obtain and return a given
 type instance's String ("stringer") method, if present.
 If not, nil is returned.
 */
-func getStringer(x any) func() string {
-	if x == nil {
-		return nil
+func getStringer(x any) (meth func() string) {
+	if x != nil {
+		if v := valOf(x); !v.IsZero() {
+			if method := v.MethodByName(`String`); method.Kind() != reflect.Invalid {
+				if _meth, ok := method.Interface().(func() string); ok {
+					meth = _meth
+				}
+			}
+		}
 	}
-
-	v := valOf(x)
-	if v.IsZero() {
-		return nil
-	}
-	method := v.MethodByName(`String`)
-	if method.Kind() == reflect.Invalid {
-		return nil
-	}
-
-	if meth, ok := method.Interface().(func() string); ok {
-		return meth
-	}
-
-	return nil
-}
-
-/*
-getIDFunc uses reflect to obtain and return a given
-type instance's ID method, if present. If not, a zero
-string is returned.
-*/
-func getIDFromAny(x any) func() string {
-	if x == nil {
-		return nil
-	}
-
-	v := valOf(x)
-	if v.IsZero() {
-		return nil
-	}
-
-	method := v.MethodByName(`ID`)
-	if method.Kind() == reflect.Invalid {
-		return nil
-	}
-
-	if meth, ok := method.Interface().(func() string); ok {
-		return meth
-	}
-
-	return nil
+	return
 }
 
 /*
@@ -385,12 +325,11 @@ func foldValue(do bool, value string) string {
 	return value // do not.
 }
 
-func isPtr(x any) bool {
-	if x == nil {
-		return false
+func isPtr(x any) (is bool) {
+	if x != nil {
+		is = typOf(x).Kind() == reflect.Ptr
 	}
-
-	return typOf(x).Kind() == reflect.Ptr
+	return
 }
 
 func isNumberPrimitive(x any) bool {

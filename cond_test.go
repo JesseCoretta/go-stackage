@@ -144,7 +144,7 @@ func TestCondition_IsNesting(t *testing.T) {
 }
 
 func TestCondition_IsPadded(t *testing.T) {
-	cond := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding()
+	cond := Cond(`person`, Eq, `Jesse`).Paren().Encap(`"`).NoPadding(false)
 
 	if got := cond.IsPadded(); got {
 		t.Errorf("%s failed: want 'false', got '%t'", t.Name(), got)

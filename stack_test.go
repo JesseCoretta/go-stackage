@@ -677,12 +677,13 @@ func TestBasic(t *testing.T) {
 }
 
 func TestBasic_withCapacity(t *testing.T) {
-	b := Basic(2)
+	cp := 2
+	b := Basic(cp)
 
 	// make sure the instance correctly
 	// reflects the capacity imposed.
-	if got := b.Cap(); got != 2 {
-		t.Errorf("%s failed: unexpected capacity value found; want %d, got %d", t.Name(), 2, got)
+	if got := b.Cap(); got != cp {
+		t.Errorf("%s failed: unexpected capacity value found; want %d, got %d", t.Name(), cp, got)
 		return
 	}
 
@@ -694,14 +695,16 @@ func TestBasic_withCapacity(t *testing.T) {
 	)
 
 	// make sure only two (2) made it in
-	if b.Len() != 2 || !b.CapReached() {
-		t.Errorf("%s failed: maximum capacity (%d) not honored; want len:%d, got len:%d", t.Name(), b.Cap(), 2, b.Len())
+	if b.Len() != cp || !b.CapReached() {
+		t.Errorf("%s failed: maximum capacity (%d) not honored; want len:%d, got len:%d", t.Name(), b.Cap(), cp, b.Len())
 		return
 	}
 }
 
 func TestBasic_availableCapacity(t *testing.T) {
-	b := Basic(2)
+	// allocate w/ max 2
+	cp := 2
+	b := Basic(cp)
 	b.Push(
 		float64(3.14159),
 		float64(-9.378),
@@ -709,13 +712,14 @@ func TestBasic_availableCapacity(t *testing.T) {
 	)
 
 	if b.Avail() != 0 {
-		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), cp, b.Avail())
 		return
 	}
 
-	b = Basic(5)
-	if b.Avail() != 5 {
-		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
+	// reallocate w/ max 5
+	cp = 5
+	if b = Basic(cp); b.Avail() != cp {
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), cp, b.Avail())
 		return
 	}
 }

@@ -116,7 +116,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 
 	st = append(st, cfg)
 	instance := &st
-	data[`addr`] = instance.addr()
+	data[`addr`] = ptrString(instance)
 	st.trace(`ALLOC`, data)
 
 	return instance
@@ -149,11 +149,7 @@ the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
 variadic fashion.
 */
 func (r Stack) SetLogLevel(l ...any) Stack {
-	cfg, err := r.config()
-	if err != nil {
-		return r
-	}
-
+	cfg, _ := r.config()
 	r.calls(sprintf("%s: in:%T(%v;len:%d)",
 		fmname(), l, l, len(l)))
 
@@ -170,11 +166,7 @@ LogLevels returns the string representation of a comma-delimited list
 of all active LogLevel values within the receiver.
 */
 func (r Stack) LogLevels() string {
-	cfg, err := r.config()
-	if err != nil {
-		return `NONE`
-	}
-
+	cfg, _ := r.config()
 	return cfg.log.lvl.String()
 }
 
@@ -184,10 +176,7 @@ instructing the logging subsystem to discard events submitted for
 transcription to the underlying logger.
 */
 func (r Stack) UnsetLogLevel(l ...any) Stack {
-	cfg, err := r.config()
-	if err != nil {
-		return r
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v;len:%d)",
@@ -207,25 +196,15 @@ address for the receiver. This may be useful for logging
 or debugging operations.
 */
 func (r Stack) Addr() string {
-	if !r.IsInit() {
-		return ``
-	}
-
-	return r.stack.addr()
+	return ptrString(r.stack)
 }
 
-/*
-addr returns the string representation of the pointer
-address for the receiver.
-*/
-func (r *stack) addr() string {
-	if r.isZero() {
-		return ``
+func ptrString(x any) (addr string) {
+	addr = sprintf(`uninitialized_%T`, x)
+	if x != nil {
+		addr = sprintf("%p", x)
 	}
-
-	addr := sprintf("%p", *r)
-
-	return addr
+	return
 }
 
 /*
@@ -296,16 +275,13 @@ func (r Stack) Auxiliary() (aux Auxiliary) {
 auxiliary is a private method called by Stack.Auxiliary.
 */
 func (r stack) auxiliary() (aux Auxiliary) {
-	cfg, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
-	aux = cfg.aux
+	aux = sc.aux
 	r.debug(sprintf("%s: get %T(len:%d)",
-		fname, cfg.aux, cfg.aux.Len()))
+		fname, sc.aux, sc.aux.Len()))
 	r.calls(sprintf("%s: out:%T(%d)",
 		fname, aux, aux.Len()))
 
@@ -331,10 +307,7 @@ func (r Stack) IsFIFO() (is bool) {
 isFIFO is a private method called by the Stack.IsFIFO method, et al.
 */
 func (r stack) isFIFO() bool {
-	sc, err := r.config()
-	if err != nil {
-		return false
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
@@ -371,10 +344,7 @@ func (r Stack) SetFIFO(fifo bool) Stack {
 }
 
 func (r *stack) setFIFO(fifo bool) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v)", fname, fifo, fifo))
@@ -428,11 +398,7 @@ setErr assigns an error instance, whether nil or not, to
 the underlying receiver configuration.
 */
 func (r *stack) setErr(err error) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v)", fname, err, err))
 	r.state(sprintf("%s: %T state change (%v->%v; ok:%t)",
@@ -446,11 +412,7 @@ getErr returns the instance of error, whether nil or not, from
 the underlying receiver configuration.
 */
 func (r stack) getErr() (err error) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 	err = sc.getErr()
@@ -465,11 +427,7 @@ kind returns the string representation of the kind value
 set within the receiver's configuration value.
 */
 func (r stack) kind() string {
-	sc, err := r.config()
-	if err != nil {
-		return ``
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 	kind := sc.kind()
@@ -543,19 +501,19 @@ This method does not take into account the presence (or
 absence) of any user-provided values (e.g.: a length of
 zero (0)) can still return true.
 */
-func (r Stack) IsInit() bool {
-	if r.IsZero() {
-		return false
+func (r Stack) IsInit() (is bool) {
+	if !r.IsZero() {
+		is = r.stack.isInit()
 	}
-
-	return r.stack.isInit()
+	return
 }
 
 /*
 isInit is a private method called by Stack.IsInit.
 */
 func (r *stack) isInit() (is bool) {
-	if r != nil {
+	var err error
+	if _, err = r.config(); err == nil {
 		is = r.stackType() != 0x0
 	}
 	return
@@ -587,7 +545,7 @@ package level function. Similar semantics apply.
 */
 func (r Stack) SetLogger(logger any) Stack {
 	if r.IsInit() {
-		if !r.stack.positive(ronly) {
+		if !r.getState(ronly) {
 			r.stack.setLogger(logger)
 		}
 	}
@@ -844,8 +802,9 @@ func (r *stack) insert(x any, left int) (ok bool) {
 
 	// Verify something was added
 	*r = R
-	r.trace(sprintf("%s: reset ptr %T(%v)->%T(%v)",
-		fname, R, R.addr(), *r, r.addr()))
+	r.trace(sprintf("%s: reset ptr %T(%p)->%T(%p)",
+		fname, R, &R, *r, r))
+
 	ok = u1+1 == r.ulen()
 	r.calls(sprintf("%s: out:%T(%v); ok:%t",
 		fname, r, r, ok))
@@ -868,33 +827,23 @@ func (r Stack) Reset() {
 reset is a private method called by Stack.Reset.
 */
 func (r *stack) reset() {
-	if !r.isInit() {
-		return
+	if !r.positive(ronly) {
+		fname := fmname()
+
+		r.calls(sprintf("%s: in:niladic", fname))
+
+		var ct int = 0
+		var plen int = r.ulen()
+		for i := r.ulen(); i > 0; i-- {
+			ct++
+			r.trace(sprintf("%s: erase idx:%d (%d/%d)",
+				fname, i-1, ct/r.ulen()))
+			r.remove(i - 1)
+		}
+
+		r.debug(sprintf("%s: removed %d/%d slices", fname, ct, plen))
+		r.calls(sprintf("%s: out:void", fname))
 	}
-
-	if r.positive(ronly) {
-		return
-	}
-
-	fname := fmname()
-
-	r.calls(sprintf("%s: in:niladic", fname))
-
-	r.lock()
-	defer r.unlock()
-
-	var ct int = 0
-	var plen int = r.ulen()
-	for i := r.ulen(); i > 0; i-- {
-		ct++
-		r.trace(sprintf("%s: erase idx:%d (%d/%d)",
-			fname, i-1, ct/r.ulen()))
-		r.remove(i - 1)
-	}
-	r.debug(sprintf("%s: removed %d/%d slices",
-		fname, ct, plen))
-
-	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -966,7 +915,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 
 	r.debug(sprintf("%s: adding %d preserved elements", fname, preserved))
 	R = append(R, contents...)
-	r.debug(sprintf("%s: updating PTR contents [%s]", fname, r.addr()))
+	r.debug(sprintf("%s: updating PTR contents [%s]", fname, ptrString(r)))
 
 	*r = R
 
@@ -1136,15 +1085,12 @@ effect. If using Boolean AND, OR or NOT stacks and a character delimiter is
 preferred over a Boolean WORD, see the Stack.Symbol method.
 */
 func (r Stack) SetDelimiter(x any) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setListDelimiter(x)
+		}
 	}
 
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setListDelimiter(x)
 	return r
 }
 
@@ -1184,10 +1130,7 @@ func (r Stack) Delimiter() string {
 setListDelimiter is a private method called by Stack.SetDelimiter
 */
 func (r *stack) setListDelimiter(x any) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(nil:%t)", fname, x == nil))
@@ -1199,10 +1142,7 @@ func (r *stack) setListDelimiter(x any) {
 getListDelimiter is a private method called by Stack.Delimiter.
 */
 func (r *stack) getListDelimiter() string {
-	sc, err := r.config()
-	if err != nil {
-		return ``
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
@@ -1226,15 +1166,12 @@ act of providing a single string value, in that both L and R will use
 one (1) value.
 */
 func (r Stack) Encap(x ...any) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setEncap(x...)
+		}
 	}
 
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setEncap(x...)
 	return r
 }
 
@@ -1242,10 +1179,8 @@ func (r Stack) Encap(x ...any) Stack {
 setEncap is a private method called by Stack.Encap.
 */
 func (r *stack) setEncap(x ...any) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
+
 	fname := fmname()
 	r.calls(sprintf("%s: in:variadic any (ct:%d)",
 		fname, len(x)))
@@ -1257,12 +1192,11 @@ func (r *stack) setEncap(x ...any) {
 IsEncap returns a Boolean value indicative of whether value encapsulation
 characters have been set within the receiver.
 */
-func (r Stack) IsEncap() bool {
-	if !r.IsInit() {
-		return false
+func (r Stack) IsEncap() (is bool) {
+	if r.IsInit() {
+		is = len(r.stack.getEncap()) > 0
 	}
-
-	return len(r.stack.getEncap()) > 0
+	return
 }
 
 /*
@@ -1293,15 +1227,12 @@ If the string `_random` is provided, a 24-character alphanumeric string is
 randomly generated using math/rand and assigned as the ID.
 */
 func (r Stack) SetID(id string) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setID(id)
+		}
 	}
 
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setID(id)
 	return r
 }
 
@@ -1309,10 +1240,7 @@ func (r Stack) SetID(id string) Stack {
 setID is a private method called by Stack.SetID.
 */
 func (r *stack) setID(id string) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v;len:%d)",
@@ -1321,7 +1249,7 @@ func (r *stack) setID(id string) {
 	if lc(id) == `_random` {
 		id = randomID(randIDSize)
 	} else if lc(id) == `_addr` {
-		id = sprintf("%s", r.addr())
+		id = ptrString(r)
 	}
 	r.debug(sprintf("%s: setID: %v", fname, id))
 
@@ -1338,15 +1266,11 @@ value. This allows for a means of identifying a particular kind of stack
 in the midst of many.
 */
 func (r Stack) SetCategory(cat string) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setCat(cat)
+		}
 	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setCat(cat)
 	return r
 }
 
@@ -1354,10 +1278,7 @@ func (r Stack) SetCategory(cat string) Stack {
 setCat is a private method called by Stack.SetCategory.
 */
 func (r *stack) setCat(cat string) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v;len:%d)",
@@ -1370,27 +1291,18 @@ func (r *stack) setCat(cat string) {
 Category returns the categorical label string value assigned to the receiver,
 if set, else a zero string.
 */
-func (r Stack) Category() string {
-	if !r.IsInit() {
-		return ``
+func (r Stack) Category() (cat string) {
+	if r.IsInit() {
+		cat = r.stack.getCat()
 	}
-
-	return r.stack.getCat()
+	return
 }
 
 /*
 getCat is a private method called by Stack.Category.
 */
 func (r *stack) getCat() (cat string) {
-	if !r.isInit() {
-		return
-	}
-
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 	cat = sc.cat
@@ -1404,29 +1316,20 @@ func (r *stack) getCat() (cat string) {
 ID returns the assigned identifier string, if set, from within the underlying
 stack configuration.
 */
-func (r Stack) ID() string {
-	if !r.IsInit() {
-		return ``
+func (r Stack) ID() (id string) {
+	id = sprintf("uninitialized_%T", r)
+	if r.IsInit() {
+		id = r.stack.getID()
 	}
-
-	return r.stack.getID()
+	return
 }
 
 /*
 getID is a private method called by Stack.ID.
 */
-func (r *stack) getID() (id string) {
-	if !r.isInit() {
-		return
-	}
-
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
-
-	id = sc.id
-	return
+func (r *stack) getID() string {
+	sc, _ := r.config()
+	return sc.id
 }
 
 /*
@@ -1573,10 +1476,7 @@ func (r Stack) Symbol(c ...any) Stack {
 setSymbol is a private method called by Stack.Symbol.
 */
 func (r *stack) setSymbol(sym string) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v;len:%d)",
@@ -1596,11 +1496,7 @@ getSymbol returns the symbol stored within the underlying *nodeConfig
 instance slice.
 */
 func (r stack) getSymbol() (sym string) {
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 	sym = sc.sym
@@ -1610,10 +1506,7 @@ func (r stack) getSymbol() (sym string) {
 }
 
 func (r *stack) setLogger(logger any) {
-	cfg, err := r.config()
-	if err != nil {
-		return
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(nil:%t)",
@@ -1628,10 +1521,7 @@ func (r *stack) setLogger(logger any) {
 }
 
 func (r *stack) logger() *log.Logger {
-	cfg, err := r.config()
-	if err != nil {
-		return nil
-	}
+	cfg, _ := r.config()
 	return cfg.log.logger()
 }
 
@@ -1664,10 +1554,7 @@ locked modification of the underlying *nodeConfig instance
 to TOGGLE the state of a particular option.
 */
 func (r *stack) toggleOpt(x cfgFlag) *stack {
-	cfg, err := r.config()
-	if err != nil {
-		return r
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%s)",
@@ -1696,11 +1583,7 @@ locked modification of the underlying *nodeConfig instance
 to SET a particular option.
 */
 func (r *stack) setOpt(x cfgFlag) *stack {
-	cfg, err := r.config()
-	if err != nil {
-		return r
-
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%s)",
@@ -1729,10 +1612,7 @@ a locked modification of the underlying *nodeConfig instance
 to UNSET a particular option.
 */
 func (r *stack) unsetOpt(x cfgFlag) *stack {
-	cfg, err := r.config()
-	if err != nil {
-		return r
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%s)",
@@ -1761,10 +1641,7 @@ cfgFlag input value is "on" within the receiver's configuration
 value.
 */
 func (r stack) positive(x cfgFlag) bool {
-	cfg, err := r.config()
-	if err != nil {
-		return false
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%s)",
@@ -1787,11 +1664,9 @@ of processing, thereby minimizing the duration of a lock as much as
 possible.
 */
 func (r Stack) Mutex() Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.stack.setMutex()
 	}
-
-	r.stack.setMutex()
 	return r
 }
 
@@ -1801,10 +1676,7 @@ setMutex is a private method called by Stack.Mutex.
 func (r *stack) setMutex() {
 	fname := fmname()
 
-	sc, err := r.config()
-	if err != nil {
-		return
-	}
+	sc, _ := r.config()
 
 	r.state(sprintf("%s: MuTeX implemented", fname))
 	sc.setMutex()
@@ -1816,23 +1688,18 @@ instance has been equipped with mutual exclusion locking features.
 
 This does NOT indicate whether the receiver is actually locked.
 */
-func (r Stack) CanMutex() bool {
-	if !r.IsInit() {
-		return false
+func (r Stack) CanMutex() (can bool) {
+	if r.IsInit() {
+		can = r.stack.canMutex()
 	}
-
-	result := r.stack.canMutex()
-	return result
+	return
 }
 
 /*
 canMutex is a private method called by Stack.CanMutex.
 */
 func (r stack) canMutex() bool {
-	sc, err := r.config()
-	if err != nil {
-		return false
-	}
+	sc, _ := r.config()
 
 	result := sc.mtx != nil
 	r.state(sprintf("%s: MuTeX implemented: %t", fmname(), result))
@@ -1846,18 +1713,14 @@ locked, the operation will block. If sync.Mutex was not enabled for
 the receiver, nothing happens.
 */
 func (r *stack) lock() {
-	if !r.canMutex() {
-		return
-	}
-
-	fname := fmname()
-
-	if mutex, found := r.mutex(); found {
-		sc, _ := r.config()
-		_now := now()
-		sc.ldr = &_now
-		r.state(sprintf("%s: LOCKING", fname))
-		mutex.Lock()
+	if r.canMutex() {
+		if mutex, found := r.mutex(); found {
+			sc, _ := r.config()
+			_now := now()
+			sc.ldr = &_now
+			r.state(sprintf("%s: LOCKING", fmname()))
+			mutex.Lock()
+		}
 	}
 }
 
@@ -1867,19 +1730,15 @@ already locked, the operation will block. If sync.Mutex was not enabled for
 the receiver, nothing happens.
 */
 func (r *stack) unlock() {
-	if !r.canMutex() {
-		return
-	}
-
-	fname := fmname()
-
-	if mutex, found := r.mutex(); found {
-		mutex.Unlock()
-		sc, _ := r.config()
-		_then := *sc.ldr
-		sc.ldr = nil
-		r.state(sprintf("%s: UNLOCKING; duration:%.09f sec",
-			fname, now().Sub(_then).Seconds()))
+	if r.canMutex() {
+		if mutex, found := r.mutex(); found {
+			mutex.Unlock()
+			sc, _ := r.config()
+			_then := *sc.ldr
+			sc.ldr = nil
+			r.state(sprintf("%s: UNLOCKING; duration:%.09f sec",
+				fmname(), now().Sub(_then).Seconds()))
+		}
 	}
 }
 
@@ -1897,6 +1756,8 @@ func (r stack) config() (sc *nodeConfig, err error) {
 	}
 
 	var ok bool
+	// verify slice #0 is a *nodeConfig
+	// instance, or bail out.
 	if sc, ok = r[0].(*nodeConfig); !ok {
 		err = errorf("%T does not contain an expected %T instance; aborting", r, sc)
 		r.error(err)
@@ -1919,12 +1780,11 @@ func (r stack) len() int {
 /*
 Len returns the integer length of the receiver.
 */
-func (r Stack) Len() int {
-	if !r.IsInit() {
-		return 0
+func (r Stack) Len() (i int) {
+	if r.IsInit() {
+		i = r.ulen()
 	}
-
-	return r.ulen()
+	return
 }
 
 /*
@@ -1939,11 +1799,7 @@ figure, and only recognizes the user-input value. Don't confuse the
 user :)
 */
 func (r stack) cap() int {
-	sc, err := r.config()
-	if err != nil {
-		return 0
-	}
-
+	sc, _ := r.config()
 	return sc.cap
 }
 
@@ -1956,18 +1812,16 @@ the receiver. The return values shall be interpreted as follows:
   - A minus one (-1) value indicates infinite capacity is available; no limit is imposed
 */
 func (r Stack) Cap() (c int) {
-	if !r.IsInit() {
-		return 0 // zero really means bogus
-	}
-
-	offset := -1
-	switch _c := r.cap(); _c {
-	case 0:
-		c = offset // interpret zero as minus 1
-	default:
-		// handle the cfg slice offset here, as
-		// the value is +non-zero
-		c = _c + offset // cfg.cap minus 1
+	if r.IsInit() {
+		offset := -1
+		switch _c := r.cap(); _c {
+		case 0:
+			c = offset // interpret zero as minus 1
+		default:
+			// handle the cfg slice offset here, as
+			// the value is +non-zero
+			c = _c + offset // cfg.cap minus 1
+		}
 	}
 
 	return
@@ -1982,12 +1836,12 @@ infinite capacity is available.
 
 If the receiver (r) is uninitialized, zero (0) is returned.
 */
-func (r Stack) Avail() int {
-	if !r.IsInit() {
-		return 0
+func (r Stack) Avail() (avail int) {
+	if r.IsInit() {
+		avail = r.stack.avail()
 	}
 
-	return r.stack.avail()
+	return
 }
 
 func (r stack) avail() int {
@@ -2018,17 +1872,16 @@ func (r stack) ulen() (l int) {
 /*
 Kind returns the string name of the type of receiver configuration.
 */
-func (r Stack) Kind() string {
-	if !r.IsInit() {
-		return badStack
+func (r Stack) Kind() (k string) {
+	k = badStack
+	if r.IsInit() {
+		switch t, c := r.stack.typ(); c {
+		case and, or, not, list, basic:
+			k = t
+		}
 	}
 
-	switch t, c := r.stack.typ(); c {
-	case and, or, not, list, basic:
-		return t
-	}
-
-	return badStack
+	return
 }
 
 /*
@@ -2038,11 +1891,11 @@ of the receiver.
 Note that invalid Stack instances, as well as basic Stacks, are not
 eligible for string representation.
 */
-func (r Stack) String() string {
-	if !r.IsInit() {
-		return ``
+func (r Stack) String() (s string) {
+	if r.IsInit() {
+		s = r.stack.string()
 	}
-	return r.stack.string()
+	return
 }
 
 /*
@@ -2278,11 +2131,9 @@ the last slice is returned as nil.
 As the return type is any, the slice value must be manually type asserted.
 */
 func (r Stack) Traverse(indices ...int) (slice any, ok bool) {
-	if !r.IsInit() {
-		return nil, false
+	if r.IsInit() {
+		slice, ok, _ = r.stack.traverse(indices...)
 	}
-
-	slice, ok, _ = r.stack.traverse(indices...)
 	return
 }
 
@@ -2483,8 +2334,8 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	err = inner.reveal()
 	r.error(sprintf("%s: %T::%s %v",
 		fname, inner, id, err))
-	r.calls(sprintf("%s: out:%T(nil:%t)",
-		fname, err, err == nil))
+	r.calls(sprintf("%s: out:error(nil:%t)",
+		fname, err == nil))
 
 	return
 }
@@ -2537,8 +2388,8 @@ func (r *stack) revealSingle(idx int) (err error) {
 		err = inner.reveal()
 	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)",
-		fname, err, err == nil))
+	r.calls(sprintf("%s: out:error(nil:%t)",
+		fname, err == nil))
 
 	return
 }
@@ -2686,11 +2537,9 @@ In any scenario, a valid index within the bounds of the stack's length
 returns the intended slice along with Boolean value of true.
 */
 func (r Stack) Index(idx int) (slice any, ok bool) {
-	if !r.IsInit() {
-		return nil, false
+	if r.IsInit() {
+		slice, _, ok = r.stack.index(idx)
 	}
-
-	slice, _, ok = r.stack.index(idx)
 	return
 }
 
@@ -2849,12 +2698,11 @@ Note that if the receiver is in an invalid state, or has a zero length,
 nothing will be removed, and a meaningless value of true will be returned
 alongside a nil slice value.
 */
-func (r Stack) Pop() (any, bool) {
-	if !r.IsInit() {
-		return nil, false
+func (r Stack) Pop() (popped any, ok bool) {
+	if r.IsInit() {
+		popped, ok = r.stack.pop()
 	}
-
-	return r.stack.pop()
+	return
 }
 
 /*
@@ -2919,30 +2767,22 @@ if maximum capacity has been set and reached, each of
 the values intended for append shall be ignored.
 */
 func (r Stack) Push(y ...any) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.push(y...)
+		}
 	}
-
-	r.stack.push(y...)
 	return r
 }
 
 /*
 push is a private method called by Stack.Push.
 */
-func (r *stack) push(x ...any) *stack {
+func (r *stack) push(x ...any) {
 	fname := fmname()
 	id := getLogID(r.getID())
 
 	r.calls(sprintf("%s: in: variadic any(len:%d)", fname, len(x)))
-
-	if !r.isInit() {
-		return r
-	}
-
-	if r.positive(ronly) {
-		return r
-	}
 
 	r.lock()
 	defer r.unlock()
@@ -2954,7 +2794,7 @@ func (r *stack) push(x ...any) *stack {
 		// use the user-provided function to scan
 		// each pushed item for verification.
 		r.methodAppend(meth, x...)
-		return r
+		return
 	}
 
 	// no push policy was found, just do it.
@@ -2963,7 +2803,7 @@ func (r *stack) push(x ...any) *stack {
 
 	r.calls(sprintf("%s: out %T(self)", fname, r))
 
-	return r
+	return
 }
 
 /*
@@ -2999,40 +2839,33 @@ to the defragmentation's influence on the instance in question.  By necessity, L
 also change accordingly.
 */
 func (r Stack) Defrag(max ...int) Stack {
-	if !r.IsInit() {
-		return r
-	}
+	if r.IsInit() {
+		// to break defrag loop.
+		m := calculateDefragMax(max...)
 
-	// determine appropriate maximum nil sequence
-	// to break defrag loop.
-	m := calculateDefragMax(max...)
+		r.stack.defrag(m) // defrag the stack itself
 
-	r.stack.defrag(m) // defrag the stack itself
+		// If the receiver instance is judged as nesting, we'll
+		// recurse through stack, and defrag any other suitable
+		// candidates for the operation. Targets are any Stack
+		// or Condition instances, OR their aliased equivalents.
+		if r.IsNesting() {
+			for i := 0; i < r.Len(); i++ {
+				slice, _ := r.Index(i)
 
-	// If the receiver instance is judged as nesting, we'll
-	// recurse through stack, and defrag any other suitable
-	// candidates for the operation. Targets are any Stack
-	// or Condition instances, OR their aliased equivalents.
-	if !r.IsNesting() {
-		return r
-	}
+				if sub, ok := stackTypeAliasConverter(slice); ok {
+					// Instance is Stack/Stack alias
+					sub.Defrag(m)
 
-	for i := 0; i < r.Len(); i++ {
-		slice, _ := r.Index(i)
-
-		if sub, ok := stackTypeAliasConverter(slice); ok {
-			// Instance is Stack/Stack alias
-			sub.Defrag(m)
-
-		} else if cub, ok := conditionTypeAliasConverter(slice); ok {
-			// Instance is Condition/Condition alias
-			if !cub.IsNesting() {
-				continue
-			}
-
-			if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
-				// Condition expression contains a Stack/Stack alias
-				sub.Defrag(m)
+				} else if cub, ok := conditionTypeAliasConverter(slice); ok {
+					// Instance is Condition/Condition alias
+					if cub.IsNesting() {
+						if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
+							// Condition expression contains a Stack/Stack alias
+							sub.Defrag(m)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -3187,12 +3020,12 @@ func (r *stack) implode(start, max int, spat []int) (tpat []int) {
 	return
 }
 
-func (r *stack) canPushNester(x any) (ok bool) {
+func (r *stack) canPushNester(x any) (can bool) {
 	if !r.positive(nnest) {
 		return true
 	}
 
-	_, ok = stackTypeAliasConverter(x)
+	_, can = stackTypeAliasConverter(x)
 	return
 }
 
@@ -3240,18 +3073,18 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 CapReached returns a Boolean value indicative of whether the receiver
 has reached the maximum configured capacity.
 */
-func (r Stack) CapReached() bool {
-	if !r.IsInit() {
-		return false
+func (r Stack) CapReached() (cr bool) {
+	if r.IsInit() {
+		cr = r.capReached()
 	}
+	return
 
-	return r.capReached()
 }
 
 /*
 capReached is a private method called by Stack.CapReached.
 */
-func (r stack) capReached() bool {
+func (r stack) capReached() (rc bool) {
 	if r.cap() == 0 {
 		return false
 	}
@@ -3263,7 +3096,7 @@ genericAppend performs a normal append operation without the
 involvement of a custom push policy. Each iteration shall verify
 that maximum capacity --if one was specified-- is not exceeded.
 */
-func (r *stack) genericAppend(x ...any) *stack {
+func (r *stack) genericAppend(x ...any) {
 	fname := fmname()
 	var pct int
 
@@ -3275,18 +3108,15 @@ func (r *stack) genericAppend(x ...any) *stack {
 		var err error
 		if !r.canPushNester(x[i]) {
 			err = errorf("%s: failed; nesting violation (%d/%d slices added)",
-				fname, Stack{}, pct, len(x))
-			r.setErr(err)
+				fname, pct, len(x))
 			r.policy(err)
 			continue
 		}
 
 		if r.capReached() {
 			err = errorf("%s: failed; capacity violation (%d/%d slices added)",
-				fname, Stack{}, pct, len(x))
-			r.setErr(err)
+				fname, pct, len(x))
 			r.policy(err)
-
 			break
 		}
 
@@ -3296,8 +3126,6 @@ func (r *stack) genericAppend(x ...any) *stack {
 	}
 
 	r.debug(sprintf("%s: complete: %d/%d slices added", fname, pct, len(x)))
-
-	return r
 }
 
 /*
@@ -3307,15 +3135,11 @@ appends to the Stack. The provided function shall be executed
 by the Push method for each individual item being added.
 */
 func (r Stack) SetPushPolicy(ppol PushPolicy) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setPushPolicy(ppol)
+		}
 	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setPushPolicy(ppol)
 	return r
 }
 
@@ -3324,13 +3148,9 @@ setPushPolicy is a private method called by Stack.SetPushPolicy.
 */
 func (r *stack) setPushPolicy(ppol PushPolicy) *stack {
 	fname := fmname()
-	rc, err := r.config()
-	if err != nil {
-		r.setErr(err)
-		return r
-	}
+	sc, _ := r.config()
 	r.state(sprintf("%s: %T registered", fname, ppol))
-	rc.ppf = ppol
+	sc.ppf = ppol
 	return r
 }
 
@@ -3338,8 +3158,8 @@ func (r *stack) setPushPolicy(ppol PushPolicy) *stack {
 getPushPolicy is a private method called by Stack.Push.
 */
 func (r *stack) getPushPolicy() PushPolicy {
-	rc, _ := r.config()
-	return rc.ppf
+	sc, _ := r.config()
+	return sc.ppf
 }
 
 /*
@@ -3350,15 +3170,11 @@ String() method will execute the provided policy instead of the
 package-provided routine.
 */
 func (r Stack) SetPresentationPolicy(ppol PresentationPolicy) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setPresentationPolicy(ppol)
+		}
 	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setPresentationPolicy(ppol)
 	return r
 }
 
@@ -3376,14 +3192,9 @@ func (r *stack) setPresentationPolicy(ppol PresentationPolicy) *stack {
 		return r
 	}
 
-	rc, err := r.config()
-	if err != nil {
-		r.setErr(err)
-		return r
-	}
-
+	sc, _ := r.config()
 	r.state(sprintf("%s: %T registered", fname, ppol))
-	rc.rpf = ppol
+	sc.rpf = ppol
 	return r
 }
 
@@ -3391,8 +3202,8 @@ func (r *stack) setPresentationPolicy(ppol PresentationPolicy) *stack {
 getPresentationPolicy is a private method called by stack.string.
 */
 func (r *stack) getPresentationPolicy() PresentationPolicy {
-	rc, _ := r.config()
-	return rc.rpf
+	sc, _ := r.config()
+	return sc.rpf
 }
 
 /*
@@ -3403,15 +3214,11 @@ gauge its validity. The provided function shall be executed
 by the Valid method.
 */
 func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack.setValidityPolicy(vpol)
+		}
 	}
-
-	if r.stack.positive(ronly) {
-		return r
-	}
-
-	r.stack.setValidityPolicy(vpol)
 	return r
 }
 
@@ -3419,14 +3226,10 @@ func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
 setValidityPolicy is a private method called by Stack.SetValidityPolicy.
 */
 func (r *stack) setValidityPolicy(vpol ValidityPolicy) *stack {
-	rc, err := r.config()
-	if err != nil {
-		return r
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.state(sprintf("%s: %T registered", fname, vpol))
-	rc.vpf = vpol
+	sc.vpf = vpol
 	return r
 }
 
@@ -3434,8 +3237,8 @@ func (r *stack) setValidityPolicy(vpol ValidityPolicy) *stack {
 getValidityPolicy is a private method called by Stack.Valid.
 */
 func (r *stack) getValidityPolicy() ValidityPolicy {
-	rc, _ := r.config()
-	return rc.vpf
+	sc, _ := r.config()
+	return sc.vpf
 }
 
 /*
@@ -3450,7 +3253,7 @@ func (r *stack) mkmsg(typ string) (Message, bool) {
 	return Message{
 		ID:   getLogID(r.getID()),
 		Tag:  typ,
-		Addr: r.addr(),
+		Addr: ptrString(r),
 		Type: sprintf("%T", *r),
 		Time: timestamp(),
 		Len:  r.ulen(),

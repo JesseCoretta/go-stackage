@@ -335,6 +335,10 @@ func SetDefaultConditionLogger(logger any) {
 	cLogDefault = resolveLogger(logger)
 }
 
+func DefaultConditionLogLevel() int {
+	return int(cLogLevelDefault)
+}
+
 /*
 SetDefaultConditionLogLevel sets the instance of LogLevel (lvl)
 as a LITERAL value, as the verbosity indicator. When set with
@@ -399,6 +403,10 @@ SetLogger method. Similar semantics apply.
 */
 func SetDefaultStackLogger(logger any) {
 	sLogDefault = resolveLogger(logger)
+}
+
+func DefaultStackLogLevel() int {
+	return int(sLogLevelDefault)
 }
 
 /*

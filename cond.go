@@ -412,8 +412,12 @@ Cond returns an instance of Condition bearing the provided component values.
 This is intended to be used in situations where a Condition instance can be
 created in one shot.
 */
-func Cond(kw any, op Operator, ex any) Condition {
-	return Condition{newCondition(kw, op, ex)}
+func Cond(kw any, op Operator, ex any) (c Condition) {
+	c = Condition{newCondition(kw, op, ex)}
+	if err := c.Valid(); err != nil {
+		c.SetErr(err)
+	}
+	return
 }
 
 /*
@@ -563,8 +567,23 @@ func (r Condition) Valid() (err error) {
 
 	// no validity policy was provided, just check
 	// what we can.
+
+	// verify keyword
+	if kw := r.Keyword(); len(kw) == 0 {
+		err = errorf("%T keyword value is zero", r)
+		return
+	}
+
+	// verify comparison operator
+	if cop := r.Operator(); !(1 <= int(cop.(ComparisonOperator)) && int(cop.(ComparisonOperator)) <= 6) {
+		err = errorf("%T operator value is bogus", r)
+		return
+	}
+
+	// verify expression value
 	if r.Expression() == nil {
 		err = errorf("%T expression value is nil", r)
+		return
 	}
 
 	return
@@ -848,8 +867,8 @@ func (r Condition) NoPadding(state ...bool) Condition {
 IsPadded returns a Boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
-func (r Condition) IsPadded() bool {
-	return r.getState(nspad)
+func (r Condition) IsPadded() (is bool) {
+	return !r.getState(nspad)
 }
 
 /*

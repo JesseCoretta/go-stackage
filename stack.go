@@ -76,13 +76,6 @@ Stack (or a Stack type alias), which embeds the *stack
 type instance.
 */
 func newStack(t stackType, fifo bool, c ...int) *stack {
-	switch t {
-	case and, or, not, list, basic:
-		// ok
-	default:
-		return nil
-	}
-
 	var (
 		data map[string]string = make(map[string]string, 0)
 		cfg  *nodeConfig       = new(nodeConfig)

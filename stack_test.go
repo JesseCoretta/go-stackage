@@ -1,10 +1,133 @@
 package stackage
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"testing"
 	_ "time"
 )
+
+func ExampleComparisonOperator_Context() {
+	var cop ComparisonOperator = Ge
+	fmt.Printf("Context: %s", cop.Context())
+	// Output: Context: comparison
+}
+
+func ExampleComparisonOperator_String() {
+	var cop ComparisonOperator = Ge
+	fmt.Printf("Operator: %s", cop)
+	// Output: Operator: >=
+}
+
+func ExampleStack_Auxiliary() {
+	// make a stack ... any type would do
+	l := List().Push(`this`, `that`, `other`)
+
+	// one can put anything they wish into this map,
+	// so we'll do a bytes.Buffer since it is simple
+	// and commonplace.
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	_, _ = buf.WriteString(`some .... data .....`)
+
+	// Create our map (one could also use make
+	// and populate it piecemeal as opposed to
+	// in-line, as we do below).
+	l.SetAuxiliary(map[string]any{
+		`buffer`: buf,
+	})
+
+	//  Call our map and call its 'Get' method in one-shot
+	if val, ok := l.Auxiliary().Get(`buffer`); ok {
+		fmt.Printf("%s", val)
+	}
+	// Output: some .... data .....
+}
+
+func ExampleAuxiliary_Get() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	val, ok := aux.Get(`value`)
+	if ok {
+		fmt.Printf("%d", val)
+	}
+	// Output: 18
+}
+
+func ExampleAuxiliary_Set() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	aux.Set(`color`, `red`)
+	aux.Set(`max`, 200)
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 3
+}
+
+func ExampleAuxiliary_Unset() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	aux.Set(`color`, `red`)
+	aux.Set(`max`, 200)
+	aux.Unset(`max`)
+
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 2
+}
+
+func ExampleAuxiliary_Len() {
+	aux := Auxiliary{
+		`value`: 18,
+	}
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 1
+}
+
+func ExampleSetDefaultStackLogLevel() {
+	SetDefaultStackLogLevel(
+		LogLevel1 + // 1
+			LogLevel4 + // 8
+			UserLogLevel2 + // 128
+			UserLogLevel5, // 1024
+	)
+	custom := DefaultStackLogLevel()
+
+	// turn loglevel to none
+	SetDefaultStackLogLevel(NoLogLevels)
+	off := DefaultStackLogLevel()
+
+	fmt.Printf("%d (custom), %d (off)", custom, off)
+	// Output: 1161 (custom), 0 (off)
+}
+
+func ExampleDefaultStackLogLevel() {
+	fmt.Printf("%d", DefaultStackLogLevel())
+	// Output: 0
+}
+
+/*
+This example demonstrates setting a custom logger which writes
+to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
+invoked, and an event -- the creation of a Basic Stack -- shall
+trigger log events that are funneled into our bytes.Buffer.
+
+For the sake of idempotent test results, the length of the buffer
+is checked only to ensure it is greater than 0.
+*/
+func ExampleSetDefaultStackLogger() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	SetDefaultStackLogger(customLogger)
+	SetDefaultStackLogLevel(AllLogLevels) // highly verbose!
+
+	// do something that triggers log events ...
+	_ = Basic().Push(
+		Cond(`π`, Eq, float64(3.14159265358979323)),
+		Cond(`m`, Eq, `mc²`),
+	)
+
+	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
+	// Output: *bytes.Buffer.Len>0 (bytes): true
+}
 
 var testParens []string = []string{`(`, `)`}
 

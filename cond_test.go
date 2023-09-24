@@ -565,6 +565,7 @@ func ExampleCondition_SetID_pointerAddress() {
 
 func TestCondition_codecov(t *testing.T) {
 	var c Condition
+	// panic checks
 	c.debug(``)
 	c.debug(nil)
 	c.error(``)
@@ -583,4 +584,35 @@ func TestCondition_codecov(t *testing.T) {
 	c.Operator()
 	c.Keyword()
 	c.Valid()
+
+	var ll logLevels
+	ll.shift(`trace`)
+	ll.shift(nil)
+	ll.shift('a')
+	ll.shift()
+	ll.shift(0)
+	ll.shift(65535)
+
+	ll.positive(`trace`)
+	ll.positive(nil)
+	ll.positive('a')
+	ll.positive(0)
+	ll.positive(65535)
+
+	ll.unshift(`trace`)
+	ll.unshift(nil)
+	ll.unshift('a')
+	ll.unshift(0)
+	ll.unshift(65535)
+
+	var lsys *logSystem = newLogSystem(cLogDefault)
+	if lsys.isZero() {
+		t.Errorf("%s failed: nil %T",
+			t.Name(), lsys.logger())
+	}
+
+	SetDefaultConditionLogLevel(`none`)
+	SetDefaultConditionLogLevel(0)
+	SetDefaultConditionLogLevel(nil)
+	SetDefaultConditionLogLevel('a')
 }

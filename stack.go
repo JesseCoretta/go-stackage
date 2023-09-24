@@ -3255,52 +3255,66 @@ func (r *stack) mkmsg(typ string) (Message, bool) {
 /*
 error conditions that are fatal and always serious
 */
-func (r stack) fatal(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+func (r *stack) fatal(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+	}
 }
 
 /*
 error conditions that are not fatal but potentially serious
 */
-func (r stack) error(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+func (r *stack) error(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+	}
 }
 
 /*
 relatively deep operational details
 */
-func (r stack) debug(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+func (r *stack) debug(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+	}
 }
 
 /*
 extreme depth operational details
 */
-func (r stack) trace(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+func (r *stack) trace(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+	}
 }
 
 /*
 policy method operational details, as well as caps, r/o, etc.
 */
-func (r stack) policy(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+func (r *stack) policy(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+	}
 }
 
 /*
 calls records in/out signatures and realtime meta-data regarding
 individual method runtimes.
 */
-func (r stack) calls(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel1, `CALL`, data...)
+func (r *stack) calls(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel1, `CALL`, data...)
+	}
 }
 
 /*
 state records interrogations of, and changes to, the underlying
 configuration value.
 */
-func (r stack) state(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel3, `STATE`, data...)
+func (r *stack) state(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel3, `STATE`, data...)
+	}
 }
 
 /*

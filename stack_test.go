@@ -1149,6 +1149,58 @@ func TestDefrag_experimental_001(t *testing.T) {
 	}
 }
 
+func TestStack_codecov(t *testing.T) {
+	var s Stack
+	// panic checks
+	s.debug(``)
+	s.debug(nil)
+	s.error(``)
+	s.error(nil)
+	s.trace(``)
+	s.trace(nil)
+	s.state(``)
+	s.state(nil)
+	s.calls(``)
+	s.calls(nil)
+	s.debug(nil)
+	s.Len()
+	s.IsZero()
+	s.IsInit()
+	s.Valid()
+
+	var ll logLevels
+	ll.shift(`trace`)
+	ll.shift(nil)
+	ll.shift('a')
+	ll.shift()
+	ll.shift(0)
+	ll.shift(65535)
+
+	ll.positive(`trace`)
+	ll.positive(nil)
+	ll.positive('a')
+	ll.positive(0)
+	ll.positive(65535)
+
+	ll.unshift(`trace`)
+	ll.unshift(nil)
+	ll.unshift('a')
+	ll.unshift()
+	ll.unshift(0)
+	ll.unshift(65535)
+
+	var lsys *logSystem = newLogSystem(sLogDefault)
+	if lsys.isZero() {
+		t.Errorf("%s failed: nil %T",
+			t.Name(), lsys.logger())
+	}
+
+	SetDefaultStackLogLevel(`none`)
+	SetDefaultStackLogLevel(0)
+	SetDefaultStackLogLevel(nil)
+	SetDefaultStackLogLevel('a')
+}
+
 func init() {
 	// just used for testing, etc.
 	//SetDefaultStackLogger(`stdout`)

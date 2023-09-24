@@ -568,19 +568,19 @@ func (r Condition) IsZero() bool {
 }
 
 /*
-Valid returns an instance of error, identifying any issues perceived with
-the state of the receiver.
+Valid returns an instance of error, identifying any serious issues perceived
+with the state of the receiver.
+
+Non-serious (interim) errors such as denied pushes, capacity violations, etc.,
+are not shown by this method.
 
 If a ValidityPolicy was set within the receiver, it shall be executed here.
-If no ValidityPolicy was specified, only a nilness is checked
+If no ValidityPolicy was specified, only elements pertaining to basic viability
+are checked.
 */
 func (r Condition) Valid() (err error) {
 	if !r.IsInit() {
 		err = errorf("%T instance is nil", r)
-		return
-	}
-
-	if err = r.condition.getErr(); err != nil {
 		return
 	}
 
@@ -600,9 +600,13 @@ func (r Condition) Valid() (err error) {
 	}
 
 	// verify comparison operator
-	if cop := r.Operator(); !(1 <= int(cop.(ComparisonOperator)) && int(cop.(ComparisonOperator)) <= 6) {
-		err = errorf("%T operator value is bogus", r)
-		return
+	if cop := r.Operator(); cop != nil {
+		if assert, ok := cop.(ComparisonOperator); ok {
+			if !(1 <= int(assert) && int(assert) <= 6) {
+				err = errorf("%T operator value is bogus", r)
+				return
+			}
+		}
 	}
 
 	// verify expression value

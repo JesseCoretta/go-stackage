@@ -583,7 +583,6 @@ func TestCondition_codecov(t *testing.T) {
 	c.Expression()
 	c.Operator()
 	c.Keyword()
-	c.Valid()
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -610,6 +609,14 @@ func TestCondition_codecov(t *testing.T) {
 		t.Errorf("%s failed: nil %T",
 			t.Name(), lsys.logger())
 	}
+
+	c.Init()
+	c.SetKeyword(`valid_keyword`)
+	c.Valid()
+	c.SetOperator(Ne)
+	c.Valid()
+	c.SetExpression(rune(1438))
+	c.Valid()
 
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)

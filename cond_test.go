@@ -582,4 +582,5 @@ func TestCondition_codecov(t *testing.T) {
 	c.Expression()
 	c.Operator()
 	c.Keyword()
+	c.Valid()
 }

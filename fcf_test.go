@@ -275,6 +275,19 @@ func ExampleStack_SetValidityPolicy() {
 	// Output: Undesirable string value 'complete_garbage' detected in struct Value field [stackage.Stack @ idx:4]
 }
 
+func ExampleCondition_SetValidityPolicy() {
+	myCondition := Cond(`keyword`, Eq, int(3))
+	myCondition.SetValidityPolicy(func(_ ...any) (err error) {
+		assert, _ := myCondition.Expression().(int)
+		if assert%2 != 0 {
+			err = fmt.Errorf("%T is not even (%d)", assert, assert)
+		}
+		return
+	})
+	fmt.Printf("%v", myCondition.Valid())
+	// Output: int is not even (3)
+}
+
 /*
 This example demonstrates the use of the SetEvaluator method to
 assign an instance of the Evaluator closure signature to the

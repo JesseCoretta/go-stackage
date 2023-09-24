@@ -653,11 +653,10 @@ This will allow the Valid method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.vpf = x
 	}
 
-	r.condition.cfg.vpf = x
 	return r
 }
 
@@ -669,11 +668,10 @@ use when this type's String method is called.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.rpf = x
 	}
 
-	r.condition.cfg.rpf = x
 	return r
 }
 
@@ -1006,52 +1004,66 @@ func (r *condition) mkmsg(typ string) (Message, bool) {
 /*
 error conditions that are fatal and always serious
 */
-func (r condition) fatal(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+func (r *condition) fatal(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+	}
 }
 
 /*
 error conditions that are not fatal but potentially serious
 */
-func (r condition) error(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+func (r *condition) error(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+	}
 }
 
 /*
 extreme depth operational details
 */
-func (r condition) trace(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+func (r *condition) trace(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+	}
 }
 
 /*
 relatively deep operational details
 */
-func (r condition) debug(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+func (r *condition) debug(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+	}
 }
 
 /*
 policy method operational details, as well as caps, r/o, etc.
 */
-func (r condition) policy(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+func (r *condition) policy(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+	}
 }
 
 /*
 calls records in/out signatures and realtime meta-data regarding
 individual method runtimes.
 */
-func (r condition) calls(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel1, `CALL`, data...)
+func (r *condition) calls(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel1, `CALL`, data...)
+	}
 }
 
 /*
 state records interrogations of, and changes to, the underlying
 configuration value.
 */
-func (r condition) state(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel3, `STATE`, data...)
+func (r *condition) state(x any, data ...map[string]string) {
+	if r != nil {
+		r.eventDispatch(x, LogLevel3, `STATE`, data...)
+	}
 }
 
 /*

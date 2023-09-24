@@ -468,6 +468,41 @@ func ExampleCondition_NoNesting() {
 	// Output: <nil>
 }
 
+func ExampleCondition_Len() {
+	var c Condition
+	c.Init()
+	c.Paren() // toggle to true from false default
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	noLen := c.Len()
+
+	c.SetExpression(`just_a_string`)
+	strLen := c.Len()
+
+	// Overwrite the above string
+	// with a stack containing
+	// three (3) strings.
+	S := And().Push(`this`, `won't`, `work`)
+	c.SetExpression(S)
+	stkLen := c.Len()
+
+	fmt.Printf("length with nothing: %d\nlength with string: %d\nlength with %T: %d", noLen, strLen, S, stkLen)
+	// Output:
+	// length with nothing: 0
+	// length with string: 1
+	// length with stackage.Stack: 3
+}
+
+func ExampleCondition_Logger() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	var c Condition
+	c.Init()
+	c.SetLogger(customLogger)
+	fmt.Printf("%T", c.Logger())
+	// Output: *log.Logger
+}
+
 func ExampleCondition_SetLogger() {
 	var buf *bytes.Buffer = &bytes.Buffer{}
 	var customLogger *log.Logger = log.New(buf, ``, 0)
@@ -526,4 +561,25 @@ func ExampleCondition_SetID_pointerAddress() {
 	c.SetID(`_addr`)
 	fmt.Printf("Address ID has '0x' prefix: %t", c.ID()[:2] == `0x`)
 	// Output: Address ID has '0x' prefix: true
+}
+
+func TestCondition_codecov(t *testing.T) {
+	var c Condition
+	c.debug(``)
+	c.debug(nil)
+	c.error(``)
+	c.error(nil)
+	c.trace(``)
+	c.trace(nil)
+	c.state(``)
+	c.state(nil)
+	c.calls(``)
+	c.calls(nil)
+	c.debug(nil)
+	c.Len()
+	c.IsZero()
+	c.IsInit()
+	c.Expression()
+	c.Operator()
+	c.Keyword()
 }

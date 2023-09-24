@@ -1162,7 +1162,6 @@ func TestStack_codecov(t *testing.T) {
 	s.state(nil)
 	s.calls(``)
 	s.calls(nil)
-	s.debug(nil)
 	s.Len()
 	s.IsZero()
 	s.IsInit()
@@ -1194,6 +1193,18 @@ func TestStack_codecov(t *testing.T) {
 		t.Errorf("%s failed: nil %T",
 			t.Name(), lsys.logger())
 	}
+
+	s = List()
+	s.debug(``)
+	s.debug(nil)
+	s.error(``)
+	s.error(nil)
+	s.trace(``)
+	s.trace(nil)
+	s.state(``)
+	s.state(nil)
+	s.calls(``)
+	s.calls(nil)
 
 	SetDefaultStackLogLevel(`none`)
 	SetDefaultStackLogLevel(0)

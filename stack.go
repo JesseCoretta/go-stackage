@@ -3236,20 +3236,23 @@ func (r *stack) getValidityPolicy() ValidityPolicy {
 mkmsg is the private method called by eventDispatch for the
 purpose of Message assembly prior to submission to a logger.
 */
-func (r *stack) mkmsg(typ string) (Message, bool) {
-	if r.isZero() || len(typ) == 0 {
-		return Message{}, false
+func (r *stack) mkmsg(typ string) (m Message, ok bool) {
+	if r.isInit() {
+		if len(typ) > 0 {
+			m = Message{
+				ID:   getLogID(r.getID()),
+				Tag:  typ,
+				Addr: ptrString(r),
+				Type: sprintf("%T", *r),
+				Time: timestamp(),
+				Len:  r.ulen(),
+				Cap:  Stack{r}.Cap(), // user-facing cap is preferred
+			}
+			ok = true
+		}
 	}
 
-	return Message{
-		ID:   getLogID(r.getID()),
-		Tag:  typ,
-		Addr: ptrString(r),
-		Type: sprintf("%T", *r),
-		Time: timestamp(),
-		Len:  r.ulen(),
-		Cap:  Stack{r}.Cap(), // user-facing cap is preferred
-	}, true
+	return
 }
 
 /*
@@ -3330,26 +3333,21 @@ func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[st
 		return
 	}
 
-	m, ok := r.mkmsg(severity)
-	if !ok {
-		return
-	}
+	if m, ok := r.mkmsg(severity); ok {
+		if ok = m.setText(x); ok {
+			if len(data) > 0 {
+				if data[0] != nil {
+					m.Data = data[0]
+				}
+			}
 
-	if ok = m.setText(x); !ok {
-		return
-	}
+			if eq(severity, `fatal`) {
+				r.logger().Fatalln(m)
+			}
 
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
+			r.logger().Println(m)
 		}
 	}
-
-	if eq(severity, `fatal`) {
-		r.logger().Fatalln(m)
-	}
-
-	r.logger().Println(m)
 }
 
 const badStack = `<invalid_stack>`

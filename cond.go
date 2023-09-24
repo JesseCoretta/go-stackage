@@ -612,7 +612,6 @@ func (r Condition) Valid() (err error) {
 	// verify expression value
 	if r.Expression() == nil {
 		err = errorf("%T expression value is nil", r)
-		return
 	}
 
 	return
@@ -989,20 +988,23 @@ func (r condition) string() string {
 mkmsg is the private method called by eventDispatch for the
 purpose of Message assembly prior to submission to a logger.
 */
-func (r *condition) mkmsg(typ string) (Message, bool) {
-	if r == nil || len(typ) == 0 {
-		return Message{}, false
+func (r *condition) mkmsg(typ string) (m Message, ok bool) {
+	if r.isInit() {
+		if len(typ) > 0 {
+			m = Message{
+				ID:   getLogID(r.cfg.id),
+				Tag:  typ,
+				Addr: ptrString(r),
+				Type: sprintf("%T", *r),
+				Time: timestamp(),
+				Len:  -1, // initially N/A
+				Cap:  -1, // initially N/A
+			}
+			ok = true
+		}
 	}
 
-	return Message{
-		ID:   getLogID(r.cfg.id),
-		Tag:  typ,
-		Addr: sprintf("%p", r),
-		Type: sprintf("%T", *r),
-		Time: timestamp(),
-		Len:  -1, // initially N/A
-		Cap:  -1, // initially N/A
-	}, true
+	return
 }
 
 /*
@@ -1082,26 +1084,21 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 		return
 	}
 
-	m, ok := r.mkmsg(severity)
-	if !ok {
-		return
-	}
+	if m, ok := r.mkmsg(severity); ok {
+		if ok = m.setText(x); ok {
+			if len(data) > 0 {
+				if data[0] != nil {
+					m.Data = data[0]
+				}
+			}
 
-	if ok = m.setText(x); !ok {
-		return
-	}
+			if eq(severity, `fatal`) {
+				r.logger().Fatalln(m)
+			}
 
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
+			r.logger().Println(m)
 		}
 	}
-
-	if eq(severity, `fatal`) {
-		r.logger().Fatalln(m)
-	}
-
-	r.logger().Println(m)
 }
 
 const badCond = `<invalid_condition>`

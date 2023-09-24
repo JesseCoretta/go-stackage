@@ -1325,7 +1325,15 @@ func TestStack_codecov(t *testing.T) {
 	SetDefaultStackLogLevel(0)
 	SetDefaultStackLogLevel(nil)
 	SetDefaultStackLogLevel('a')
+	s.SetLogger(`stderr`)
+	s.SetLogger(1)
+	s.SetLogger(`stdout`)
+	s.SetLogger(1)
 	s.SetLogger(sLogDefault)
+
+	s.SetLogLevel(8, 16)
+	s.UnsetLogLevel(8, 16)
+
 	s.SetLogLevel(LogLevel4, LogLevel5)
 	s.LogLevels()
 	s.UnsetLogLevel(LogLevel4, LogLevel5)
@@ -1335,6 +1343,9 @@ func TestStack_codecov(t *testing.T) {
 	s.SetErr(errorf(errorf(`this is a serious error`))) // err err
 	s.Err()
 	s.SetErr(nil)
+
+	s.SetLogger(`off`)
+	s.SetLogger(0)
 }
 
 func init() {

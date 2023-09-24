@@ -518,23 +518,17 @@ type Message struct {
 }
 
 func (r *Message) setText(txt any) (ok bool) {
+	r.Msg = sprintf("Unidentified or zero debug payload (%T)", txt)
+
 	switch tv := txt.(type) {
 	case error:
-		if tv == nil {
-			break
+		if ok = tv != nil; ok {
+			r.Msg = tv.Error()
 		}
-
-		r.Msg = tv.Error()
 	case string:
-		if len(tv) == 0 {
-			break
+		if ok = len(tv) != 0; ok {
+			r.Msg = tv
 		}
-
-		r.Msg = tv
-	}
-
-	if ok = len(r.Msg) > 0; !ok {
-		r.Msg = sprintf("Unidentified or zero debug payload (%T)", txt)
 	}
 
 	return
@@ -553,38 +547,36 @@ closure type and override the string representation procedure for instances
 of this type (thus implementing any syntax or format they wish, i.e.: XML,
 YAML, et al).
 */
-func (r Message) String() string {
-	if !r.Valid() {
-		return ``
-	} else if r.PPol != nil {
-		return r.PPol()
-	}
+func (r Message) String() (data string) {
+	if r.Valid() {
+		if r.PPol != nil {
+			data = r.PPol()
+			return
+		}
 
-	b, err := json.Marshal(&r)
-	if err != nil {
-		return ``
-	}
+		if b, err := json.Marshal(&r); err == nil {
+			var replacements [][]string = [][]string{
+				{`\\u`, `\u`},
+				{`<nil>`, `nil`},
+				{` <= `, ` LE `},
+				{` >= `, ` GE `},
+				{` < `, ` LT `},
+				{` > `, ` GT `},
+				{`&&`, `SYMBOLIC_AND`},
+				{`&`, `AMPERSAND`},
+				{`||`, `SYMBOLIC_OR`},
+			}
 
-	var replacements [][]string = [][]string{
-		{`\\u`, `\u`},
-		{`<nil>`, `nil`},
-		{` <= `, ` LE `},
-		{` >= `, ` GE `},
-		{` < `, ` LT `},
-		{` > `, ` GT `},
-		{`&&`, `SYMBOLIC_AND`},
-		{`&`, `AMPERSAND`},
-		{`||`, `SYMBOLIC_OR`},
-	}
-
-	var data string = string(b)
-	for _, repl := range replacements {
-		if str, err := uq(rplc(qt(data), repl[0], repl[1])); err == nil {
-			data = string(json.RawMessage(str))
+			data = string(b)
+			for _, repl := range replacements {
+				if str, err := uq(rplc(qt(data), repl[0], repl[1])); err == nil {
+					data = string(json.RawMessage(str))
+				}
+			}
 		}
 	}
 
-	return data
+	return
 }
 
 /*

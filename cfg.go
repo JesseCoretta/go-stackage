@@ -78,9 +78,6 @@ Len returns the integer length of the receiver, defining the number of
 key/value pairs present.
 */
 func (r Auxiliary) Len() int {
-	if r == nil {
-		return 0
-	}
 	return len(r)
 }
 
@@ -94,12 +91,8 @@ explicitly set to false prior to return.
 Case is significant in the matching process.
 */
 func (r Auxiliary) Get(key string) (value any, ok bool) {
-	if r == nil {
-		return
-	}
-
-	if value, ok = r[key]; value == nil {
-		ok = false
+	if r != nil {
+		value, ok = r[key]
 	}
 
 	return
@@ -112,11 +105,9 @@ also the Unset method.
 If the receiver is not initialized, a new allocation is made.
 */
 func (r Auxiliary) Set(key string, value any) Auxiliary {
-	if r == nil {
-		return r
+	if r != nil {
+		r[key] = value
 	}
-
-	r[key] = value
 	return r
 }
 
@@ -196,11 +187,6 @@ func (r stack) stackType() stackType {
 	return sc.stackType()
 }
 
-func (r stack) stackKind() string {
-	sc, _ := r.config()
-	return sc.kind()
-}
-
 func (r nodeConfig) isError() bool {
 	return r.err != nil
 }
@@ -261,13 +247,11 @@ if the cfold bit is enabled.
 */
 func (r *nodeConfig) kind() (kind string) {
 	kind = `null`
-	if r.isZero() {
-		return
-	}
-
-	switch r.typ {
-	case and, or, not, list, cond, basic:
-		kind = foldValue(r.positive(cfold), r.typ.String())
+	if !r.isZero() {
+		switch r.typ {
+		case and, or, not, list, cond, basic:
+			kind = foldValue(r.positive(cfold), r.typ.String())
+		}
 	}
 
 	return
@@ -278,13 +262,12 @@ valid returns an error if the receiver is considered to be
 invalid or nil.
 */
 func (r *nodeConfig) valid() (err error) {
-	if r.isZero() {
-		err = errorf("%T instance is nil; aborting", r)
-		return
-	}
-	if r.typ == 0x0 {
+	err = errorf("%T instance is nil; aborting", r)
+	if !r.isZero() {
 		err = errorf("%T instance defines no stack \"kind\", or %T is invalid", r, r)
-		return
+		if r.typ != 0x0 {
+			err = nil
+		}
 	}
 
 	return
@@ -294,12 +277,11 @@ func (r *nodeConfig) valid() (err error) {
 positive returns a Boolean value indicative of whether the specified
 cfgFlag input value is "on" within the receiver's opt field.
 */
-func (r nodeConfig) positive(x cfgFlag) bool {
-	if err := r.valid(); err != nil {
-		return false
+func (r nodeConfig) positive(x cfgFlag) (is bool) {
+	if err := r.valid(); err == nil {
+		is = r.opt.positive(x)
 	}
-
-	return r.opt.positive(x)
+	return
 }
 
 /*
@@ -315,11 +297,9 @@ setOpt sets the specified cfgFlag to "on" within the receiver's
 opt field.
 */
 func (r *nodeConfig) setOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err != nil {
-		return
+	if err = r.valid(); err == nil {
+		r.opt.shift(x)
 	}
-
-	r.opt.shift(x)
 	return
 }
 
@@ -468,12 +448,10 @@ setMutex enables the receiver's mutual exclusion
 locking capabilities.
 */
 func (r *nodeConfig) setMutex() {
-	if err := r.valid(); err != nil {
-		return
-	}
-
-	if r.mtx == nil {
-		r.mtx = &sync.Mutex{}
+	if err := r.valid(); err == nil {
+		if r.mtx == nil {
+			r.mtx = &sync.Mutex{}
+		}
 	}
 }
 
@@ -482,11 +460,9 @@ unsetOpt sets the specified cfgFlag to "off" within the receiver's
 opt field.
 */
 func (r *nodeConfig) unsetOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err != nil {
-		return
+	if err = r.valid(); err == nil {
+		r.opt.unshift(x)
 	}
-
-	r.opt.unshift(x)
 	return
 }
 
@@ -504,11 +480,9 @@ to its current value in terms of the input value. In other words, if the
 state is "on" for a flag, it will be toggled to "off" and vice versa.
 */
 func (r *nodeConfig) toggleOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err != nil {
-		return
+	if err = r.valid(); err == nil {
+		r.opt.toggle(x)
 	}
-
-	r.opt.toggle(x)
 	return
 }
 
@@ -535,12 +509,10 @@ func (r *stack) mutex() (*sync.Mutex, bool) {
 }
 
 func (r *nodeConfig) canWriteMessage() bool {
-	if err := r.valid(); err != nil {
-		return false
-	}
-
-	if r.log == nil {
-		r.log = newLogSystem(devNull)
+	if err := r.valid(); err == nil {
+		if r.log == nil {
+			r.log = newLogSystem(devNull)
+		}
 	}
 
 	return r.log.log != devNull

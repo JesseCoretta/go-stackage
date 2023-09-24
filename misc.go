@@ -80,6 +80,10 @@ func errorf(msg any, x ...any) error {
 	return nil
 }
 
+func isPowerOfTwo(x int) bool {
+	return x&(x-1) == 0
+}
+
 /*
 strInSlice returns a Boolean value indicative of whether the
 specified string (str) is present within slice. Please note
@@ -88,6 +92,20 @@ that case is a significant element in the matching process.
 func strInSlice(str string, slice []string) bool {
 	for i := 0; i < len(slice); i++ {
 		if str == slice[i] {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+strInSliceFold returns a Boolean value indicative of whether
+the specified string (str) is present within slice. Case is
+not significant in the matching process.
+*/
+func strInSliceFold(str string, slice []string) bool {
+	for i := 0; i < len(slice); i++ {
+		if eq(str, slice[i]) {
 			return true
 		}
 	}
@@ -152,37 +170,25 @@ of Stack. This will only work if input value u is a type alias of Stack. An
 instance of Stack is returned along with a success-indicative Boolean value.
 */
 func stackTypeAliasConverter(u any) (S Stack, converted bool) {
-	if u == nil {
-		return
-	}
+	if u != nil {
+		// If it isn't a Stack alias, but is a
+		// genuine Stack, just pass it back
+		// with a thumbs-up ...
+		if st, isStack := u.(Stack); isStack {
+			S = st
+			converted = isStack
+			return
+		}
 
-	// If it isn't a Stack alias, but is a
-	// genuine Stack, just pass it back
-	// with a thumbs-up ...
-	if st, isStack := u.(Stack); isStack {
-		S = st
-		converted = isStack
-		return
-	}
-
-	a := typOf(u) // current (src) type
-	v := valOf(u) // current (src) value
-
-	// unwrap any pointers for
-	// maximum compatibility
-	if isPtr(u) {
-		a = a.Elem()
-		v = v.Elem()
-	}
-
-	b := typOf(Stack{}) // target (dest) type
-	if a.ConvertibleTo(b) {
-		X := v.Convert(b).Interface()
-		if assert, ok := X.(Stack); ok {
-			if !assert.IsZero() {
-				S = assert
-				converted = true
-				return
+		a, v := derefPtr(u)
+		b := typOf(Stack{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Stack); ok {
+				if !assert.IsZero() {
+					S = assert
+					converted = true
+				}
 			}
 		}
 	}
@@ -217,7 +223,6 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 			if !assert.IsZero() {
 				C = assert
 				converted = true
-				return
 			}
 		}
 	}

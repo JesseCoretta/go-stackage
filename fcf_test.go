@@ -128,7 +128,7 @@ func ExampleStack_SetPushPolicy() {
 			if tv <= 0 {
 				// value cannot be negative nor can it be zero
 				err = fmt.Errorf("%T->%T push denied: unsupported integer value: %d <= 0", tv, myStack, tv)
-			} else if tv&(tv-1) != 0 {
+			} else if !isPowerOfTwo(tv) {
 				// value must be power of two
 				err = fmt.Errorf("%T->%T push denied: unsupported integer value: %d != n²", tv, myStack, tv)
 			}

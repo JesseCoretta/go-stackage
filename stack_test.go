@@ -1331,7 +1331,8 @@ func TestStack_codecov(t *testing.T) {
 	s.UnsetLogLevel(LogLevel4, LogLevel5)
 	s.Logger()
 
-	s.SetErr(errorf(`this is a serious error`))
+	s.SetErr(errorf(`this is a serious error`))         // txt err
+	s.SetErr(errorf(errorf(`this is a serious error`))) // err err
 	s.Err()
 	s.SetErr(nil)
 }

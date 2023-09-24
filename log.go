@@ -74,9 +74,9 @@ const (
 )
 
 func (r logLevels) String() string {
-	if LogLevel(r) == AllLogLevels {
+	if int(r) == int(AllLogLevels) {
 		return `ALL`
-	} else if LogLevel(r) == NoLogLevels {
+	} else if int(r) == 0 {
 		return `NONE`
 	}
 
@@ -110,9 +110,6 @@ set to ^LogLevel(0) (uint16(65535)) and any remaining shifts shall be
 discarded. Predictably, "shift 65535" translates to "log everything".
 */
 func (r *logSystem) shift(l ...any) *logSystem {
-	if r == nil {
-		r = newLogSystem(devNull)
-	}
 	r.lvl.shift(l...)
 	return r
 }
@@ -142,20 +139,18 @@ func (r *logLevels) shift(l ...any) *logLevels {
 			// value is a LogLevel instance. Just take
 			// it at face value.
 			ll = tv
+		case int:
+			ll = LogLevel(tv)
 		default:
 			// no other types make sense for support,
 			// so skip to the next iteration.
 			continue
 		}
 
-		if ll == NoLogLevels {
-			// clobber loglevel with zero (0) and
-			// ditch remaining iteration(s).
+		if logLevels(ll) == logLevels(0) {
 			*r = logLevels(NoLogLevels)
 			return r
-		} else if ll == AllLogLevels {
-			// clobber loglevel with ^uint16(0) (max)
-			// and ditch remaining iteration(s).
+		} else if logLevels(ll) == ^logLevels(0) {
 			*r = logLevels(AllLogLevels)
 			return r
 		}
@@ -184,11 +179,6 @@ If any of l's values are LogLevel16, the receiver shall be set to zero
 in this context translates to "log nothing".
 */
 func (r *logSystem) unshift(l ...any) *logSystem {
-	if r.isZero() {
-		r = newLogSystem(devNull)
-		return r
-	}
-
 	r.lvl.unshift(l...)
 	return r
 }
@@ -216,10 +206,9 @@ func (r *logLevels) unshift(l ...any) *logLevels {
 			continue
 		}
 
-		if ll == NoLogLevels {
-			continue // WAT.
-		} else if ll == AllLogLevels {
-			*r = logLevels(ll)
+		if logLevels(ll) == logLevels(0) {
+			continue
+		} else if logLevels(ll) == ^logLevels(0) {
 			return r
 		}
 
@@ -233,12 +222,11 @@ positive returns a Boolean value indicative of whether the receiver
 contains the bit value for the specified logLevel. In context, this
 means "logLevel <X>" is either active (true) or not (false).
 */
-func (r logSystem) positive(l any) bool {
-	if r.isZero() {
-		return false
+func (r logSystem) positive(l any) (posi bool) {
+	if !r.isZero() {
+		posi = r.lvl.positive(l)
 	}
-
-	return r.lvl.positive(l)
+	return
 }
 
 func (r logLevels) positive(l any) bool {
@@ -280,12 +268,11 @@ func (r *logSystem) isZero() bool {
 	return r.log == nil && r.lvl == logLevels(NoLogLevels)
 }
 
-func (r logSystem) logger() *log.Logger {
-	if r.isZero() {
-		return nil
+func (r logSystem) logger() (l *log.Logger) {
+	if !r.isZero() {
+		l = r.log
 	}
-
-	return r.log
+	return
 }
 
 func (r *logSystem) setLogger(logger any) *logSystem {

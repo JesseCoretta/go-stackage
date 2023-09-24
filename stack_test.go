@@ -1326,7 +1326,7 @@ func TestStack_codecov(t *testing.T) {
 	SetDefaultStackLogLevel(nil)
 	SetDefaultStackLogLevel('a')
 	s.SetLogger(`stderr`)
-	s.SetLogger(1)
+	s.SetLogger(2)
 	s.SetLogger(`stdout`)
 	s.SetLogger(1)
 	s.SetLogger(sLogDefault)

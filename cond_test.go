@@ -54,7 +54,7 @@ func ExampleSetDefaultConditionLogger() {
 
 func ExampleCond() {
 	fmt.Printf("%s", Cond(`π`, Eq, float64(3.14159265358979323)))
-	// Output: π = 3.14
+	// Output: π = 3.141593
 }
 
 func ExampleCondition_CanNest() {
@@ -449,7 +449,7 @@ func ExampleCondition_Paren() {
 	c.SetOperator(Ge)
 	c.SetExpression(1.456)
 	fmt.Printf("%s", c)
-	// Output: ( keyword >= 1.46 )
+	// Output: ( keyword >= 1.456000 )
 }
 
 func ExampleCondition_NoNesting() {

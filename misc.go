@@ -65,19 +65,19 @@ func timestamp() string {
 errorf wraps errors.New and returns a non-nil instance of error
 based upon a non-nil/non-zero msg input value with optional args.
 */
-func errorf(msg any, x ...any) error {
+func errorf(msg any, x ...any) (err error) {
 	switch tv := msg.(type) {
 	case string:
 		if len(tv) > 0 {
-			return errors.New(sprintf(tv, x...))
+			err = errors.New(sprintf(tv, x...))
 		}
 	case error:
 		if tv != nil {
-			return errors.New(sprintf(tv.Error(), x...))
+			err = errors.New(sprintf(tv.Error(), x...))
 		}
 	}
 
-	return nil
+	return
 }
 
 func isPowerOfTwo(x int) bool {
@@ -202,27 +202,25 @@ of Condition. This will only work if input value u is a type alias of Condition.
 instance of Condition is returned along with a success-indicative Boolean value.
 */
 func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
-	if u == nil {
-		return
-	}
+	if u != nil {
+		// If it isn't a Condition alias, but is a
+		// genuine Condition, just pass it back
+		// with a thumbs-up ...
+		if co, isCond := u.(Condition); isCond {
+			C = co
+			converted = isCond
+			return
+		}
 
-	// If it isn't a Condition alias, but is a
-	// genuine Condition, just pass it back
-	// with a thumbs-up ...
-	if co, isCond := u.(Condition); isCond {
-		C = co
-		converted = isCond
-		return
-	}
-
-	a, v := derefPtr(u)
-	b := typOf(Condition{}) // target (dest) type
-	if a.ConvertibleTo(b) {
-		X := v.Convert(b).Interface()
-		if assert, ok := X.(Condition); ok {
-			if !assert.IsZero() {
-				C = assert
-				converted = true
+		a, v := derefPtr(u)
+		b := typOf(Condition{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Condition); ok {
+				if !assert.IsZero() {
+					C = assert
+					converted = true
+				}
 			}
 		}
 	}
@@ -370,102 +368,110 @@ func isBoolPrimitive(x any) bool {
 	return false
 }
 
-func isKnownPrimitive(x any) bool {
+func isKnownPrimitive(x any) (is bool) {
 	if isStringPrimitive(x) {
-		return true
+		is = true
 	} else if isNumberPrimitive(x) {
-		return true
+		is = true
 	} else if isBoolPrimitive(x) {
-		return true
+		is = true
 	}
 
-	return false
+	return
 }
 
-func numberStringer(x any) string {
+func numberStringer(x any) (s string) {
+	s = `NaN`
 	switch tv := x.(type) {
 	case float32, float64:
-		return floatStringer(tv)
+		s = floatStringer(tv)
 	case complex64, complex128:
-		return complexStringer(tv)
+		s = complexStringer(tv)
 	case int, int8, int16, int32, int64:
-		return intStringer(tv)
+		s = intStringer(tv)
 	case uint, uint8, uint16, uint32, uint64, uintptr:
-		return uintStringer(tv)
+		s = uintStringer(tv)
 	}
 
-	return `NaN`
+	return
 }
 
-func primitiveStringer(x any) string {
-	if !isKnownPrimitive(x) {
-		return ``
-	}
-	if isBoolPrimitive(x) {
-		return boolStringer(x)
-	}
-	if isNumberPrimitive(x) {
-		return numberStringer(x)
-	}
-	if isStringPrimitive(x) {
-		return x.(string)
+func primitiveStringer(x any) (s string) {
+	s = `unsupported_primitive_type`
+	if isKnownPrimitive(x) {
+		switch {
+		case isBoolPrimitive(x):
+			s = boolStringer(x)
+		case isNumberPrimitive(x):
+			s = numberStringer(x)
+		case isStringPrimitive(x):
+			s = x.(string)
+		}
 	}
 
-	return `unsupported_stringer_type`
+	return
 }
 
 func boolStringer(x any) string {
 	return sprintf("%t", x.(bool))
 }
 
-func floatStringer(x any) string {
+func floatStringer(x any) (s string) {
 	switch tv := x.(type) {
+	case float32:
+		s = sprintf("%f", tv)
 	case float64:
-		return sprintf("%.02f", tv)
+		s = sprintf("%f", tv)
 	}
 
-	return sprintf("%.02f", x.(float32))
+	return
 }
 
-func complexStringer(x any) string {
+func complexStringer(x any) (s string) {
 	switch tv := x.(type) {
+	case complex64:
+		s = sprintf("%v", tv)
 	case complex128:
-		return sprintf("%v", tv)
+		s = sprintf("%v", tv)
 	}
 
-	return sprintf("%v", x.(complex64))
+	return
 }
 
-func uintStringer(x any) string {
+func uintStringer(x any) (s string) {
 	switch tv := x.(type) {
+	case uint:
+		s = sprintf("%d", tv)
 	case uint8:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case uint16:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case uint32:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case uint64:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case uintptr:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	}
 
-	return sprintf("%d", x.(uint))
+	return
 }
 
-func intStringer(x any) string {
+func intStringer(x any) (s string) {
 	switch tv := x.(type) {
+	case int:
+		s = sprintf("%d", tv)
 	case int8:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case int16:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case int32:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	case int64:
-		return sprintf("%d", tv)
+		s = sprintf("%d", tv)
 	}
 
-	return sprintf("%d", x.(int))
+	return
 }
 
 /*

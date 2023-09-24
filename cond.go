@@ -1,12 +1,12 @@
 package stackage
 
-import (
-	"log"
-)
-
 /*
 cond.go contains Condition-related methods and functions.
 */
+
+import (
+	"log"
+)
 
 /*
 Condition describes a single evaluative statement, i.e.:
@@ -92,7 +92,7 @@ func initCondition() (r *condition) {
 	r = new(condition)
 	r.cfg = new(nodeConfig)
 	r.cfg.log = newLogSystem(cLogDefault)
-	r.cfg.log.lvl = logLevels(cLogLevelDefault)
+	r.cfg.log.lvl = logLevels(NoLogLevels)
 
 	r.cfg.typ = cond
 	data[`type`] = cond.String()
@@ -165,6 +165,72 @@ func (r *condition) setExpression(ex any) {
 }
 
 /*
+SetLogLevel enables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to accept events for submission
+and transcription to the underlying logger.
+
+Users may also sum the desired bit values manually, and cast the
+product as a LogLevel. For example, if STATE (4), DEBUG (8) and
+TRACE (32) logging were desired, entering LogLevel(44) would be
+the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
+variadic fashion.
+*/
+func (r Condition) SetLogLevel(l ...any) Condition {
+	if r.IsInit() {
+		r.condition.setLogLevel(l...)
+	}
+	return r
+}
+
+func (r *condition) setLogLevel(l ...any) {
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fmname(), l, l, len(l)))
+
+	r.cfg.log.shift(l...)
+
+	r.calls(sprintf("%s: out:%T(self)",
+		fmname(), r))
+}
+
+/*
+LogLevels returns the string representation of a comma-delimited list
+of all active LogLevel values within the receiver.
+*/
+func (r Condition) LogLevels() (l string) {
+	if r.IsInit() {
+		l = r.condition.logLevels()
+	}
+	return
+}
+
+func (r condition) logLevels() (l string) {
+	return r.cfg.log.lvl.String()
+}
+
+/*
+UnsetLogLevel disables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to discard events submitted for
+transcription to the underlying logger.
+*/
+func (r Condition) UnsetLogLevel(l ...any) Condition {
+	if r.IsInit() {
+		r.condition.unsetLogLevel(l...)
+	}
+	return r
+}
+
+func (r *condition) unsetLogLevel(l ...any) {
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, l, l, len(l)))
+
+	r.cfg.log.unshift(l...)
+
+	r.calls(sprintf("%s: out:%T(self)",
+		fname, r))
+}
+
+/*
 SetLogger assigns the specified logging facility to the receiver
 instance.
 
@@ -230,23 +296,6 @@ func assertKeyword(x any) (s string) {
 		}
 	}
 
-	return
-}
-
-/*
-tryPushPolicy will execute a push policy if one is set, and will return an error
-and a Boolean value indicative of the presence of said policy.
-*/
-func (r *condition) tryPushPolicy(x any) (err error, found bool) {
-	if found = r.cfg.ppf != nil; found {
-		// if we have a policy, always set
-		// found to true, regardless of the
-		// outcome
-		err = r.cfg.ppf(x)
-	}
-
-	// if no policy, err is always nil
-	// and found is always false
 	return
 }
 
@@ -326,18 +375,6 @@ defaultAssertionExpressionHandler is the catch-all private method called
 by condition.assertConditionExpressionValue.
 */
 func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
-
-	// Try to find a push policy first and, IF
-	// FOUND, run it and break out of the case
-	// statement either way.
-	if err, found := r.tryPushPolicy(x); found {
-		X = x
-		return
-	} else if err != nil {
-		r.setErr(err)
-		return
-	}
-
 	// no push policy, so we'll see if the basic
 	// guidelines were satisfied, at least ...
 	if _, ok := stackTypeAliasConverter(x); ok {
@@ -378,11 +415,9 @@ This allows for a means of identifying a particular kind of Condition in the mid
 of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setCategory(cat)
 	}
-
-	r.condition.setCategory(cat)
 	return r
 }
 
@@ -390,11 +425,11 @@ func (r Condition) SetCategory(cat string) Condition {
 Category returns the categorical label string value assigned to the receiver, if
 set, else a zero string.
 */
-func (r Condition) Category() string {
-	if r.IsZero() {
-		return ``
+func (r Condition) Category() (cat string) {
+	if r.IsInit() {
+		cat = r.condition.getCat()
 	}
-	return r.condition.getCat()
+	return
 }
 
 /*

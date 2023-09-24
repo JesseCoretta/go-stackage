@@ -43,10 +43,10 @@ func ExampleSetDefaultConditionLogger() {
 	var buf *bytes.Buffer = &bytes.Buffer{}
 	var customLogger *log.Logger = log.New(buf, ``, 0)
 	SetDefaultConditionLogger(customLogger)
-	SetDefaultConditionLogLevel(AllLogLevels) // highly verbose!
 
 	// do something that triggers log events ...
-	_ = Cond(`π`, Eq, float64(3.14159265358979323))
+	c := Cond(`π`, Eq, float64(3.14159265358979323))
+	c.SetLogLevel(AllLogLevels)
 
 	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
 	// Output: *bytes.Buffer.Len>0 (bytes): true
@@ -419,4 +419,111 @@ func ExampleCondition_Addr() {
 
 	fmt.Printf("Address prefix valid: %t", c.Addr()[:2] == `0x`)
 	// Address prefix valid: true
+}
+
+func ExampleCondition_SetExpression() {
+	var c Condition
+	c.Init()
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(1.456)
+	fmt.Printf("Expr type: %T", c.Expression())
+	// Output: Expr type: float64
+}
+
+func ExampleCondition_Operator() {
+	var c Condition
+	c.Init()
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(1.456)
+	fmt.Printf("Operator: %s", c.Operator())
+	// Output: Operator: >=
+}
+
+func ExampleCondition_Paren() {
+	var c Condition
+	c.Init()
+	c.Paren() // toggle to true from false default
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(1.456)
+	fmt.Printf("%s", c)
+	// Output: ( keyword >= 1.46 )
+}
+
+func ExampleCondition_NoNesting() {
+	var c Condition
+	c.Init()
+	c.Paren() // toggle to true from false default
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.NoNesting(true)
+
+	c.SetExpression(
+		And().Push(`this`, `won't`, `work`),
+	)
+
+	fmt.Printf("%v", c.Expression())
+	// Output: <nil>
+}
+
+func ExampleCondition_SetLogger() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	var c Condition
+	c.Init()
+	c.SetLogger(customLogger)
+	c.SetLogLevel(AllLogLevels)
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ne)
+	c.SetExpression(`bad_value`)
+
+	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
+	// Output: *bytes.Buffer.Len>0 (bytes): true
+}
+
+func ExampleCondition_SetLogLevel() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	var c Condition
+	c.Init()
+	c.SetLogger(customLogger)
+	c.SetLogLevel(LogLevel1, LogLevel3) // calls (1) + state(4)
+	fmt.Printf("LogLevels active: %s", c.LogLevels())
+	// Output: LogLevels active: CALLS,STATE
+}
+
+func ExampleCondition_UnsetLogLevel() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	var c Condition
+	c.Init()
+	c.SetLogger(customLogger)
+	c.SetLogLevel(LogLevel1, LogLevel3) // calls (1) + state(4)
+	c.UnsetLogLevel(LogLevel1)          // -1
+	fmt.Printf("LogLevels active: %s", c.LogLevels())
+	// Output: LogLevels active: STATE
+}
+
+func ExampleCondition_SetID_random() {
+	var c Condition = Cond(`keyword`, Ne, `bogus`)
+
+	// can't predict what ID will
+	// be, so we'll check length
+	// which should always be 24.
+	c.SetID(`_random`)
+	fmt.Printf("Random ID len: %d", len(c.ID()))
+	// Output: Random ID len: 24
+}
+
+func ExampleCondition_SetID_pointerAddress() {
+	var c Condition = Cond(`keyword`, Ne, `bogus`)
+
+	// can't predict what ID will be,
+	// so we'll check the prefix to
+	// be certain it begins with '0x'.
+	c.SetID(`_addr`)
+	fmt.Printf("Address ID has '0x' prefix: %t", c.ID()[:2] == `0x`)
+	// Output: Address ID has '0x' prefix: true
 }

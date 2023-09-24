@@ -349,18 +349,8 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 		// was converted back to Stack without
 		// any issues ...
 		X = x
-
-	} else if meth := getStringer(x); meth != nil {
-		// whatever it is, it seems to have
-		// a stringer method, at least ...
+	} else {
 		X = x
-
-	} else if isKnownPrimitive(x) {
-		// value is one of go's builtin
-		// numerical primitives, which
-		// are string represented using
-		// sprintf.
-		X = primitiveStringer(x)
 	}
 
 	return
@@ -598,12 +588,14 @@ A Boolean value returned indicative of the result. Note that if an
 instance of Evaluator was not assigned to the Condition prior to
 execution of this method, the return value shall always be false.
 */
-func (r Condition) Evaluate(x ...any) error {
-	if r.cfg.evl != nil {
-		return r.cfg.evl(r, x...)
+func (r Condition) Evaluate(x ...any) (ev any, err error) {
+	if r.IsInit() {
+		if err = errorf("No %T.%T func/meth found", r, r.cfg.evl); r.cfg.evl != nil {
+			ev, err = r.cfg.evl(x...)
+		}
 	}
 
-	return errorf("No %T function or method was set within %T")
+	return
 }
 
 /*
@@ -613,11 +605,9 @@ will allow the Evaluate method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetEvaluator(x Evaluator) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.evl = x
 	}
-
-	r.condition.cfg.evl = x
 	return r
 }
 
@@ -872,23 +862,6 @@ func (r Condition) IsPadded() (is bool) {
 }
 
 /*
-SetPushPolicy assigns the instance of PushPolicy to the receiver. This
-will allow the Set method to control what elements may (or may not) be
-set as the expression value within the receiver.
-
-See the documentation for the Set method for information on the default
-behavior without the involvement of a PushPolicy instance.
-
-Specifying nil shall disable this capability if enabled.
-*/
-func (r Condition) SetPushPolicy(x PushPolicy) Condition {
-	if r.IsInit() {
-		r.condition.cfg.ppf = x
-	}
-	return r
-}
-
-/*
 Expression returns the expression value(s) stored within the receiver, or
 nil if unset. A valid receiver instance MUST always possess a non-nil
 expression value.
@@ -926,6 +899,15 @@ func (r Condition) Keyword() (kw string) {
 String is a stringer method that returns the string representation
 of the receiver instance. It will only function if the receiver is
 in good standing, and passes validity checks.
+
+Note that if the underlying expression value is not a known type,
+such as a Stack or a Go primitive, this method may be uncertain
+as to what it should do. A bogus string may be returned.
+
+In such a case, it may be necessary to subvert the default string
+representation behavior demonstrated by instances of this type in
+favor of a custom instance of the PresentationPolicy closure type
+for maximum control.
 */
 func (r Condition) String() (s string) {
 	if err := r.Valid(); err == nil {
@@ -945,8 +927,14 @@ func (r condition) string() string {
 
 	// begin default presentation
 	// handler ...
+	var raw string
+	if meth := getStringer(r.ex); meth != nil {
+		raw = meth()
+	} else {
+		raw = primitiveStringer(r.ex)
+	}
 
-	val := encapValue(r.cfg.enc, sprintf("%s", r.ex))
+	val := encapValue(r.cfg.enc, raw)
 	var pad string = string(rune(32))
 	if r.cfg.positive(nspad) {
 		pad = ``

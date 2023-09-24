@@ -287,7 +287,6 @@ func (r *nodeConfig) valid() (err error) {
 		return
 	}
 
-	err = r.getErr()
 	return
 }
 

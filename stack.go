@@ -504,12 +504,10 @@ func (r Stack) IsInit() (is bool) {
 /*
 isInit is a private method called by Stack.IsInit.
 */
-func (r *stack) isInit() (is bool) {
-	var err error
-	if _, err = r.config(); err == nil {
-		is = r.stackType() != 0x0
-	}
-	return
+func (r *stack) isInit() bool {
+	//var err error
+	_, err := r.config()
+	return err == nil
 }
 
 /*
@@ -1757,7 +1755,6 @@ func (r stack) config() (sc *nodeConfig, err error) {
 		return
 	}
 
-	err = sc.valid()
 	return
 }
 
@@ -3047,16 +3044,17 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 			break
 		}
 
-		if err = meth(x[i]); err == nil {
-			r.policy(sprintf("%s: appending %T instance (idx:%d) per %T",
-				fname, x[i], i, meth))
-			*r = append(*r, x[i])
-			pct++
-		} else {
+		if err = meth(x[i]); err != nil {
 			r.setErr(err)
 			r.policy(sprintf("%s: appending %T instance (idx:%d) failed per %T: %v",
 				fname, x[i], i, meth, err))
+			break
 		}
+
+		r.policy(sprintf("%s: appending %T instance (idx:%d) per %T",
+			fname, x[i], i, meth))
+		*r = append(*r, x[i])
+		pct++
 	}
 
 	return r

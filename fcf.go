@@ -19,8 +19,13 @@ order to make such determinations practical.
 
 Use of this feature is totally optional, and may be overkill
 for most users.
+
+The signature allows for variadic input of any type(s), and
+shall require the return of a single any instance alongside
+an error. The contents of the return 'any' instance (if not
+nil) is entirely up to the user.
 */
-type Evaluator func(Condition, ...any) error
+type Evaluator func(...any) (any, error)
 
 /*
 PushPolicy is a first-class (closure) function signature

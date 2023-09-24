@@ -20,6 +20,12 @@ func ExampleComparisonOperator_String() {
 	// Output: Operator: >=
 }
 
+func ExampleStack_Addr() {
+	var c Stack = List().Push(`this`, `and`, `that`)
+	fmt.Printf("Address ID has '0x' prefix: %t", c.Addr()[:2] == `0x`)
+	// Output: Address ID has '0x' prefix: true
+}
+
 func ExampleStack_Auxiliary() {
 	// make a stack ... any type would do
 	l := List().Push(`this`, `that`, `other`)
@@ -980,6 +986,77 @@ func ExampleStack_SetDelimiter() {
 	// Output: item1,item2
 }
 
+func ExampleStack_Transfer() {
+	var source Stack = Basic().Push(1, 2, 3, 4)
+	var dest Stack = Basic()
+	source.Transfer(dest)
+	slice, _ := dest.Index(2)
+	fmt.Printf("%d", slice.(int))
+	// Output: 3
+}
+
+func ExampleStack_Insert() {
+	var stk Stack = Basic().Push(1, 2, 3, 5)
+	add := 4
+	idx := 3
+	stk.Insert(add, idx)
+	slice, _ := stk.Index(idx)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_ForwardIndices() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.ForwardIndices(true)
+	slice, _ := stk.Index(1000)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_NegativeIndices() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.NegativeIndices(true)
+	slice, _ := stk.Index(-1)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_SetID_random() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+
+	// can't predict what ID will
+	// be, so we'll check length
+	// which should always be 24.
+	stk.SetID(`_random`)
+	fmt.Printf("Random ID len: %d", len(stk.ID()))
+	// Output: Random ID len: 24
+}
+
+func ExampleStack_SetID_pointerAddress() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+
+	// can't predict what ID will be,
+	// so we'll check the prefix to
+	// be certain it begins with '0x'.
+	stk.SetID(`_addr`)
+	fmt.Printf("Address ID has '0x' prefix: %t", stk.ID()[:2] == `0x`)
+	// Output: Address ID has '0x' prefix: true
+}
+
+func ExampleStack_Category() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.SetCategory(`basic_stuff`)
+	fmt.Printf("Category: %s", stk.Category())
+	// Output: Category: basic_stuff
+}
+
+func ExampleStack_SetCategory() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.SetCategory(`basic_stuff`)
+	fmt.Printf("Category: %s", stk.Category())
+	// Output: Category: basic_stuff
+}
+
 /*
 This example demonstrates the creation of a list stack
 using comma delimitation and the retrieval of the same
@@ -1194,7 +1271,27 @@ func TestStack_codecov(t *testing.T) {
 			t.Name(), lsys.logger())
 	}
 
+	s.CanMutex()
+	s.Avail()
+	s.string()
+	s.IsEncap()
+	s.SetAuxiliary(nil)
+	s.SetLogger(nil)
+	s.NoNesting()
+	s.NoNesting(true)
+	s.NoNesting(false)
+	s.Logger()
+
 	s = List()
+	s.config()
+	s.IsEncap()
+	s.ReadOnly()
+	s.ReadOnly(true)
+	s.ReadOnly(false)
+	s.IsReadOnly()
+	s.Avail()
+	s.traverse()
+	s.string()
 	s.Paren()
 	s.Paren(true)
 	s.Paren(false)
@@ -1210,11 +1307,33 @@ func TestStack_codecov(t *testing.T) {
 	s.state(nil)
 	s.calls(``)
 	s.calls(nil)
+	s.NoNesting()
+	s.NoNesting(true)
+	s.CanNest()
+	s.NoNesting(false)
+	s.CanMutex()
+
+	s.ReadOnly()
+	s.ReadOnly(true)
+	s.ReadOnly(false)
+
+	s.SetAuxiliary(nil)
+	s.SetLogger(nil)
+	s.Logger()
 
 	SetDefaultStackLogLevel(`none`)
 	SetDefaultStackLogLevel(0)
 	SetDefaultStackLogLevel(nil)
 	SetDefaultStackLogLevel('a')
+	s.SetLogger(sLogDefault)
+	s.SetLogLevel(LogLevel4, LogLevel5)
+	s.LogLevels()
+	s.UnsetLogLevel(LogLevel4, LogLevel5)
+	s.Logger()
+
+	s.SetErr(errorf(`this is a serious error`))
+	s.Err()
+	s.SetErr(nil)
 }
 
 func init() {

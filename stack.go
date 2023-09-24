@@ -458,11 +458,13 @@ func (r *stack) valid() (err error) {
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 
-	if _, err = r.config(); err != nil {
-		r.error(err)
-		r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
-		return
-	}
+	/*
+		if _, err = r.config(); err != nil {
+			r.error(err)
+			r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
+			return
+		}
+	*/
 
 	// try to see if the user provided a
 	// validity function
@@ -965,7 +967,7 @@ A return value of true is thrown at the first of either
 occurrence. Length of matched candidates is not significant
 during the matching process.
 */
-func (r stack) isNesting() bool {
+func (r stack) isNesting() (is bool) {
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
@@ -982,9 +984,7 @@ func (r stack) isNesting() bool {
 
 		// native Stack instance
 		case Stack:
-			r.calls(sprintf("%s: out:%T(%t)",
-				fname, true, true))
-			return true
+			is = true
 
 		// type alias stack instnaces, since
 		// we have no knowledge of them here,
@@ -994,17 +994,17 @@ func (r stack) isNesting() bool {
 
 			// If convertible is true, we know the
 			// instance (tv) is a stack alias.
-			if _, convertible := stackTypeAliasConverter(tv); convertible {
-				r.calls(sprintf("%s: out:%T(%t)",
-					fname, convertible, convertible))
-				return convertible
-			}
+			_, is = stackTypeAliasConverter(tv)
+		}
+
+		if is {
+			break
 		}
 	}
 
-	r.calls(sprintf("%s: out:%T(%t)", fname, false, false))
+	r.calls(sprintf("%s: out:%T(%t)", fname, is, is))
 
-	return false
+	return
 }
 
 /*
@@ -1093,16 +1093,14 @@ intended to serve as delimiter character for a LIST Stack when
 string representation is requested.
 */
 func assertListDelimiter(x any) (v string) {
-	if x == nil {
-		return
-	}
-
-	switch tv := x.(type) {
-	case string:
-		v = tv
-	case rune:
-		if tv != rune(0) {
-			v = string(tv)
+	if x != nil {
+		switch tv := x.(type) {
+		case string:
+			v = tv
+		case rune:
+			if tv != rune(0) {
+				v = string(tv)
+			}
 		}
 	}
 
@@ -1435,31 +1433,23 @@ word-based behavior.
 This method has no effect on list-style stacks.
 */
 func (r Stack) Symbol(c ...any) Stack {
-	if !r.IsInit() {
-		return r
-	}
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			var str string
+			for i := 0; i < len(c); i++ {
+				switch tv := c[i].(type) {
+				case string:
+					str += tv
+				case rune:
+					char := string(tv)
+					str += char
+				}
+			}
 
-	if r.getState(ronly) {
-		return r
-	}
-
-	if len(c) == 0 {
-		r.stack.setSymbol(``)
-		return r
-	}
-
-	var str string
-	for i := 0; i < len(c); i++ {
-		switch tv := c[i].(type) {
-		case string:
-			str += tv
-		case rune:
-			char := string(tv)
-			str += char
+			r.stack.setSymbol(str)
 		}
 	}
 
-	r.stack.setSymbol(str)
 	return r
 }
 
@@ -1739,20 +1729,17 @@ alongside an instance of error. If either the *stackInstance (sc)
 is nil OR if the error (err) is non-nil, the receiver is deemed
 totally invalid and unusable.
 */
-func (r stack) config() (sc *nodeConfig, err error) {
-	if &r == nil || r.len() == 0 {
-		err = errorf("%T instance is nil; aborting", r)
-		r.error(err)
-		return
-	}
-
-	var ok bool
-	// verify slice #0 is a *nodeConfig
-	// instance, or bail out.
-	if sc, ok = r[0].(*nodeConfig); !ok {
+func (r *stack) config() (sc *nodeConfig, err error) {
+	if r != nil {
+		var ok bool
+		// verify slice #0 is a *nodeConfig
+		// instance, or bail out.
 		err = errorf("%T does not contain an expected %T instance; aborting", r, sc)
+		if sc, ok = (*r)[0].(*nodeConfig); ok {
+			err = nil
+		}
+
 		r.error(err)
-		return
 	}
 
 	return
@@ -1828,17 +1815,12 @@ If the receiver (r) is uninitialized, zero (0) is returned.
 */
 func (r Stack) Avail() (avail int) {
 	if r.IsInit() {
-		avail = r.stack.avail()
+		if avail = -1; r.cap() > 0 {
+			avail = r.cap() - r.len()
+		}
 	}
 
 	return
-}
-
-func (r stack) avail() int {
-	if r.cap() == 0 {
-		return -1 // no cap set means "infinite capacity"
-	}
-	return r.cap() - r.len()
 }
 
 /*
@@ -1888,65 +1870,60 @@ func (r Stack) String() (s string) {
 	return
 }
 
+func (r *stack) canString() (can bool, ot string, oc stackType) {
+	if r != nil {
+		if err := r.valid(); err == nil {
+			ot, oc = r.typ()
+			can = oc != 0x0 && oc != basic
+		}
+	}
+	return
+}
+
 /*
 string is a private method called by Stack.String.
 */
-func (r stack) string() string {
-	// run validity checks, whether package default
-	// or a user-authored validity policy ...
-	if err := r.valid(); err != nil {
-		return badStack
-	}
+func (r *stack) string() (assembled string) {
+	if can, ot, oc := r.canString(); can {
+		fname := fmname()
+		r.calls(sprintf("%s: in:niladic", fname))
 
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-
-	var str []string
-	ot, oc := r.typ()
-	if oc == 0x0 {
-		r.calls(sprintf("%s: out:%T(%v)",
-			fname, badStack, badStack))
-		return badStack
-	} else if oc == basic {
-		r.calls(sprintf("%s: out:%T(%v)",
-			fname, `basic_incompatible`, `basic_incompatible`))
-		return ``
-	}
-
-	// execute the user-authoried presentation
-	// policy, if defined, instead of going any
-	// further.
-	if ppol := r.getPresentationPolicy(); ppol != nil {
-		r.policy(sprintf("%s: call %T", fname, ppol))
-		output := ppol(r)
-		r.calls(sprintf("%s: out:%T(%v)",
-			fname, output, output))
-		return output
-	}
-
-	// Scan each slice and attempt stringification
-	for i := 1; i < r.len(); i++ {
-		r.trace(sprintf("%s: iterate %T:%d:%s (slice %d/%d)",
-			fname, r[i], i-1, getLogID(``), i-1, r.len()-1))
-		// Handle slice value types through assertion
-		if val := r.stringAssertion(r[i]); len(val) > 0 {
-			// Append the apparently valid
-			// string value ...
-			r.trace(sprintf("%s: %T:%d:%s += %T(%v;len:%d)",
-				fname, r[i], i-1, getLogID(``), val, val, len(val)))
-			str = append(str, val)
+		var str []string
+		// execute the user-authoried presentation
+		// policy, if defined, instead of going any
+		// further.
+		if ppol := r.getPresentationPolicy(); ppol != nil {
+			r.policy(sprintf("%s: call %T", fname, ppol))
+			assembled = ppol(r)
+			r.calls(sprintf("%s: out:%T(%v)",
+				fname, assembled, assembled))
+			return
 		}
+
+		// Scan each slice and attempt stringification
+		for i := 1; i < r.len(); i++ {
+			r.trace(sprintf("%s: iterate %T:%d:%s (slice %d/%d)",
+				fname, (*r)[i], i-1, getLogID(``), i-1, r.len()-1))
+			// Handle slice value types through assertion
+			if val := r.stringAssertion((*r)[i]); len(val) > 0 {
+				// Append the apparently valid
+				// string value ...
+				r.trace(sprintf("%s: %T:%d:%s += %T(%v;len:%d)",
+					fname, (*r)[i], i-1, getLogID(``), val, val, len(val)))
+				str = append(str, val)
+			}
+		}
+
+		// hand off our string slices, along with the outermost
+		// type/code values, to the assembleStringStack worker.
+		doPad := !r.positive(nspad) && r.getSymbol() == ``
+		assembled = r.assembleStringStack(str, padValue(doPad, ot), oc)
+
+		r.calls(sprintf("%s: out:%T(%v;len:%d)",
+			fname, assembled, assembled, len(assembled)))
 	}
 
-	// hand off our string slices, along with the outermost
-	// type/code values, to the assembleStringStack worker.
-	doPad := !r.positive(nspad) && r.getSymbol() == ``
-	assembled := r.assembleStringStack(str, padValue(doPad, ot), oc)
-
-	r.calls(sprintf("%s: out:%T(%v;len:%d)",
-		fname, assembled, assembled, len(assembled)))
-
-	return assembled
+	return
 }
 
 /*
@@ -2153,24 +2130,20 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 		current := indices[i] // user-facing index number w/ offset
 		r.trace(sprintf("%s: iterate idx:%d %v", fname, current, indices))
 
-		instance, _, found := r.index(current) // don't expose the TRUE index
-		if !found {
-			r.trace(sprintf("%s: idx:%d not found", fname, current))
+		if instance, _, found := r.index(current); found {
+			id := getLogID(r.getID())
+
+			// Begin assertion of possible traversable and non-traversable
+			// values. We'll go as deep as possible, provided each nesting
+			// instance is a Stack/Stack alias, or Condition/Condition alias
+			// containing a Stack/Stack alias value.
+			r.trace(sprintf("%s: attempting descent into idx:%d of %T::%s", fname, current, instance, id))
+			if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); !done {
+				continue
+			}
 			break
 		}
-
-		id := getLogID(r.getID())
-
-		// Begin assertion of possible traversable and non-traversable
-		// values. We'll go as deep as possible, provided each nesting
-		// instance is a Stack/Stack alias, or Condition/Condition alias
-		// containing a Stack/Stack alias value.
-		r.trace(sprintf("%s: attempting descent into idx:%d of %T::%s", fname, current, instance, id))
-
-		if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); done {
-			r.trace(sprintf("%s: returned from idx:%d of %T::%s", fname, current, instance, id))
-			break
-		}
+		break
 	}
 
 	r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
@@ -2192,47 +2165,44 @@ func (r Stack) Reveal() Stack {
 reveal is a private method called by Stack.Reveal.
 */
 func (r *stack) reveal() (err error) {
-	if !r.isInit() {
-		// receiver not initialized
-		return
-	}
+	if r.isInit() {
+		fname := fmname()
+		r.calls(sprintf("%s: in:niladic", fname))
 
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
+		if !r.positive(ronly) {
+			r.lock()
+			defer r.unlock()
 
-	if r.positive(ronly) {
-		return // no error needed
-	}
+			// scan each slice (except the config
+			// slice) and analyze its structure.
+			for i := 0; i < r.len(); i++ {
+				sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
+				r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
+				if sl == nil {
+					continue
+				}
 
-	r.lock()
-	defer r.unlock()
-
-	// scan each slice (except the config
-	// slice) and analyze its structure.
-	for i := 0; i < r.len(); i++ {
-		sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
-		r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
-		if sl == nil {
-			continue
-		}
-
-		// If the element is a stack, begin descent
-		// through recursion.
-		if outer, ook := stackTypeAliasConverter(sl); ook {
-			id := getLogID(outer.getID())
-			r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
-			if err = r.revealDescend(outer, i); err != nil {
-				r.setErr(err)
-				r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
-				r.calls(sprintf("%s: out:%T(nil:%t)",
-					fname, err, err == nil))
-				return
+				// If the element is a stack, begin descent
+				// through recursion.
+				if outer, ook := stackTypeAliasConverter(sl); ook {
+					id := getLogID(outer.getID())
+					r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
+					if err = r.revealDescend(outer, i); err == nil {
+						continue
+					}
+					r.setErr(err)
+					r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
+					r.calls(sprintf("%s: out:%T(nil:%t)",
+						fname, err, err == nil))
+					break
+				}
 			}
 		}
-	}
 
-	r.calls(sprintf("%s: out:%T(nil:%t)",
-		fname, err, err == nil))
+		r.calls(sprintf("%s: out:%T(nil:%t)",
+			fname, err, err == nil))
+
+	}
 
 	return
 }
@@ -2278,19 +2248,18 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 			if ok {
 				cid = getLogID(assert.ID())
 			}
-			if assert.IsParen() || inner.IsParen() {
-				break
+
+			if !assert.IsParen() && !inner.IsParen() {
+				r.trace(sprintf("%s: descending into single idx:%d %T::%s",
+					fname, 0, child, cid))
+
+				err = r.revealSingle(0)
+
+				r.error(sprintf("%s: %T::%s %v",
+					fname, child, cid, err))
+
+				updated = child
 			}
-
-			r.trace(sprintf("%s: descending into single idx:%d %T::%s",
-				fname, 0, child, cid))
-
-			err = r.revealSingle(0)
-
-			r.error(sprintf("%s: %T::%s %v",
-				fname, child, cid, err))
-
-			updated = child
 		default:
 			// begin new top-level reveal of inner
 			// as a whole, scanning all +2 slices
@@ -2414,7 +2383,7 @@ func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice a
 		// If we arrived here with more path elements left,
 		// it would appear the path was invalid, or ill-suited
 		// for this particular structure in the traversable
-		// sense. Return the last slice, but don't declare
+		// sense. Don't return the last slice, don't declare
 		// done or ok since it (probably) isn't what they
 		// wanted ...
 		slice = nil
@@ -3259,7 +3228,7 @@ func (r *stack) mkmsg(typ string) (m Message, ok bool) {
 error conditions that are fatal and always serious
 */
 func (r *stack) fatal(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
 	}
 }
@@ -3268,7 +3237,7 @@ func (r *stack) fatal(x any, data ...map[string]string) {
 error conditions that are not fatal but potentially serious
 */
 func (r *stack) error(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
 	}
 }
@@ -3277,7 +3246,7 @@ func (r *stack) error(x any, data ...map[string]string) {
 relatively deep operational details
 */
 func (r *stack) debug(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
 	}
 }
@@ -3286,7 +3255,7 @@ func (r *stack) debug(x any, data ...map[string]string) {
 extreme depth operational details
 */
 func (r *stack) trace(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
 	}
 }
@@ -3295,7 +3264,7 @@ func (r *stack) trace(x any, data ...map[string]string) {
 policy method operational details, as well as caps, r/o, etc.
 */
 func (r *stack) policy(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
 	}
 }
@@ -3305,7 +3274,7 @@ calls records in/out signatures and realtime meta-data regarding
 individual method runtimes.
 */
 func (r *stack) calls(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel1, `CALL`, data...)
 	}
 }
@@ -3315,7 +3284,7 @@ state records interrogations of, and changes to, the underlying
 configuration value.
 */
 func (r *stack) state(x any, data ...map[string]string) {
-	if r != nil {
+	if r != nil && x != nil {
 		r.eventDispatch(x, LogLevel3, `STATE`, data...)
 	}
 }

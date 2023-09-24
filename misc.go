@@ -209,16 +209,7 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 		return
 	}
 
-	a := typOf(u) // current (src) type
-	v := valOf(u) // current (src) value
-
-	// unwrap any pointers for
-	// maximum compatibility
-	if isPtr(u) {
-		a = a.Elem()
-		v = v.Elem()
-	}
-
+	a, v := derefPtr(u)
 	b := typOf(Condition{}) // target (dest) type
 	if a.ConvertibleTo(b) {
 		X := v.Convert(b).Interface()
@@ -229,6 +220,20 @@ func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
 				return
 			}
 		}
+	}
+
+	return
+}
+
+func derefPtr(u any) (t reflect.Type, v reflect.Value) {
+	t = typOf(u) // current (src) type
+	v = valOf(u) // current (src) value
+
+	// unwrap any pointers for
+	// maximum compatibility
+	if isPtr(u) {
+		t = t.Elem()
+		v = v.Elem()
 	}
 
 	return
@@ -310,19 +315,18 @@ func padValue(do bool, value string) string {
 foldValue will apply lc (Strings.ToLower) and uc (Strings.ToUpper)
 to the value based on the "do" disposition (do, or do not).
 */
-func foldValue(do bool, value string) string {
-	if len(value) == 0 {
-		return value // ???
-	}
-
-	if do {
-		if iuc(rune(value[0])) {
-			return lc(value) // fold to lower
+func foldValue(do bool, value string) (s string) {
+	s = value
+	if len(value) > 0 {
+		if do {
+			s = uc(value) // default to upper
+			if iuc(rune(value[0])) {
+				s = lc(value) // fold to lower
+			}
 		}
-		return uc(value) // fold to upper
 	}
 
-	return value // do not.
+	return
 }
 
 func isPtr(x any) (is bool) {

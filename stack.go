@@ -3333,6 +3333,15 @@ func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[st
 		return
 	}
 
+	printers := map[string]func(...any){
+		`FATAL`:  r.logger().Fatalln,
+		`STATE`:  r.logger().Println,
+		`CALL`:   r.logger().Println,
+		`DEBUG`:  r.logger().Println,
+		`TRACE`:  r.logger().Println,
+		`POLICY`: r.logger().Println,
+	}
+
 	if m, ok := r.mkmsg(severity); ok {
 		if ok = m.setText(x); ok {
 			if len(data) > 0 {
@@ -3340,12 +3349,7 @@ func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[st
 					m.Data = data[0]
 				}
 			}
-
-			if eq(severity, `fatal`) {
-				r.logger().Fatalln(m)
-			}
-
-			r.logger().Println(m)
+			printers[severity](m)
 		}
 	}
 }

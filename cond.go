@@ -126,7 +126,9 @@ func (r *condition) setKeyword(kw any) {
 	case string:
 		r.kw = tv
 	default:
-		r.kw = assertKeyword(tv)
+		if meth := getStringer(tv); meth != nil {
+			r.kw = meth()
+		}
 	}
 }
 
@@ -277,25 +279,6 @@ func (r Condition) Logger() (l *log.Logger) {
 	if r.IsInit() {
 		l = r.condition.logger()
 	}
-	return
-}
-
-/*
-assertKeyword returns a valid keyword string value based on the input value.
-If the value is a string, it is returned as-is. Else, if a custom type that
-possesses its own stringer method, the returned value from that method is
-returned.
-*/
-func assertKeyword(x any) (s string) {
-	switch tv := x.(type) {
-	case string:
-		s = tv
-	default:
-		if meth := getStringer(x); meth != nil {
-			s = meth()
-		}
-	}
-
 	return
 }
 
@@ -1084,6 +1067,15 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 		return
 	}
 
+	printers := map[string]func(...any){
+		`FATAL`:  r.logger().Fatalln,
+		`STATE`:  r.logger().Println,
+		`CALL`:   r.logger().Println,
+		`DEBUG`:  r.logger().Println,
+		`TRACE`:  r.logger().Println,
+		`POLICY`: r.logger().Println,
+	}
+
 	if m, ok := r.mkmsg(severity); ok {
 		if ok = m.setText(x); ok {
 			if len(data) > 0 {
@@ -1091,12 +1083,7 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 					m.Data = data[0]
 				}
 			}
-
-			if eq(severity, `fatal`) {
-				r.logger().Fatalln(m)
-			}
-
-			r.logger().Println(m)
+			printers[severity](m)
 		}
 	}
 }

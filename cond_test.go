@@ -582,6 +582,7 @@ func TestCondition_codecov(t *testing.T) {
 	c.Expression()
 	c.Operator()
 	c.Keyword()
+	c.Valid()
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -610,16 +611,22 @@ func TestCondition_codecov(t *testing.T) {
 	}
 
 	c.Init()
+	c.Paren()
+	c.Paren(true)
+	c.Paren(false)
 	c.SetKeyword(`valid_keyword`)
 	c.Valid()
 	c.SetOperator(Ne)
 	c.Valid()
 	c.SetExpression(rune(1438))
+	c.SetOperator(ComparisonOperator(77))
 	c.Valid()
 	c.debug(``)
 	c.debug(nil)
 	c.error(``)
 	c.error(nil)
+	c.policy(``)
+	c.policy(nil)
 	c.trace(``)
 	c.trace(nil)
 	c.state(``)
@@ -631,4 +638,8 @@ func TestCondition_codecov(t *testing.T) {
 	SetDefaultConditionLogLevel(0)
 	SetDefaultConditionLogLevel(nil)
 	SetDefaultConditionLogLevel('a')
+
+	c.calls("this is a message", map[string]string{
+		`content`: `hello`,
+	})
 }

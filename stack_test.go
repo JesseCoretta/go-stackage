@@ -1195,10 +1195,15 @@ func TestStack_codecov(t *testing.T) {
 	}
 
 	s = List()
+	s.Paren()
+	s.Paren(true)
+	s.Paren(false)
 	s.debug(``)
 	s.debug(nil)
 	s.error(``)
 	s.error(nil)
+	s.policy(``)
+	s.policy(nil)
 	s.trace(``)
 	s.trace(nil)
 	s.state(``)

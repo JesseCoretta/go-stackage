@@ -121,6 +121,7 @@ logSystem struct type, et al.
 func (r *logLevels) shift(l ...any) *logLevels {
 	for i := 0; i < len(l); i++ {
 		var ll LogLevel // current iteration's resolved loglevel stored here
+		var ok bool
 
 		// Perform type-switch upon the
 		// currently iterated 'any' (#i)
@@ -130,36 +131,33 @@ func (r *logLevels) shift(l ...any) *logLevels {
 			// value could be a loglevel NAME. Try to
 			// resolve it, and pay no regard to case
 			// folding.
-			var found bool
-			if ll, found = logLevelMap[uc(tv)]; !found {
-				continue
-			}
+			ll, ok = logLevelMap[uc(tv)]
 
 		case LogLevel:
 			// value is a LogLevel instance. Just take
 			// it at face value.
 			ll = tv
+			ok = true
 		case int:
 			ll = LogLevel(tv)
-		default:
-			// no other types make sense for support,
-			// so skip to the next iteration.
-			continue
+			ok = true
 		}
 
 		if logLevels(ll) == logLevels(0) {
 			*r = logLevels(NoLogLevels)
-			return r
+			break
 		} else if logLevels(ll) == ^logLevels(0) {
 			*r = logLevels(AllLogLevels)
-			return r
+			break
 		}
 
 		// Loglevel is neither "all" nor "none",
 		// meaning is a singular, discrete log
 		// verbosity specifier; shift it into
 		// current value, don't clobber.
-		*r |= logLevels(ll)
+		if ok {
+			*r |= logLevels(ll)
+		}
 	}
 
 	return r
@@ -186,33 +184,34 @@ func (r *logSystem) unshift(l ...any) *logSystem {
 func (r *logLevels) unshift(l ...any) *logLevels {
 	for i := 0; i < len(l); i++ {
 		var ll LogLevel
+		var ok bool
+
 		switch tv := l[i].(type) {
 		case string:
 			// value could be a loglevel NAME. Try to
 			// resolve it, and pay no regard to case
 			// folding.
-			var found bool
-			if ll, found = logLevelMap[uc(tv)]; !found {
-				continue
-			}
+			ll, ok = logLevelMap[uc(tv)]
 
 		case LogLevel:
 			// value is a LogLevel instance. Just take
 			// it at face value.
 			ll = tv
-		default:
-			// no other types make sense for support,
-			// so skip to the next iteration.
-			continue
+			ok = true
+		case int:
+			ll = LogLevel(tv)
+			ok = true
 		}
 
 		if logLevels(ll) == logLevels(0) {
 			continue
 		} else if logLevels(ll) == ^logLevels(0) {
-			return r
+			break
 		}
 
-		*r = (*r &^ logLevels(ll))
+		if ok {
+			*r = (*r &^ logLevels(ll))
+		}
 	}
 	return r
 }
@@ -229,43 +228,42 @@ func (r logSystem) positive(l any) (posi bool) {
 	return
 }
 
-func (r logLevels) positive(l any) bool {
+func (r logLevels) positive(l any) (posi bool) {
 	if r == logLevels(0) {
-		return false
+		return
 	} else if r == ^logLevels(0) {
-		return true
+		posi = true
+		return
 	}
 
 	var ll LogLevel
+	var ok bool
 	switch tv := l.(type) {
 	case string:
 		// value could be a loglevel NAME. Try to
 		// resolve it, and pay no regard to case
 		// folding.
-		var found bool
-		if ll, found = logLevelMap[uc(tv)]; !found {
-			return false
-		}
+		ll, ok = logLevelMap[uc(tv)]
 
 	case LogLevel:
 		// value is a LogLevel instance. Just take
 		// it at face value.
 		ll = tv
-	default:
-		return false
+		ok = true
 	}
 
-	result := (r & logLevels(ll)) != 0
+	if ok {
+		posi = (r & logLevels(ll)) != 0
+	}
 
-	return result
+	return
 }
 
-func (r *logSystem) isZero() bool {
-	if r == nil {
-		return true
+func (r *logSystem) isZero() (is bool) {
+	if r != nil {
+		is = r.log == nil && r.lvl == logLevels(NoLogLevels)
 	}
-
-	return r.log == nil && r.lvl == logLevels(NoLogLevels)
+	return
 }
 
 func (r logSystem) logger() (l *log.Logger) {

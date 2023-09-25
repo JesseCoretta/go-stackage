@@ -239,12 +239,6 @@ func (r logLevels) positive(l any) (posi bool) {
 	var ll LogLevel
 	var ok bool
 	switch tv := l.(type) {
-	case string:
-		// value could be a loglevel NAME. Try to
-		// resolve it, and pay no regard to case
-		// folding.
-		ll, ok = logLevelMap[uc(tv)]
-
 	case LogLevel:
 		// value is a LogLevel instance. Just take
 		// it at face value.

@@ -676,6 +676,9 @@ func TestCondition_codecov(t *testing.T) {
 		`FATAL`: `false`,
 	})
 
+	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
+	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
+
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)
 	SetDefaultConditionLogLevel(nil)
@@ -690,4 +693,20 @@ func TestCondition_codecov(t *testing.T) {
 	if Cx, ok := conditionTypeAliasConverter(customCondition(cx)); !ok {
 		t.Errorf("%s failed: %T->%T conversion failure", t.Name(), cx, Cx)
 	}
+}
+
+func TestMessage_PPol(t *testing.T) {
+	ppol := func(...any) string {
+		return `string_output`
+	}
+
+	var m Message = Message{
+		Type: `S`,
+		ID:   `identifier`,
+		Time: `20230927011732`,
+		Tag:  `tag`,
+		PPol: ppol,
+	}
+	fmt.Printf("%s", m)
+	// Output: string_output
 }

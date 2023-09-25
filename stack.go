@@ -592,14 +592,6 @@ func (r *stack) transfer(dest *stack) (ok bool) {
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 
-	if r.ulen() == 0 || dest == nil {
-		// nothing to xfer
-		err := errorf("%s: failed; %T nothing to transfer, or destination %T is not initialized",
-			fname, Stack{}, Stack{})
-		r.trace(err)
-		return
-	}
-
 	// if a capacity was set, make sure
 	// the destination can handle it...
 	if dest.cap() > 0 {
@@ -2111,7 +2103,11 @@ Reveal processes the receiver instance and disenvelops needlessly
 enveloped Stack slices.
 */
 func (r Stack) Reveal() Stack {
-	_ = r.stack.reveal()
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			_ = r.stack.reveal()
+		}
+	}
 	return r
 }
 
@@ -2119,41 +2115,34 @@ func (r Stack) Reveal() Stack {
 reveal is a private method called by Stack.Reveal.
 */
 func (r *stack) reveal() (err error) {
-	if r.isInit() {
-		fname := fmname()
-		r.calls(sprintf("%s: in:niladic", fname))
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
 
-		if !r.positive(ronly) {
-			r.lock()
-			defer r.unlock()
+	r.lock()
+	defer r.unlock()
 
-			// scan each slice (except the config
-			// slice) and analyze its structure.
-			for i := 0; i < r.len(); i++ {
-				sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
-				r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
-				if sl == nil {
-					continue
-				}
-
-				// If the element is a stack, begin descent
-				// through recursion.
-				if outer, ook := stackTypeAliasConverter(sl); ook {
-					id := getLogID(outer.getID())
-					r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
-					if err = r.revealDescend(outer, i); err == nil {
-						continue
-					}
-					r.setErr(err)
-					r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
-					break
-				}
-			}
+	// scan each slice (except the config
+	// slice) and analyze its structure.
+	for i := 0; i < r.len(); i++ {
+		sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
+		r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
+		if sl == nil {
+			continue
 		}
 
-		r.calls(sprintf("%s: out:%T(nil:%t)",
-			fname, err, err == nil))
-
+		// If the element is a stack, begin descent
+		// through recursion.
+		if outer, ook := stackTypeAliasConverter(sl); ook && outer.Len() > 0 {
+			id := getLogID(outer.getID())
+			r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
+			if err = r.revealDescend(outer, i); err == nil {
+				continue
+			}
+			r.setErr(err)
+			r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
+			break
+		}
+		r.calls(sprintf("%s: out:%T(nil:%t)", fname, err, err == nil))
 	}
 
 	return
@@ -2188,10 +2177,6 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 	// TODO: Still mulling the best way to handle NOTs.
 	if inner.stackType() != not {
 		switch inner.Len() {
-		case 0:
-			r.trace(sprintf("%s: remove zero-length %T at idx:%d",
-				fname, inner, idx))
-			r.remove(idx) // empty stack? remove it from outer (self)
 		case 1:
 			// descend into inner slice #0
 			child, _, _ := inner.index(0)
@@ -2458,43 +2443,26 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 
 	if L := r.ulen(); L > 0 {
 		if i < 0 {
-			if !r.positive(negidx) {
-				r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (neg. indices unavailable)",
-					fname, slice, slice == nil, idx, idx, ok, ok))
-				return
+			if r.positive(negidx) {
+				i = factorNegIndex(i, L)
+				ok = true
 			}
-			// We're negative, so let's increase
-			// 'idx' to a positive number that
-			// reflects the intended slice index
-			// value.
-			i = factorNegIndex(i, L)
 		} else if i > L-1 {
-			if !r.positive(fwdidx) {
-				r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (fwd. indices unavailable)",
-					fname, slice, slice == nil, idx, idx, ok, ok))
-				return
+			if r.positive(fwdidx) {
+				i = L
+				ok = true
 			}
-			// If the user input an index
-			// that was always greater than
-			// the length of the stack, then
-			// return the value for -1 (last
-			// slice value).
-			i = L
 		} else {
-			// The index was neither greater
-			// than the length of the stack,
-			// nor was it a negative index.
-			// so just increment by one (1)
-			// to account for *nodeConfig
-			// offset index.
 			i++
+			ok = true
 		}
 
-		// We're about to find out whether
-		// or not the index is really valid
-		slice = r[i]
-		idx = i
-		ok = slice != nil
+		// We're about to find out whether the index valid
+		if ok {
+			slice = r[i]
+			idx = i
+			ok = slice != nil
+		}
 	}
 
 	r.debug(sprintf("%s: %T:%d:%s; found %T [nil:%t]", fname, r, i, id, slice, !ok))
@@ -2514,22 +2482,10 @@ func factorNegIndex(i, l int) int {
 	// reflects the intended slice index
 	// value.
 	if i += (l * 2); i == 0 {
-		// if i was increased and
-		// landed on zero (0), add
-		// one so we don't expose
-		// the *nodeConfig slice.
 		i++
 	} else if i > l-1 {
-		// if the index is higher than
-		// the length of the stack, we
-		// will reduce as needed.
 		i = (i - l) + 1
 	} else {
-		// The index was neither zero (0)
-		// nor a number higher than the
-		// length of the stack, so just
-		// increment by one (1) to account
-		// for the *nodeConfig offset.
 		i++
 	}
 
@@ -2795,7 +2751,6 @@ func calculateDefragMax(max ...int) (m int) {
 func (r *stack) defrag(max int) {
 
 	fname := fmname()
-	id := getLogID(r.getID())
 	r.calls(sprintf("%s: in: %T(%d)",
 		fname, max, max))
 
@@ -2812,24 +2767,17 @@ func (r *stack) defrag(max int) {
 		spat[i] = 1
 	}
 
-	if start == -1 || max <= start {
-		r.debug(sprintf("%s: %T::%s; no fragmented data, or max:%d<start:%d", fname, r, id, max, start))
-		return
-	}
-
-	if r.positive(ronly) {
-		return
-	}
-
-	tpat := r.implode(start, max, spat)
-	last, err := r.verifyImplode(spat, tpat)
-	if err != nil {
-		r.setErr(err)
-	} else if last >= 0 {
-		// chop off the remaining consecutive nil slices
-		r.trace(sprintf("%s: truncating %d/%d slices",
-			fname, len((*r)[:last+1]), len(*r)))
-		(*r) = (*r)[:last+1]
+	if !(start == -1 || max <= start) {
+		tpat := r.implode(start, max, spat)
+		last, err := r.verifyImplode(spat, tpat)
+		if err != nil {
+			r.setErr(err)
+		} else if last >= 0 {
+			// chop off the remaining consecutive nil slices
+			r.trace(sprintf("%s: truncating %d/%d slices",
+				fname, len((*r)[:last+1]), len(*r)))
+			(*r) = (*r)[:last+1]
+		}
 	}
 
 	r.calls(sprintf("%s: out:void", fname))

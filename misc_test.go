@@ -54,3 +54,12 @@ func TestStrInSlice(t *testing.T) {
 		}
 	}
 }
+
+func TestDeref(t *testing.T) {
+	c := Cond(`this`, Eq, `that`)
+	ptr := &c
+	if T, V := derefPtr(ptr); V.IsZero() || T.Kind() == 0x0 {
+		t.Errorf("%s failed; pointer deref unsuccessful", t.Name())
+		return
+	}
+}

@@ -427,7 +427,7 @@ func floatStringer(x any) (s string) {
 
 func complexStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case complex64,complex128:
+	case complex64, complex128:
 		s = sprintf("%v", tv)
 	}
 
@@ -436,7 +436,7 @@ func complexStringer(x any) (s string) {
 
 func uintStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case uint,uint8,uint16,uint32,uint64,uintptr:
+	case uint, uint8, uint16, uint32, uint64, uintptr:
 		s = sprintf("%d", tv)
 	}
 
@@ -445,7 +445,7 @@ func uintStringer(x any) (s string) {
 
 func intStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case int,int8,int16,int32,int64:
+	case int, int8, int16, int32, int64:
 		s = sprintf("%d", tv)
 	}
 

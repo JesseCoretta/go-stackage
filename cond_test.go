@@ -577,7 +577,7 @@ demonstrate the type was cast successfully.
 */
 func ExampleCondition_typeAlias() {
 	type customCondition Condition
-	var c Condition = Cond(`keyword`,Ne,`Value`)
+	var c Condition = Cond(`keyword`, Ne, `Value`)
 	fmt.Printf("%s (%T)",
 		Condition(customCondition(c)),
 		customCondition(c),
@@ -676,8 +676,8 @@ func TestCondition_codecov(t *testing.T) {
 		`content`: `hello`,
 	})
 
-        type customCondition Condition
-        var cx Condition = Cond(`keyword`,Ne,`Value`)
+	type customCondition Condition
+	var cx Condition = Cond(`keyword`, Ne, `Value`)
 	if Cx, ok := conditionTypeAliasConverter(customCondition(cx)); !ok {
 		t.Errorf("%s failed: %T->%T conversion failure", t.Name(), cx, Cx)
 	}

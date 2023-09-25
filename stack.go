@@ -839,53 +839,45 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v)", fname, idx, idx))
 
-	if r.positive(ronly) {
-		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
-		return
-	}
-
 	r.lock()
 	defer r.unlock()
 
-	slice, index, found := r.index(idx)
-	if !found {
-		r.debug(sprintf("%s: idx:%d not found", fname, idx))
-		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
-		return
-	}
+	var found bool
+	var index int
+	if slice, index, found = r.index(idx); found {
+		// note the len before we start
+		var u1 int = r.ulen()
+		var contents []any
+		var preserved int
 
-	// note the len before we start
-	var u1 int = r.ulen()
-	var contents []any
-	var preserved int
-
-	// Gather what we want to keep.
-	for i := 1; i < r.len(); i++ {
-		if index != i {
-			r.trace(sprintf("%s: preserving idx:%d (%T)", fname, idx, (*r)[i]))
-			preserved++
-			contents = append(contents, (*r)[i])
+		// Gather what we want to keep.
+		for i := 1; i < r.len(); i++ {
+			if index != i {
+				r.trace(sprintf("%s: preserving idx:%d (%T)", fname, idx, (*r)[i]))
+				preserved++
+				contents = append(contents, (*r)[i])
+			}
 		}
+
+		// zero out everything except the config slice
+		cfg, _ := r.config()
+		r.trace(sprintf("%s: ALLOC", fname))
+
+		var R stack = make(stack, 0)
+		R = append(R, cfg)
+
+		r.debug(sprintf("%s: adding %d preserved elements", fname, preserved))
+		R = append(R, contents...)
+		r.debug(sprintf("%s: updating PTR contents [%s]", fname, ptrString(r)))
+
+		*r = R
+
+		// make sure we succeeded both in non-nilness
+		// and in the expected integer length change.
+		ok = slice != nil && u1-1 == r.ulen()
+		r.debug(sprintf("%s: updated: %t", fname, ok))
+		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
 	}
-
-	// zero out everything except the config slice
-	cfg, _ := r.config()
-	r.trace(sprintf("%s: ALLOC", fname))
-
-	var R stack = make(stack, 0)
-	R = append(R, cfg)
-
-	r.debug(sprintf("%s: adding %d preserved elements", fname, preserved))
-	R = append(R, contents...)
-	r.debug(sprintf("%s: updating PTR contents [%s]", fname, ptrString(r)))
-
-	*r = R
-
-	// make sure we succeeded both in non-nilness
-	// and in the expected integer length change.
-	ok = slice != nil && u1-1 == r.ulen()
-	r.debug(sprintf("%s: updated: %t", fname, ok))
-	r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
 
 	return
 }
@@ -2014,15 +2006,16 @@ func (r stack) assembleStringStack(str []string, ot string, oc stackType) string
 			// char (e.g.: '&&', '||', 'AND',
 			// et al).
 			var tjn string
-			char := string(rune(32)) // by default, use WHSP padding for symbol ops
+			var char string
 			if len(r.getSymbol()) > 0 {
-				if r.positive(nspad) {
-					char = `` // ... unless user turns it off
+				if !r.positive(nspad) {
+					char = string(rune(32))
 				}
 
 				sympad := padValue(!r.positive(nspad), char)
 				tjn = join(str, sprintf("%s%s%s", sympad, ot, sympad))
 			} else {
+				char = string(rune(32)) // by default, use WHSP padding for symbol ops
 				sympad := padValue(true, char)
 				tjn = join(str, sprintf("%s%s%s", sympad, ot, sympad))
 			}
@@ -2102,7 +2095,6 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 				if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); !done {
 					continue
 				}
-				break
 			}
 			break
 		}
@@ -2279,36 +2271,30 @@ func (r *stack) revealSingle(idx int) (err error) {
 		fname, idx, idx))
 
 	// get slice @ idx, bail if nil ...
-	slice, _, _ := r.index(idx)
-	if slice == nil {
-		r.calls(sprintf("%s: out:%T(nil:%t) (nil slice)",
-			fname, err, err == nil))
-		return
-	}
-
-	// If a condition ...
-	if c, okc := conditionTypeAliasConverter(slice); okc {
-		r.trace(sprintf("%s slice conversion to %T:ok", fname, c))
-		// ... If condition expression is a stack ...
-		if inner, iok := stackTypeAliasConverter(c.Expression()); iok {
-			r.trace(sprintf("%s: slice assertion to %T:ok", fname, inner))
-			// ... recurse into said stack expression
-			if err = inner.reveal(); err == nil {
-				r.trace(sprintf("%s: set expression to %T(len:%d)",
-					fname, inner, inner.Len()))
-				// update the condition w/ new value
-				c.SetExpression(inner)
+	if slice, _, _ := r.index(idx); slice != nil {
+		// If a condition ...
+		if c, okc := conditionTypeAliasConverter(slice); okc {
+			r.trace(sprintf("%s slice conversion to %T:ok", fname, c))
+			// ... If condition expression is a stack ...
+			if inner, iok := stackTypeAliasConverter(c.Expression()); iok {
+				r.trace(sprintf("%s: slice assertion to %T:ok", fname, inner))
+				// ... recurse into said stack expression
+				if err = inner.reveal(); err == nil {
+					r.trace(sprintf("%s: set expression to %T(len:%d)",
+						fname, inner, inner.Len()))
+					// update the condition w/ new value
+					c.SetExpression(inner)
+				}
 			}
+		} else if inner, iok := stackTypeAliasConverter(slice); iok {
+			r.trace(sprintf("%s slice conversion to %T:ok", fname, inner))
+			// If a stack then recurse
+			err = inner.reveal()
 		}
 
-	} else if inner, iok := stackTypeAliasConverter(slice); iok {
-		r.trace(sprintf("%s slice conversion to %T:ok", fname, inner))
-		// If a stack then recurse
-		err = inner.reveal()
+		r.calls(sprintf("%s: out:error(nil:%t)",
+			fname, err == nil))
 	}
-
-	r.calls(sprintf("%s: out:error(nil:%t)",
-		fname, err == nil))
 
 	return
 }
@@ -2470,52 +2456,48 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 	var id string = getLogID(r.getID())
 	r.calls(sprintf("%s: in:%T(%d)", fname, i, i))
 
-	L := r.ulen()
-	if L == 0 {
-		r.debug(sprintf("%s: %T:%d:%s; no content", fname, r, i, id))
-		return
+	if L := r.ulen(); L > 0 {
+		if i < 0 {
+			if !r.positive(negidx) {
+				r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (neg. indices unavailable)",
+					fname, slice, slice == nil, idx, idx, ok, ok))
+				return
+			}
+			// We're negative, so let's increase
+			// 'idx' to a positive number that
+			// reflects the intended slice index
+			// value.
+			i = factorNegIndex(i, L)
+		} else if i > L-1 {
+			if !r.positive(fwdidx) {
+				r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (fwd. indices unavailable)",
+					fname, slice, slice == nil, idx, idx, ok, ok))
+				return
+			}
+			// If the user input an index
+			// that was always greater than
+			// the length of the stack, then
+			// return the value for -1 (last
+			// slice value).
+			i = L
+		} else {
+			// The index was neither greater
+			// than the length of the stack,
+			// nor was it a negative index.
+			// so just increment by one (1)
+			// to account for *nodeConfig
+			// offset index.
+			i++
+		}
+
+		// We're about to find out whether
+		// or not the index is really valid
+		slice = r[i]
+		idx = i
+		ok = slice != nil
 	}
 
-	if i < 0 {
-		if !r.positive(negidx) {
-			r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (neg. indices unavailable)",
-				fname, slice, slice == nil, idx, idx, ok, ok))
-			return
-		}
-		// We're negative, so let's increase
-		// 'idx' to a positive number that
-		// reflects the intended slice index
-		// value.
-		i = factorNegIndex(i, L)
-	} else if i > L-1 {
-		if !r.positive(fwdidx) {
-			r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t) (fwd. indices unavailable)",
-				fname, slice, slice == nil, idx, idx, ok, ok))
-			return
-		}
-		// If the user input an index
-		// that was always greater than
-		// the length of the stack, then
-		// return the value for -1 (last
-		// slice value).
-		i = L
-	} else {
-		// The index was neither greater
-		// than the length of the stack,
-		// nor was it a negative index.
-		// so just increment by one (1)
-		// to account for *nodeConfig
-		// offset index.
-		i++
-	}
-
-	// We're about to find out whether
-	// or not the index is really valid
-	slice = r[i]
-	idx = i
-	ok = slice != nil
 	r.debug(sprintf("%s: %T:%d:%s; found %T [nil:%t]", fname, r, i, id, slice, !ok))
-
 	r.calls(sprintf("%s: out:%T(nil:%t),%T(%d),%T(done:%t)",
 		fname, slice, slice == nil, idx, idx, ok, ok))
 
@@ -2576,11 +2558,11 @@ func (r stack) paren(v string) string {
 encapv may (or may not) apply character encapsulation to the
 input/return value, depending on the underlying receiver cfg.
 */
-func (r stack) encapv(v string) string {
-	if r.stackType() == basic {
-		return v
+func (r stack) encapv(v string) (e string) {
+	if r.stackType() != basic {
+		e = encapValue(r.getEncap(), v)
 	}
-	return encapValue(r.getEncap(), v)
+	return
 }
 
 /*
@@ -2619,7 +2601,9 @@ alongside a nil slice value.
 */
 func (r Stack) Pop() (popped any, ok bool) {
 	if r.IsInit() {
-		popped, ok = r.stack.pop()
+		if !r.getState(ronly) {
+			popped, ok = r.stack.pop()
+		}
 	}
 	return
 }
@@ -2636,10 +2620,6 @@ func (r *stack) pop() (slice any, ok bool) {
 	if r.ulen() < 1 {
 		ok = true
 		r.debug(sprintf("%s: %T:%s; nothing poppable", fname, r, id))
-		return
-	}
-
-	if r.positive(ronly) {
 		return
 	}
 
@@ -2759,29 +2739,29 @@ also change accordingly.
 */
 func (r Stack) Defrag(max ...int) Stack {
 	if r.IsInit() {
-		// to break defrag loop.
-		m := calculateDefragMax(max...)
+		if !r.getState(ronly) {
+			// to break defrag loop.
+			m := calculateDefragMax(max...)
 
-		r.stack.defrag(m) // defrag the stack itself
+			r.stack.defrag(m) // defrag the stack itself
 
-		// If the receiver instance is judged as nesting, we'll
-		// recurse through stack, and defrag any other suitable
-		// candidates for the operation. Targets are any Stack
-		// or Condition instances, OR their aliased equivalents.
-		if r.IsNesting() {
-			for i := 0; i < r.Len(); i++ {
-				slice, _ := r.Index(i)
-
-				if sub, ok := stackTypeAliasConverter(slice); ok {
-					// Instance is Stack/Stack alias
-					sub.Defrag(m)
-
-				} else if cub, ok := conditionTypeAliasConverter(slice); ok {
-					// Instance is Condition/Condition alias
-					if cub.IsNesting() {
-						if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
-							// Condition expression contains a Stack/Stack alias
-							sub.Defrag(m)
+			// If the receiver instance is judged as nesting, we'll
+			// recurse through stack, and defrag any other suitable
+			// candidates for the operation. Targets are any Stack
+			// or Condition instances, OR their aliased equivalents.
+			if r.IsNesting() {
+				for i := 0; i < r.Len(); i++ {
+					slice, _ := r.Index(i)
+					if sub, ok := stackTypeAliasConverter(slice); ok {
+						// Instance is Stack/Stack alias
+						sub.Defrag(m)
+					} else if cub, ok := conditionTypeAliasConverter(slice); ok {
+						// Instance is Condition/Condition alias
+						if cub.IsNesting() {
+							if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
+								// Condition expression contains a Stack/Stack alias
+								sub.Defrag(m)
+							}
 						}
 					}
 				}
@@ -2869,8 +2849,9 @@ func (r stack) verifyImplode(spat, tpat []int) (last int, err error) {
 	for i := 1; i < len(spat); i++ {
 		key := sprintf("S[%d]", i-1)
 		result := spat[i] == tpat[i]
-		if !result {
-			fail = true
+		fail = true
+		if result {
+			fail = false
 		}
 		if tpat[i] != 0 {
 			last = (len(data) + i) - len(tpat)
@@ -2940,11 +2921,10 @@ func (r *stack) implode(start, max int, spat []int) (tpat []int) {
 }
 
 func (r *stack) canPushNester(x any) (can bool) {
-	if !r.positive(nnest) {
-		return true
-	}
-
 	_, can = stackTypeAliasConverter(x)
+	if !r.positive(nnest) {
+		can = true
+	}
 	return
 }
 
@@ -2957,33 +2937,22 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 
 	// use the user-provided function to scan
 	// each pushed item for verification.
-	capacity := r.cap()
 	var pct int
 	for i := 0; i < len(x); i++ {
 		var err error
-		if r.capReached() {
-			// if capacity has been reached,
-			// break out of loop.
-			err = errorf("%s failed: capacity violation (%d/%d slices added)",
-				fname, pct, len(x))
-			r.setErr(err)
+		if !r.capReached() {
+			if err = meth(x[i]); err != nil {
+				r.setErr(err)
+				r.policy(sprintf("%s: appending %T:%d:%s instance failed per %T: %v",
+					fname, x[i], i, id, meth, err))
+				break
+			}
 
-			r.policy(sprintf("%s: +X= %T:%d:%s capacity violation (total:%d > cap:%d)",
-				fname, x[i], i, id, r.len()+len(x), capacity))
-			break
+			r.policy(sprintf("%s: appending %T instance (idx:%d) per %T",
+				fname, x[i], i, meth))
+			*r = append(*r, x[i])
+			pct++
 		}
-
-		if err = meth(x[i]); err != nil {
-			r.setErr(err)
-			r.policy(sprintf("%s: appending %T instance (idx:%d) failed per %T: %v",
-				fname, x[i], i, meth, err))
-			break
-		}
-
-		r.policy(sprintf("%s: appending %T instance (idx:%d) per %T",
-			fname, x[i], i, meth))
-		*r = append(*r, x[i])
-		pct++
 	}
 
 	return r
@@ -3024,25 +2993,13 @@ func (r *stack) genericAppend(x ...any) {
 
 	for i := 0; i < len(x); i++ {
 		r.trace(sprintf("%s: += %T (%d)", fname, x[i], i))
-
-		var err error
-		if !r.canPushNester(x[i]) {
-			err = errorf("%s: failed; nesting violation (%d/%d slices added)",
-				fname, pct, len(x))
-			r.policy(err)
-			continue
+		if r.canPushNester(x[i]) {
+			if !r.capReached() {
+				r.trace(sprintf("%s: += %T (%d); ok:true", fname, x[i], i))
+				*r = append(*r, x[i])
+				pct++
+			}
 		}
-
-		if r.capReached() {
-			err = errorf("%s: failed; capacity violation (%d/%d slices added)",
-				fname, pct, len(x))
-			r.policy(err)
-			break
-		}
-
-		r.trace(sprintf("%s: += %T (%d); ok:true", fname, x[i], i))
-		*r = append(*r, x[i])
-		pct++
 	}
 
 	r.debug(sprintf("%s: complete: %d/%d slices added", fname, pct, len(x)))

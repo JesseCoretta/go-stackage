@@ -319,6 +319,8 @@ func TestStack_And001(t *testing.T) {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 		return
 	}
+
+	_, _ = got.Traverse(0, 2, 6, 19)
 }
 
 func TestStack_Insert(t *testing.T) {

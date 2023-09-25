@@ -222,10 +222,7 @@ func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
 setAuxiliary is a private method called by Stack.SetAuxiliary.
 */
 func (r *stack) setAuxiliary(aux ...Auxiliary) {
-	cfg, err := r.config()
-	if err != nil {
-		return
-	}
+	cfg, _ := r.config()
 
 	fname := fmname()
 	r.calls(sprintf("%s: in: variadic %T(len:%d)",
@@ -450,33 +447,24 @@ func (r Stack) Valid() (err error) {
 valid is a private method called by Stack.Valid.
 */
 func (r *stack) valid() (err error) {
-	if !r.isInit() {
-		err = errorf("stack instance is not initialized")
-		return
-	}
+	err = errorf("stack instance is not initialized")
+	if r.isInit() {
+		fname := fmname()
+		r.calls(sprintf("%s: in:niladic", fname))
 
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-
-	/*
-		if _, err = r.config(); err != nil {
-			r.error(err)
-			r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
-			return
+		// try to see if the user provided a
+		// validity function
+		stk := Stack{r}
+		err = nil
+		if meth := stk.getValidityPolicy(); meth != nil {
+			r.calls(sprintf("%s: executing validity_policy", fname))
+			if err = meth(r); err != nil {
+				r.policy(sprintf("%s: error: %v", fname, err))
+			}
 		}
-	*/
 
-	// try to see if the user provided a
-	// validity function
-	stk := Stack{r}
-	if meth := stk.getValidityPolicy(); meth != nil {
-		r.calls(sprintf("%s: executing validity_policy", fname))
-		if err = meth(r); err != nil {
-			r.policy(sprintf("%s: error: %v", fname, err))
-		}
+		r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
 	}
-
-	r.calls(sprintf("%s: out:error(nil:%t)", fname, err == nil))
 
 	return
 }
@@ -581,8 +569,11 @@ Transfer method, only the source will be emptied, and of the
 slices that have since been transferred instance shall remain
 in the destination instance.
 */
-func (r Stack) Transfer(dest Stack) bool {
-	return r.transfer(dest.stack)
+func (r Stack) Transfer(dest Stack) (ok bool) {
+	if r.Len() > 0 && dest.IsInit() {
+		ok = r.transfer(dest.stack)
+	}
+	return
 }
 
 /*
@@ -597,11 +588,7 @@ Capacity enforcement is honored. If the source (r) contains
 more slices than a non-zero destination capacity allows, the
 operation is canceled outright and false is returned.
 */
-func (r *stack) transfer(dest *stack) bool {
-	if !r.isInit() {
-		return false
-	}
-
+func (r *stack) transfer(dest *stack) (ok bool) {
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 
@@ -610,16 +597,7 @@ func (r *stack) transfer(dest *stack) bool {
 		err := errorf("%s: failed; %T nothing to transfer, or destination %T is not initialized",
 			fname, Stack{}, Stack{})
 		r.trace(err)
-		return false
-	}
-
-	if !r.isInit() {
-		// dest MUST be initialized in some way
-		// or this happens ...
-		err := errorf("%s: failed; %T not initialized",
-			fname, Stack{})
-		r.trace(err)
-		return false
+		return
 	}
 
 	// if a capacity was set, make sure
@@ -632,7 +610,7 @@ func (r *stack) transfer(dest *stack) bool {
 			err := errorf("%s failed: capacity violation (%d/%d slices added)",
 				fname, r.ulen(), dest.cap()-r.ulen())
 			r.policy(err)
-			return false
+			return
 		}
 	}
 
@@ -647,12 +625,12 @@ func (r *stack) transfer(dest *stack) bool {
 	}
 
 	// return result
-	result := dest.ulen() >= r.ulen()
+	ok = dest.ulen() >= r.ulen()
 	r.trace(sprintf("%s: %T::%s :: transfer result:%t",
-		fname, Stack{}, getLogID(r.getID()), result))
-	r.calls(sprintf("%s: out:%T(%v)", fname, result, result))
+		fname, Stack{}, getLogID(r.getID()), ok))
+	r.calls(sprintf("%s: out:%T(%v)", fname, ok, ok))
 
-	return result
+	return
 }
 
 /*
@@ -707,27 +685,22 @@ Use of the Insert method shall not result in fragmentation of the
 receiver instance, as any nil x value shall be discarded and not
 considered for insertion into the stack.
 */
-func (r Stack) Insert(x any, left int) bool {
-	return r.stack.insert(x, left)
+func (r Stack) Insert(x any, left int) (ok bool) {
+	if r.IsInit() && x != nil {
+		if !r.getState(ronly) {
+			ok = r.stack.insert(x, left)
+		}
+	}
+	return
 }
 
 /*
 insert is a private method called by Stack.Insert.
 */
 func (r *stack) insert(x any, left int) (ok bool) {
-	// bail out if receiver or
-	// input value is nil
-	if r == nil || x == nil {
-		return
-	}
-
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%t),%T(%v:%d)",
 		fname, x, x == nil, left, left, left))
-
-	if r.positive(ronly) {
-		return
-	}
 
 	// note the len before we start
 	var u1 int = r.ulen()
@@ -851,7 +824,9 @@ available.
 */
 func (r Stack) Remove(idx int) (slice any, ok bool) {
 	if r.IsInit() {
-		slice, ok = r.stack.remove(idx)
+		if !r.getState(ronly) {
+			slice, ok = r.stack.remove(idx)
+		}
 	}
 	return
 }
@@ -860,9 +835,6 @@ func (r Stack) Remove(idx int) (slice any, ok bool) {
 remove is a private method called by Stack.Remove.
 */
 func (r *stack) remove(idx int) (slice any, ok bool) {
-	if !r.isInit() {
-		return
-	}
 
 	fname := fmname()
 	r.calls(sprintf("%s: in:%T(%v)", fname, idx, idx))
@@ -879,9 +851,6 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 	if !found {
 		r.debug(sprintf("%s: idx:%d not found", fname, idx))
 		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)", fname, slice, slice == nil, ok, ok))
-		return
-	} else if index == 0 {
-		// I'm just paranoid
 		return
 	}
 
@@ -1193,11 +1162,7 @@ getEncap returns the current value encapsulation character pattern
 set within the receiver instance.
 */
 func (r *stack) getEncap() (encs [][]string) {
-	sc, err := r.config()
-	if err != nil {
-		return [][]string{}
-	}
-
+	sc, _ := r.config()
 	fname := fmname()
 	r.calls(sprintf("%s: in:niladic", fname))
 	encs = sc.enc
@@ -2112,38 +2077,35 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 	r.calls(sprintf("%s: in: variadic %T(%v;len:%d)",
 		fname, indices, indices, indices))
 
-	if err := r.valid(); err != nil {
-		r.error(sprintf("%s: %v", fname, err))
-		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
-			fname, slice, slice == nil, ok, ok))
-		return
-	} else if len(indices) == 0 {
-		r.error(sprintf("%s: non-traversable %T (NO_PATH)", fname, indices))
-		r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
-			fname, slice, slice == nil, ok, ok))
-		return
-	}
+	if err := r.valid(); err == nil {
+		if len(indices) == 0 {
+			r.error(sprintf("%s: non-traversable %T (NO_PATH)", fname, indices))
+			r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
+				fname, slice, slice == nil, ok, ok))
+			return
+		}
 
-	// begin "walking" path of int breadcrumbs ...
-	for i := 0; i < len(indices); i++ {
+		// begin "walking" path of int breadcrumbs ...
+		for i := 0; i < len(indices); i++ {
 
-		current := indices[i] // user-facing index number w/ offset
-		r.trace(sprintf("%s: iterate idx:%d %v", fname, current, indices))
+			current := indices[i] // user-facing index number w/ offset
+			r.trace(sprintf("%s: iterate idx:%d %v", fname, current, indices))
 
-		if instance, _, found := r.index(current); found {
-			id := getLogID(r.getID())
+			if instance, _, found := r.index(current); found {
+				id := getLogID(r.getID())
 
-			// Begin assertion of possible traversable and non-traversable
-			// values. We'll go as deep as possible, provided each nesting
-			// instance is a Stack/Stack alias, or Condition/Condition alias
-			// containing a Stack/Stack alias value.
-			r.trace(sprintf("%s: attempting descent into idx:%d of %T::%s", fname, current, instance, id))
-			if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); !done {
-				continue
+				// Begin assertion of possible traversable and non-traversable
+				// values. We'll go as deep as possible, provided each nesting
+				// instance is a Stack/Stack alias, or Condition/Condition alias
+				// containing a Stack/Stack alias value.
+				r.trace(sprintf("%s: attempting descent into idx:%d of %T::%s", fname, current, instance, id))
+				if slice, ok, done = r.traverseAssertionHandler(instance, i, indices...); !done {
+					continue
+				}
+				break
 			}
 			break
 		}
-		break
 	}
 
 	r.calls(sprintf("%s: out:%T(nil:%t),%T(%t)",
@@ -2192,8 +2154,6 @@ func (r *stack) reveal() (err error) {
 					}
 					r.setErr(err)
 					r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
-					r.calls(sprintf("%s: out:%T(nil:%t)",
-						fname, err, err == nil))
 					break
 				}
 			}

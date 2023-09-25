@@ -409,6 +409,33 @@ func TestStack_Transfer(t *testing.T) {
 	}
 }
 
+func TestStack_Traverse(t *testing.T) {
+
+	stk := Basic().Push(
+		1,
+		Basic().Push(2),
+		Cond(`keyword`, Eq, Basic().Push(3)),
+	)
+
+	slice, _ := stk.Traverse(0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(1, 0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 2", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(2, 0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 3", t.Name(), slice)
+		return
+	}
+}
+
 func TestStack_IsPadded(t *testing.T) {
 	stk := And().Paren().Fold().Push(
 		`testing1`,
@@ -1186,7 +1213,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 			),
 		),
 		nil,
-		nil,
+		Cond(`keyword`, Eq, Basic().Push(1, 2, nil, 3, nil, nil, 4)),
 		nil,
 		nil,
 		3.14159,
@@ -1212,7 +1239,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 
 	// verify no errors resulted from the attempt
 	// to defragment our stack
-	if err := l.Defrag().Err(); err != nil {
+	if err := l.Defrag(-1).Err(); err != nil {
 		t.Errorf("%s failed: %v", t.Name(), err)
 		return
 	}
@@ -1226,6 +1253,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 			t.Name(), offsetLen, afterLen)
 		return
 	}
+
 }
 
 func TestStack_codecov(t *testing.T) {
@@ -1245,6 +1273,7 @@ func TestStack_codecov(t *testing.T) {
 	s.IsZero()
 	s.IsInit()
 	s.Valid()
+	s.Pop()
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -1285,6 +1314,7 @@ func TestStack_codecov(t *testing.T) {
 	s.Logger()
 
 	s = List()
+	s.Pop()
 	s.config()
 	s.IsEncap()
 	s.ReadOnly()
@@ -1322,6 +1352,10 @@ func TestStack_codecov(t *testing.T) {
 	s.SetAuxiliary(nil)
 	s.SetLogger(nil)
 	s.Logger()
+
+	s.fatal(`test fatal`, map[string]string{
+		`FATAL`: `false`,
+	})
 
 	SetDefaultStackLogLevel(`none`)
 	SetDefaultStackLogLevel(0)

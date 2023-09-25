@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"testing"
 )
 
 /*
@@ -322,4 +323,18 @@ func ExampleCondition_SetEvaluator() {
 	radians, _ := c.Evaluate()
 	fmt.Printf("%.02f° x π/180° = %.02frad", degrees, radians.(float64))
 	// Output: 83.10° x π/180° = 1.45rad
+}
+
+func TestFCF_codecov(t *testing.T) {
+	stk := Basic().Push(
+		float32(1.1),
+		float32(1.2),
+		float32(1.3),
+	)
+	stk.SetPresentationPolicy(func(_ ...any) (_ string) {
+		return `doomed string`
+	})
+
+	fmt.Printf("%s", stk)
+	// Output:
 }

@@ -2382,13 +2382,10 @@ func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, don
 		if len(indices) <= 1 {
 			slice = u
 			ok = sOK
-			//, _, ok = s.index(indices[idx])
-			//ok = slice != nil
 			done = true
 			s.trace(sprintf("%s: found slice %T:%d:%s of %T at %v", fname, s, idx, id, u, indices))
 		} else {
-			// begin new Stack (tv/x) recursion beginning at
-			// the NEXT index ...
+			// begin new Stack (tv/x) recursion beginning at the NEXT index ...
 			s.trace(sprintf("%s: descending into %T:%d:%s of %T at %v", fname, s, indices[idx], id, u, indices[idx:]))
 			return s.stack.traverse(indices[1:]...)
 		}
@@ -2770,9 +2767,8 @@ func (r *stack) defrag(max int) {
 	if !(start == -1 || max <= start) {
 		tpat := r.implode(start, max, spat)
 		last, err := r.verifyImplode(spat, tpat)
-		if err != nil {
-			r.setErr(err)
-		} else if last >= 0 {
+		r.setErr(err)
+		if err == nil && last >= 0 {
 			// chop off the remaining consecutive nil slices
 			r.trace(sprintf("%s: truncating %d/%d slices",
 				fname, len((*r)[:last+1]), len(*r)))
@@ -2792,6 +2788,7 @@ func (r stack) verifyImplode(spat, tpat []int) (last int, err error) {
 	r.calls(sprintf("%s: in: %T,%T",
 		fname, spat, tpat))
 
+	err = errorf("defragmentation failed; inconsistent slice results")
 	data := make(map[string]string, len(tpat))
 	var fail bool
 	for i := 1; i < len(spat); i++ {
@@ -2808,11 +2805,9 @@ func (r stack) verifyImplode(spat, tpat []int) (last int, err error) {
 		data[key] = sprintf("match:%t", result)
 	}
 
-	if fail {
-		err = errorf("defragmentation failed; inconsistent slice results")
-		r.error(sprintf("%s: %T::%s result:%t: %v", fname, r, id, !fail, err), data)
-	} else {
+	if !fail {
 		r.debug(sprintf("%s: %T::%s result:%t", fname, r, id, !fail), data)
+		err = nil
 	}
 
 	last--
@@ -3169,6 +3164,7 @@ func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[st
 
 	printers := map[string]func(...any){
 		`FATAL`:  r.logger().Fatalln,
+		`ERROR`:  r.logger().Println,
 		`STATE`:  r.logger().Println,
 		`CALL`:   r.logger().Println,
 		`DEBUG`:  r.logger().Println,
@@ -3181,6 +3177,9 @@ func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[st
 			if len(data) > 0 {
 				if data[0] != nil {
 					m.Data = data[0]
+					if _, ok := data[0][`FATAL`]; ok {
+						severity = `ERROR`
+					}
 				}
 			}
 			printers[severity](m)

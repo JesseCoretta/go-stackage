@@ -527,12 +527,12 @@ of this type (thus implementing any syntax or format they wish, i.e.: XML,
 YAML, et al).
 */
 func (r Message) String() (data string) {
-	if r.Valid() {
-		if r.PPol != nil {
-			data = r.PPol()
-			return
-		}
+	if r.PPol != nil {
+		data = r.PPol()
+		return
+	}
 
+	if r.Valid() {
 		if b, err := json.Marshal(&r); err == nil {
 			var replacements [][]string = [][]string{
 				{`\\u`, `\u`},

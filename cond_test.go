@@ -676,8 +676,10 @@ func TestCondition_codecov(t *testing.T) {
 		`FATAL`: `false`,
 	})
 
+	c.SetLogLevel(LogLevel5)
 	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
 	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
+	c.UnsetLogLevel(LogLevel5)
 
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)
@@ -696,8 +698,9 @@ func TestCondition_codecov(t *testing.T) {
 }
 
 func TestMessage_PPol(t *testing.T) {
+	sout := `string_output`
 	ppol := func(...any) string {
-		return `string_output`
+		return sout
 	}
 
 	var m Message = Message{
@@ -707,6 +710,10 @@ func TestMessage_PPol(t *testing.T) {
 		Tag:  `tag`,
 		PPol: ppol,
 	}
-	fmt.Printf("%s", m)
-	// Output: string_output
+
+	if m.String() != sout {
+		t.Errorf("%s failed: want '%s', got '%s'",
+			t.Name(), sout, m)
+		return
+	}
 }

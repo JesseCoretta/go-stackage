@@ -362,8 +362,6 @@ input length (x).
 */
 func (r *nodeConfig) setStringSliceEncap(x []string) {
 	switch len(x) {
-	case 0:
-		return
 	case 1:
 		r.setStringSliceEncapOne(x)
 	default:
@@ -393,19 +391,10 @@ setStringSliceEncapOne is a private method called by setStringSliceEncap
 for the purpose of assigning a pair of characters for L and R encapsulation.
 */
 func (r *nodeConfig) setStringSliceEncapTwo(x []string) {
-	if len(x[0])|len(x[1]) == 0 {
-		return
-	}
-
 	var found bool
-	for i := 0; i < 2; i++ {
-		for u := 0; u < len(r.enc); u++ {
-			if found = strInSlice(x[i], r.enc[u]); found {
-				break
-			}
-		}
-		if found {
-			break
+	for i := 0; i < 2 && !found; i++ {
+		for u := 0; u < len(r.enc) && !found; u++ {
+			found = strInSlice(x[i], r.enc[u])
 		}
 	}
 

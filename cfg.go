@@ -508,16 +508,6 @@ func (r *stack) mutex() (*sync.Mutex, bool) {
 	return sc.mtx, sc.mtx != nil
 }
 
-func (r *nodeConfig) canWriteMessage() bool {
-	if err := r.valid(); err == nil {
-		if r.log == nil {
-			r.log = newLogSystem(devNull)
-		}
-	}
-
-	return r.log.log != devNull
-}
-
 func init() {
 	cfgFlagMap = map[cfgFlag]string{
 		parens: `parenthetical`,

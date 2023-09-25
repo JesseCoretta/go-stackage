@@ -418,9 +418,7 @@ func boolStringer(x any) string {
 
 func floatStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case float32:
-		s = sprintf("%f", tv)
-	case float64:
+	case float32, float64:
 		s = sprintf("%f", tv)
 	}
 
@@ -429,9 +427,7 @@ func floatStringer(x any) (s string) {
 
 func complexStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case complex64:
-		s = sprintf("%v", tv)
-	case complex128:
+	case complex64,complex128:
 		s = sprintf("%v", tv)
 	}
 
@@ -440,17 +436,7 @@ func complexStringer(x any) (s string) {
 
 func uintStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case uint:
-		s = sprintf("%d", tv)
-	case uint8:
-		s = sprintf("%d", tv)
-	case uint16:
-		s = sprintf("%d", tv)
-	case uint32:
-		s = sprintf("%d", tv)
-	case uint64:
-		s = sprintf("%d", tv)
-	case uintptr:
+	case uint,uint8,uint16,uint32,uint64,uintptr:
 		s = sprintf("%d", tv)
 	}
 
@@ -459,15 +445,7 @@ func uintStringer(x any) (s string) {
 
 func intStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case int:
-		s = sprintf("%d", tv)
-	case int8:
-		s = sprintf("%d", tv)
-	case int16:
-		s = sprintf("%d", tv)
-	case int32:
-		s = sprintf("%d", tv)
-	case int64:
+	case int,int8,int16,int32,int64:
 		s = sprintf("%d", tv)
 	}
 

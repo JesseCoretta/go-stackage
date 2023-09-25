@@ -563,6 +563,28 @@ func ExampleCondition_SetID_pointerAddress() {
 	// Output: Address ID has '0x' prefix: true
 }
 
+/*
+This example offers a naïve demonstration of a user-authored
+type alias for the Condition type.
+
+In a practical scenario, a user would likely want to write
+custom methods to perform new tasks and/or wrap any existing
+Condition methods desired in order to avoid the frequent need
+to cast a custom type to the native stackage.Condition type.
+
+As this is an example, we'll perform a simple cast merely to
+demonstrate the type was cast successfully.
+*/
+func ExampleCondition_typeAlias() {
+	type customCondition Condition
+	var c Condition = Cond(`keyword`,Ne,`Value`)
+	fmt.Printf("%s (%T)",
+		Condition(customCondition(c)),
+		customCondition(c),
+	)
+	// Output: keyword != Value (stackage.customCondition)
+}
+
 func TestCondition_codecov(t *testing.T) {
 	var c Condition
 	// panic checks
@@ -622,11 +644,11 @@ func TestCondition_codecov(t *testing.T) {
 	_ = c.String()
 	c.SetExpression(true)
 	_ = c.String()
-	c.SetExpression(3.6663)
+	c.SetExpression(float32(3.6663))
 	_ = c.String()
 	c.SetExpression(1438)
 	_ = c.String()
-	c.SetExpression(0x0a)
+	c.SetExpression(uint8(10))
 	_ = c.String()
 	c.SetExpression(`string`)
 	_ = c.String()
@@ -653,4 +675,10 @@ func TestCondition_codecov(t *testing.T) {
 	c.calls("this is a message", map[string]string{
 		`content`: `hello`,
 	})
+
+        type customCondition Condition
+        var cx Condition = Cond(`keyword`,Ne,`Value`)
+	if Cx, ok := conditionTypeAliasConverter(customCondition(cx)); !ok {
+		t.Errorf("%s failed: %T->%T conversion failure", t.Name(), cx, Cx)
+	}
 }

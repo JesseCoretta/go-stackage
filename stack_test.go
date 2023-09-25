@@ -143,6 +143,12 @@ func (r customStack) String() string {
 	return Stack(r).String()
 }
 
+type customStruct struct{}
+
+func (r customStruct) String() string {
+	return `struct_value`
+}
+
 func ExampleStack_SetAuxiliary() {
 
 	// Always alloc stack somehow, in this
@@ -1124,6 +1130,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 					Or().Push(
 						Cond(`dayofweek`, Ne, "Wednesday"),
 						Cond(`ssf`, Ge, "128"),
+						Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
 					),
 				),
 			),
@@ -1146,6 +1153,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 	table := []row{
 		{0, [][]int{{1, 2, 0, 0}, {1, 2}}, ``, nil},
 		{1, [][]int{{1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}}, ``, nil},
+		//{2, [][]int{{1, 1, 1, 0, 2, 0, 0, 0}, {1, 1, 1, 0, 2}}, ``, nil},
 	}
 
 	// Scan the target values we'll be using for
@@ -1367,6 +1375,9 @@ func TestStack_codecov(t *testing.T) {
 	s.ReadOnly()
 	s.ReadOnly(true)
 	s.ReadOnly(false)
+
+	s.Push(customStruct{})
+	_ = s.String()
 
 	s.SetAuxiliary(nil)
 	s.SetLogger(nil)

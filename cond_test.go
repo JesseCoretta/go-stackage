@@ -671,15 +671,18 @@ func TestCondition_codecov(t *testing.T) {
 	c.state(nil)
 	c.calls(``)
 	c.calls(nil)
+	_ = c.condition.cfg.log.lvl.String()
 
 	c.fatal(`test fatal`, map[string]string{
 		`FATAL`: `false`,
 	})
 
 	c.SetLogLevel(LogLevel5)
+	c.SetLogLevel(AllLogLevels)
+	_ = c.condition.cfg.log.lvl.String()
 	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
 	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
-	c.UnsetLogLevel(LogLevel5)
+	c.UnsetLogLevel(`all`)
 
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)

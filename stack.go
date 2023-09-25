@@ -9,9 +9,9 @@ Stack embeds slices of any ([]any) in pointer form
 and extends methods allowing convenient interaction
 with stack structures.
 */
-type Stack struct {
-	*stack
-}
+	type Stack struct {
+		*stack
+	}
 
 /*
 stack represents the underlying ordered slice type, which

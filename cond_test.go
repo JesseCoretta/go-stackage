@@ -672,6 +672,10 @@ func TestCondition_codecov(t *testing.T) {
 	c.calls(``)
 	c.calls(nil)
 
+	c.fatal(`test fatal`, map[string]string{
+		`FATAL`: `false`,
+	})
+
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)
 	SetDefaultConditionLogLevel(nil)

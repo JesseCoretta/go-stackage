@@ -1070,6 +1070,7 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 	printers := map[string]func(...any){
 		`FATAL`:  r.logger().Fatalln,
 		`STATE`:  r.logger().Println,
+		`ERROR`:  r.logger().Println,
 		`CALL`:   r.logger().Println,
 		`DEBUG`:  r.logger().Println,
 		`TRACE`:  r.logger().Println,
@@ -1081,6 +1082,9 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 			if len(data) > 0 {
 				if data[0] != nil {
 					m.Data = data[0]
+					if _, ok := data[0][`FATAL`]; ok {
+						severity = `ERROR`
+					}
 				}
 			}
 			printers[severity](m)

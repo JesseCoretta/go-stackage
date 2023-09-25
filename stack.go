@@ -109,6 +109,7 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 
 	st = append(st, cfg)
 	instance := &st
+
 	data[`addr`] = ptrString(instance)
 	st.trace(`ALLOC`, data)
 
@@ -2440,7 +2441,7 @@ func (r stack) index(i int) (slice any, idx int, ok bool) {
 
 	if L := r.ulen(); L > 0 {
 		if i < 0 {
-			if r.positive(negidx) {
+			if r.positive(negidx) && i-(i*2) <= L {
 				i = factorNegIndex(i, L)
 				ok = true
 			}

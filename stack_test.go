@@ -1315,6 +1315,25 @@ func TestStack_codecov(t *testing.T) {
 
 	s = List()
 	s.Pop()
+	s.Push(-1, -2, -3, -4, -5)
+	s.NegativeIndices(true)
+
+	for i := 0; i < s.Len(); i++ {
+		offset := i - (i + 1)
+
+		slice, _ := s.Index(i)
+		want, _ := slice.(int)
+
+		slice, _ = s.Index(offset - want)
+		got, _ := slice.(int)
+
+		if want != got {
+			t.Errorf("%s failed [loop:%d]: want %d, got %d",
+				t.Name(), i, want, got)
+			return
+		}
+	}
+
 	s.config()
 	s.IsEncap()
 	s.ReadOnly()

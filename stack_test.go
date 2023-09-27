@@ -143,7 +143,10 @@ func (r customStack) String() string {
 	return Stack(r).String()
 }
 
-type customStruct struct{}
+type customStruct struct {
+	Type  string
+	Value any
+}
 
 func (r customStruct) String() string {
 	return `struct_value`
@@ -426,6 +429,12 @@ func TestStack_Traverse(t *testing.T) {
 	slice, _ := stk.Traverse(0)
 	if _, ok := slice.(int); !ok {
 		t.Errorf("%s failed: unexpected type %T", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(1)
+	if _, ok := slice.(Stack); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 2", t.Name(), slice)
 		return
 	}
 
@@ -1139,6 +1148,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 					Cond(`keyword2`, Lt, "someothervalue"),
 				),
 			),
+			Cond(`keyword`, Gt, Or().Push(`...`)),
 		),
 		`this2`,
 	)
@@ -1264,6 +1274,42 @@ func TestDefrag_experimental_001(t *testing.T) {
 
 }
 
+func TestStack_withCap(t *testing.T) {
+	src := Basic().Push(
+		`element0`,
+		`element1`,
+		`element2`,
+		`element3`,
+		`element4`,
+		`element5`,
+		`element6`,
+		`element7`,
+		`element8`,
+		`element9`,
+	)
+
+	dst := Basic(3).Push(
+		`element0a`,
+		`element0b`,
+		`element0c`,
+	)
+
+	src.Transfer(dst)
+
+	if dst.Len() != 3 {
+		t.Errorf("%s failed; transfer process bypassed capacity constraints; want len:%d, got len:%d",
+			t.Name(), 3, dst.Len())
+		return
+	}
+
+	dst.Insert(struct{}{}, 2)
+	if dst.Len() != 3 {
+		t.Errorf("%s failed; insert process bypassed capacity constraints; want len:%d, got len:%d",
+			t.Name(), 3, dst.Len())
+		return
+	}
+}
+
 func TestStack_codecov(t *testing.T) {
 	var s Stack
 	// panic checks
@@ -1376,7 +1422,7 @@ func TestStack_codecov(t *testing.T) {
 	s.ReadOnly(true)
 	s.ReadOnly(false)
 
-	s.Push(customStruct{})
+	s.Push(customStruct{`keyword`, `vaLUE`})
 	_ = s.String()
 
 	s.SetAuxiliary(nil)

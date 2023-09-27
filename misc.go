@@ -248,12 +248,10 @@ type instance's String ("stringer") method, if present.
 If not, nil is returned.
 */
 func getStringer(x any) (meth func() string) {
-	if x != nil {
-		if v := valOf(x); !v.IsZero() {
-			if method := v.MethodByName(`String`); method.Kind() != reflect.Invalid {
-				if _meth, ok := method.Interface().(func() string); ok {
-					meth = _meth
-				}
+	if v := valOf(x); !v.IsZero() {
+		if method := v.MethodByName(`String`); method.Kind() != reflect.Invalid {
+			if _meth, ok := method.Interface().(func() string); ok {
+				meth = _meth
 			}
 		}
 	}
@@ -407,6 +405,9 @@ func primitiveStringer(x any) (s string) {
 		case isStringPrimitive(x):
 			s = x.(string)
 		}
+	}
+	if s == `unsupported_primitive_type` {
+		s += sprintf("_%T", x)
 	}
 
 	return

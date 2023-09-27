@@ -700,7 +700,7 @@ func (r *stack) insert(x any, left int) (ok bool) {
 
 	// bail out if a capacity has been set and
 	// would be breached by this insertion.
-	if u1+1 > r.cap() && r.cap() != 0 {
+	if u1+1 > r.cap()-1 && r.cap() != 0 {
 		err := errorf("%s failed: capacity violation (%d/%d slices added)",
 			fname, 0, 1)
 		r.policy(err)
@@ -1938,6 +1938,9 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 		// whatever it is, it seems to have
 		// a stringer method, at least ...
 		str = padValue(!r.positive(nspad), r.encapv(meth()))
+	} else {
+		// If its a Go primitive, string it.
+		str = padValue(!r.positive(nspad), r.encapv(primitiveStringer(x)))
 	}
 
 	r.debug(sprintf("%s: %T produced: %s",
@@ -2737,10 +2740,6 @@ func calculateDefragMax(max ...int) (m int) {
 		if max[0] > 0 {
 			m = max[0]
 		}
-	}
-
-	if m <= 0 {
-		m = _m
 	}
 
 	return

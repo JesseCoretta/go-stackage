@@ -395,7 +395,7 @@ func numberStringer(x any) (s string) {
 }
 
 func primitiveStringer(x any) (s string) {
-	s = `unsupported_primitive_type`
+	s = sprintf(`unsupported_primitive_type_%T`, x)
 	if isKnownPrimitive(x) {
 		switch {
 		case isBoolPrimitive(x):
@@ -405,9 +405,6 @@ func primitiveStringer(x any) (s string) {
 		case isStringPrimitive(x):
 			s = x.(string)
 		}
-	}
-	if s == `unsupported_primitive_type` {
-		s += sprintf("_%T", x)
 	}
 
 	return

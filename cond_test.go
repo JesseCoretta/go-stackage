@@ -381,6 +381,26 @@ func ExampleCondition_oneShot() {
 	// Output: (person="Jesse")
 }
 
+func ExampleCondition_String() {
+	c := Cond(`person`, Eq, `Jesse`).
+		Paren().
+		Encap(`"`).
+		NoPadding()
+
+	fmt.Printf("%s", c)
+	// Output: (person="Jesse")
+}
+
+func ExampleCondition_Valid() {
+	c := Cond(`person`, Eq, `Jesse`).
+		Paren().
+		Encap(`"`).
+		NoPadding()
+
+	fmt.Printf("Valid: %t", c.Valid() == nil)
+	// Output: Valid: true
+}
+
 /*
 This example demonstrates the act of procedural assembly of an instance
 of Condition. The variable c is defined and not initialized. Its values
@@ -441,6 +461,16 @@ func ExampleCondition_Operator() {
 	// Output: Operator: >=
 }
 
+func ExampleCondition_SetOperator() {
+	var c Condition
+	c.Init()
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(1.456)
+	fmt.Printf("Operator: %s", c.Operator())
+	// Output: Operator: >=
+}
+
 func ExampleCondition_Paren() {
 	var c Condition
 	c.Init()
@@ -450,6 +480,50 @@ func ExampleCondition_Paren() {
 	c.SetExpression(1.456)
 	fmt.Printf("%s", c)
 	// Output: ( keyword >= 1.456000 )
+}
+
+func ExampleCondition_IsParen() {
+	var c Condition
+	c.Init()
+	c.Paren() // toggle to true from false default
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(1.456)
+	fmt.Printf("Is parenthetical: %t", c.IsParen())
+	// Output: Is parenthetical: true
+}
+
+func ExampleCondition_IsZero() {
+	var c Condition
+	fmt.Printf("Zero: %t", c.IsZero())
+	// Output: Zero: true
+}
+
+func ExampleCondition_SetKeyword() {
+	var c Condition
+	c.Init()
+	c.SetKeyword(`my_keyword`)
+	fmt.Printf("Keyword: %s", c.Keyword())
+	// Output: Keyword: my_keyword
+}
+
+func ExampleCondition_Keyword() {
+	var c Condition
+	c.Init()
+	c.SetKeyword(`my_keyword`)
+	fmt.Printf("Keyword: %s", c.Keyword())
+	// Output: Keyword: my_keyword
+}
+
+func ExampleCondition_LogLevels() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	var c Condition
+	c.Init()
+	c.SetLogger(customLogger)
+	c.SetLogLevel(LogLevel1, LogLevel3)
+	fmt.Printf("Loglevels: %s", c.LogLevels())
+	// Output: Loglevels: CALLS,STATE
 }
 
 func ExampleCondition_NoNesting() {
@@ -466,6 +540,18 @@ func ExampleCondition_NoNesting() {
 
 	fmt.Printf("%v", c.Expression())
 	// Output: <nil>
+}
+
+func ExampleCondition_NoPadding() {
+	var c Condition
+	c.Init()
+	c.NoPadding(true)
+	c.SetKeyword(`keyword`)
+	c.SetOperator(Ge)
+	c.SetExpression(`expression`)
+
+	fmt.Printf("%s", c)
+	// Output: keyword>=expression
 }
 
 func ExampleCondition_Len() {

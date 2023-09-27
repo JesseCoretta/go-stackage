@@ -1855,7 +1855,8 @@ func (r *stack) string() (assembled string) {
 			r.trace(sprintf("%s: iterate %T:%d:%s (slice %d/%d)",
 				fname, (*r)[i], i-1, getLogID(``), i-1, r.len()-1))
 			// Handle slice value types through assertion
-			if val := r.stringAssertion((*r)[i]); len(val) > 0 {
+			if val := r.defaultAssertionHandler((*r)[i]); len(val) > 0 {
+				//if val := r.stringAssertion((*r)[i]); len(val) > 0 {
 				// Append the apparently valid
 				// string value ...
 				r.trace(sprintf("%s: %T:%d:%s += %T(%v;len:%d)",
@@ -1879,7 +1880,10 @@ func (r *stack) string() (assembled string) {
 /*
 stringAssertion is the private method called during slice iteration
 during stack.string runs.
+
+DECOM
 */
+/*
 func (r stack) stringAssertion(x any) (value string) {
 	fname := fmname()
 
@@ -1907,6 +1911,7 @@ func (r stack) stringAssertion(x any) (value string) {
 
 	return
 }
+*/
 
 /*
 defaultAssertionHandler is a private method called by stack.string.

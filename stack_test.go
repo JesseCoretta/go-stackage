@@ -363,7 +363,7 @@ func TestStack_Insert(t *testing.T) {
 }
 
 func TestStack_Replace(t *testing.T) {
-	s := List().SetDelimiter(rune(44)).Push(
+	s := List().SetDelimiter(rune(44)).NoPadding(true).Push(
 		`testing1`,
 		`testing2`,
 		`testing3`,
@@ -588,6 +588,27 @@ func ExampleOr_symbolicOr() {
 }
 
 /*
+This example demonstrates the creation of a List stack, a stack type suitable for
+general use.
+*/
+func ExampleList() {
+	l := List().Push(
+		1.234,
+		1+3i,
+		`hello mr thompson`,
+	)
+
+	l.SetDelimiter('?')
+
+	// alternatives ...
+	//l.JoinDelim(`,`) 	//strings ok too!
+	//l.JoinDelim(`delim`)
+
+	fmt.Printf("%s", l)
+	// Output: 1.234000 ? (1+3i) ? hello mr thompson
+}
+
+/*
 This example demonstrates ANDed stack values using the double ampersand (&&) symbol.
 */
 func ExampleAnd_symbolicAnd() {
@@ -660,7 +681,7 @@ func TestList_001(t *testing.T) {
 
 func TestList_001_withNoDelim(t *testing.T) {
 
-	A := List().Push(
+	A := List().NoPadding(true).Push(
 		`(top_element_number_0)`,
 		`(top_element_number_1)`,
 		`(top_element_number_2)`,
@@ -674,7 +695,7 @@ func TestList_001_withNoDelim(t *testing.T) {
 }
 
 func TestCustomStack001(t *testing.T) {
-	A := List().SetDelimiter(`,`).Push(
+	A := List().SetDelimiter(`,`).NoPadding().Push(
 		`top_element_number_0`,
 		`top_element_number_1`,
 		`top_element_number_2`,
@@ -1002,19 +1023,6 @@ func ExampleBasic_withCapacity() {
 	// Output: 2
 }
 
-func TestList_Join(t *testing.T) {
-	L := List().SetDelimiter(`,`).Push(
-		`item1`,
-		`item2`,
-	)
-	want := `item1,item2`
-	got := L.String()
-	if want != got {
-		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
-		return
-	}
-}
-
 /*
 This example demonstrates the creation of a list stack
 using comma delimitation.
@@ -1022,12 +1030,12 @@ using comma delimitation.
 func ExampleStack_SetDelimiter() {
 	// note: one could also use a rune
 	// e.g: ',' or rune(44) for comma.
-	L := List().SetDelimiter(`,`).Push(
+	L := List().SetDelimiter(`+`).Push(
 		`item1`,
 		`item2`,
 	)
 	fmt.Printf("%s", L)
-	// Output: item1,item2
+	// Output: item1 + item2
 }
 
 func ExampleStack_Transfer() {

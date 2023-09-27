@@ -325,6 +325,37 @@ func ExampleCondition_SetEvaluator() {
 	// Output: 83.10° x π/180° = 1.45rad
 }
 
+/*
+This example demonstrates the use of the Evaluate method to
+execute an Evaluator instance assigned using the Set Evaluator
+method.
+*/
+func ExampleCondition_Evaluate() {
+	degrees := float64(83.1)
+	c := Cond(`degrees`, Eq, degrees)
+
+	// we don't really need input values for
+	// this one, since we read directly from
+	// the Condition instance c. And we don't
+	// need an error value since this is just
+	// an example, therefore we use shadowing
+	// (_) as needed.
+	c.SetEvaluator(func(_ ...any) (R any, _ error) {
+		expr := c.Expression()
+		D, _ := expr.(float64) // Don't shadow 'ok' in real-life.
+
+		// I could have imported "math",
+		// but this is all we need.
+		pi := 3.14159265358979323846264338327950288419716939937510582097494459
+		R = float64(D*pi) / 180
+		return
+	})
+
+	radians, _ := c.Evaluate()
+	fmt.Printf("%.02f° x π/180° = %.02frad", degrees, radians.(float64))
+	// Output: 83.10° x π/180° = 1.45rad
+}
+
 func TestFCF_codecov(t *testing.T) {
 	stk := Basic().Push(
 		float32(1.1),

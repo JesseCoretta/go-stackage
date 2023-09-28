@@ -30,6 +30,58 @@ func ExampleDefaultConditionLogLevel() {
 	// Output: 0
 }
 
+func ExampleCondition_Auxiliary() {
+	var c Condition
+	c.Init()
+
+	// one can put anything they wish into this map,
+	// so we'll do a bytes.Buffer since it is simple
+	// and commonplace.
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	_, _ = buf.WriteString(`some .... data .....`)
+
+	// Create our map (one could also use make
+	// and populate it piecemeal as opposed to
+	// in-line, as we do below).
+	c.SetAuxiliary(map[string]any{
+		`buffer`: buf,
+	})
+
+	//  Call our map and call its 'Get' method in one-shot
+	if val, ok := c.Auxiliary().Get(`buffer`); ok {
+		fmt.Printf("%s", val)
+	}
+	// Output: some .... data .....
+}
+
+func ExampleCondition_SetAuxiliary() {
+	var c Condition
+	c.Init()
+
+	// alloc map
+	aux := make(Auxiliary, 0)
+
+	// populate map
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
+		Value []string
+	}{
+		Type: `L`,
+		Value: []string{
+			`abc`,
+			`def`,
+		},
+	})
+
+	// assign map to condition rcvr
+	c.SetAuxiliary(aux)
+
+	// verify presence
+	call := c.Auxiliary()
+	fmt.Printf("%T found, length:%d", call, call.Len())
+	// Output: stackage.Auxiliary found, length:1
+}
+
 /*
 This example demonstrates setting a custom logger which writes
 to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is

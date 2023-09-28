@@ -110,6 +110,80 @@ func initCondition() (r *condition) {
 }
 
 /*
+SetAuxiliary assigns aux, as initialized and optionally populated as
+needed by the user, to the receiver instance. The aux input value may
+be nil.
+
+If no variadic input is provided, the default Auxiliary allocation
+shall occur.
+
+Note that this method shall obliterate any instance that may already
+be present, regardless of the state of the input value aux.
+*/
+func (r Condition) SetAuxiliary(aux ...Auxiliary) Condition {
+	if r.IsInit() {
+		r.condition.setAuxiliary(aux...)
+	}
+	return r
+}
+
+/*
+setAuxiliary is a private method called by Condition.SetAuxiliary.
+*/
+func (r *condition) setAuxiliary(aux ...Auxiliary) {
+	fname := fmname()
+	r.calls(sprintf("%s: in: variadic %T(len:%d)",
+		fname, aux, len(aux)))
+
+	var _aux Auxiliary
+	if len(aux) == 0 {
+		r.trace(sprintf("%s: ALLOC %T (no variadic input)",
+			fname, _aux))
+		_aux = make(Auxiliary, 0)
+	} else {
+		if aux[0] == nil {
+			r.trace(sprintf("%s: ALLOC %T (nil variadic slice)",
+				fname, _aux))
+			_aux = make(Auxiliary, 0)
+		} else {
+			r.trace(sprintf("%s: assign user %T(len:%d)",
+				fname, _aux, _aux.Len()))
+			_aux = aux[0]
+		}
+	}
+
+	r.cfg.aux = _aux
+	r.debug(sprintf("%s: registered %T(len:%d)",
+		fname, r.cfg.aux, r.cfg.aux.Len()))
+	r.calls(sprintf("%s: out:void", fname))
+}
+
+/*
+Auxiliary returns the instance of Auxiliary from within the receiver.
+*/
+func (r Condition) Auxiliary() (aux Auxiliary) {
+	if r.IsInit() {
+		aux = r.condition.auxiliary()
+	}
+	return
+}
+
+/*
+auxiliary is a private method called by Condition.Auxiliary.
+*/
+func (r condition) auxiliary() (aux Auxiliary) {
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	aux = r.cfg.aux
+	r.debug(sprintf("%s: get %T(len:%d)",
+		fname, aux, aux.Len()))
+	r.calls(sprintf("%s: out:%T(%d)",
+		fname, aux, aux.Len()))
+
+	return
+}
+
+/*
 SetKeyword sets the receiver's keyword using the specified kw
 input argument.
 */

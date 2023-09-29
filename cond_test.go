@@ -83,6 +83,115 @@ func ExampleCondition_SetAuxiliary() {
 }
 
 /*
+This example demonstrates the call and (failed) set of an
+uninitialized Auxiliary instance. While no panic ensues,
+the map instance is not writable.
+
+The user must instead follow the procedures in the WithInit,
+UserInit or ByTypeCast examples.
+*/
+func ExampleCondition_Auxiliary_noInit() {
+
+	var c Condition = Cond(`keyword`, Eq, `value`)
+	aux := c.Auxiliary()
+	fmt.Printf("%T found, length:%d",
+		aux, aux.Set(`testing`, `123`).Len())
+	// Output: stackage.Auxiliary found, length:0
+}
+
+/*
+This example continues the concepts within the NoInit example,
+except in this case proper initialization occurs and a desirable
+outcome is achieved.
+*/
+func ExampleCondition_Auxiliary_withInit() {
+
+	var c Condition = Cond(`keyword`, Eq, `value`)
+	c.SetAuxiliary() // auto-init
+	aux := c.Auxiliary()
+	fmt.Printf("%T found, length was:%d, is now:%d",
+		aux,
+		aux.Len(),                       // check initial (pre-set) length
+		aux.Set(`testing`, `123`).Len()) // fluent Set/Len in one shot
+	// Output: stackage.Auxiliary found, length was:0, is now:1
+}
+
+/*
+This example demonstrates a scenario similar to that of the WithInit
+example, except in this case the map instance is entirely created and
+populated by the user in a traditional fashion.
+*/
+func ExampleCondition_Auxiliary_userInit() {
+
+	var c Condition = Cond(`keyword`, Eq, `value`)
+	aux := make(Auxiliary, 0)
+
+	// user opts to just use standard map
+	// key/val set procedure, and avoids
+	// use of the convenience methods.
+	// This is totally fine.
+	aux[`value1`] = []int{1, 2, 3, 4, 5}
+	aux[`value2`] = [2]any{float64(7.014), rune('#')}
+
+	c.SetAuxiliary(aux)
+	fmt.Printf("%T length:%d", aux, len(aux))
+	// Output: stackage.Auxiliary length:2
+}
+
+/*
+This example demonstrates building of the Auxiliary map in its generic
+form (map[string]any) before being type cast to Auxiliary.
+*/
+func ExampleCondition_Auxiliary_byTypeCast() {
+
+	var c Condition = Cond(`keyword`, Eq, `value`)
+	proto := make(map[string]any, 0)
+	proto[`value1`] = []int{1, 2, 3, 4, 5}
+	proto[`value2`] = [2]any{float64(7.014), rune('#')}
+	c.SetAuxiliary(Auxiliary(proto)) // cast proto and assign to stack
+	aux := c.Auxiliary()             // call map to variable
+	fmt.Printf("%T length:%d", aux, aux.Len())
+	// Output: stackage.Auxiliary length:2
+}
+
+func TestCondition_SetAuxiliary(t *testing.T) {
+	var c Condition = Cond(`keyword`, Eq, `value`)
+
+	// alloc map
+	aux := make(Auxiliary, 0)
+
+	// populate map
+	aux.Set(`somethingWeNeed`, struct {
+		Type  string
+		Value []string
+	}{
+		Type: `L`,
+		Value: []string{
+			`abc`,
+			`def`,
+		},
+	})
+
+	// assign map to stack rcvr
+	c.SetAuxiliary(aux)
+
+	// test that it was assigned properly
+	var call Auxiliary = c.Auxiliary()
+	if call == nil {
+		t.Errorf("%s failed: %T nil", t.Name(), call)
+		return
+	}
+
+	// make sure the contents are present
+	want := 1
+	if length := call.Len(); length != want {
+		t.Errorf("%s failed: unexpected length; want %d, got %d",
+			t.Name(), want, length)
+		return
+	}
+}
+
+/*
 This example demonstrates setting a custom logger which writes
 to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
 invoked, and an event -- the creation of a Condition -- shall
@@ -764,6 +873,8 @@ func TestCondition_codecov(t *testing.T) {
 	ll.unshift(0)
 	ll.unshift(65535)
 
+	c.SetAuxiliary(nil)
+
 	var lsys *logSystem = newLogSystem(cLogDefault)
 	if lsys.isZero() {
 		t.Errorf("%s failed: nil %T",
@@ -777,6 +888,7 @@ func TestCondition_codecov(t *testing.T) {
 	c.SetKeyword(`valid_keyword`)
 	c.Valid()
 	c.SetOperator(Ne)
+	c.SetAuxiliary(nil)
 	c.Valid()
 	c.SetExpression(rune(1438))
 	_ = c.String()

@@ -1,12 +1,12 @@
 package stackage
 
-import (
-	"log"
-)
-
 /*
 cond.go contains Condition-related methods and functions.
 */
+
+import (
+	"log"
+)
 
 /*
 Condition describes a single evaluative statement, i.e.:
@@ -92,7 +92,7 @@ func initCondition() (r *condition) {
 	r = new(condition)
 	r.cfg = new(nodeConfig)
 	r.cfg.log = newLogSystem(cLogDefault)
-	r.cfg.log.lvl = logLevels(cLogLevelDefault)
+	r.cfg.log.lvl = logLevels(NoLogLevels)
 
 	r.cfg.typ = cond
 	data[`type`] = cond.String()
@@ -110,28 +110,99 @@ func initCondition() (r *condition) {
 }
 
 /*
+SetAuxiliary assigns aux, as initialized and optionally populated as
+needed by the user, to the receiver instance. The aux input value may
+be nil.
+
+If no variadic input is provided, the default Auxiliary allocation
+shall occur.
+
+Note that this method shall obliterate any instance that may already
+be present, regardless of the state of the input value aux.
+*/
+func (r Condition) SetAuxiliary(aux ...Auxiliary) Condition {
+	if r.IsInit() {
+		r.condition.setAuxiliary(aux...)
+	}
+	return r
+}
+
+/*
+setAuxiliary is a private method called by Condition.SetAuxiliary.
+*/
+func (r *condition) setAuxiliary(aux ...Auxiliary) {
+	fname := fmname()
+	r.calls(sprintf("%s: in: variadic %T(len:%d)",
+		fname, aux, len(aux)))
+
+	var _aux Auxiliary
+	if len(aux) == 0 {
+		r.trace(sprintf("%s: ALLOC %T (no variadic input)",
+			fname, _aux))
+		_aux = make(Auxiliary, 0)
+	} else {
+		if aux[0] == nil {
+			r.trace(sprintf("%s: ALLOC %T (nil variadic slice)",
+				fname, _aux))
+			_aux = make(Auxiliary, 0)
+		} else {
+			r.trace(sprintf("%s: assign user %T(len:%d)",
+				fname, _aux, _aux.Len()))
+			_aux = aux[0]
+		}
+	}
+
+	r.cfg.aux = _aux
+	r.debug(sprintf("%s: registered %T(len:%d)",
+		fname, r.cfg.aux, r.cfg.aux.Len()))
+	r.calls(sprintf("%s: out:void", fname))
+}
+
+/*
+Auxiliary returns the instance of Auxiliary from within the receiver.
+*/
+func (r Condition) Auxiliary() (aux Auxiliary) {
+	if r.IsInit() {
+		aux = r.condition.auxiliary()
+	}
+	return
+}
+
+/*
+auxiliary is a private method called by Condition.Auxiliary.
+*/
+func (r condition) auxiliary() (aux Auxiliary) {
+	fname := fmname()
+	r.calls(sprintf("%s: in:niladic", fname))
+	aux = r.cfg.aux
+	r.debug(sprintf("%s: get %T(len:%d)",
+		fname, aux, aux.Len()))
+	r.calls(sprintf("%s: out:%T(%d)",
+		fname, aux, aux.Len()))
+
+	return
+}
+
+/*
 SetKeyword sets the receiver's keyword using the specified kw
 input argument.
 */
 func (r Condition) SetKeyword(kw any) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setKeyword(kw)
 	}
 
-	r.condition.setKeyword(kw)
 	return r
 }
 
 func (r *condition) setKeyword(kw any) {
-	if r == nil {
-		r = initCondition()
-	}
-
 	switch tv := kw.(type) {
 	case string:
 		r.kw = tv
 	default:
-		r.kw = assertKeyword(tv)
+		if meth := getStringer(tv); meth != nil {
+			r.kw = meth()
+		}
 	}
 }
 
@@ -140,19 +211,13 @@ SetOperator sets the receiver's comparison operator using the
 specified Operator-qualifying input argument (op).
 */
 func (r Condition) SetOperator(op Operator) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setOperator(op)
 	}
-
-	r.condition.setOperator(op)
 	return r
 }
 
 func (r *condition) setOperator(op Operator) {
-	if r == nil {
-		r = initCondition()
-	}
-
 	if len(op.Context()) > 0 && len(op.String()) > 0 {
 		r.op = op
 	}
@@ -163,22 +228,82 @@ SetExpression sets the receiver's expression value(s) using the
 specified ex input argument.
 */
 func (r Condition) SetExpression(ex any) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setExpression(ex)
 	}
-
-	r.condition.setExpression(ex)
 	return r
 }
 
 func (r *condition) setExpression(ex any) {
-	if r == nil {
-		r = initCondition()
-	}
-
 	if v, ok := r.assertConditionExpressionValue(ex); ok {
 		r.ex = v
 	}
+}
+
+/*
+SetLogLevel enables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to accept events for submission
+and transcription to the underlying logger.
+
+Users may also sum the desired bit values manually, and cast the
+product as a LogLevel. For example, if STATE (4), DEBUG (8) and
+TRACE (32) logging were desired, entering LogLevel(44) would be
+the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
+variadic fashion.
+*/
+func (r Condition) SetLogLevel(l ...any) Condition {
+	if r.IsInit() {
+		r.condition.setLogLevel(l...)
+	}
+	return r
+}
+
+func (r *condition) setLogLevel(l ...any) {
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fmname(), l, l, len(l)))
+
+	r.cfg.log.shift(l...)
+
+	r.calls(sprintf("%s: out:%T(self)",
+		fmname(), r))
+}
+
+/*
+LogLevels returns the string representation of a comma-delimited list
+of all active LogLevel values within the receiver.
+*/
+func (r Condition) LogLevels() (l string) {
+	if r.IsInit() {
+		l = r.condition.logLevels()
+	}
+	return
+}
+
+func (r condition) logLevels() (l string) {
+	return r.cfg.log.lvl.String()
+}
+
+/*
+UnsetLogLevel disables the specified LogLevel instance(s), thereby
+instructing the logging subsystem to discard events submitted for
+transcription to the underlying logger.
+*/
+func (r Condition) UnsetLogLevel(l ...any) Condition {
+	if r.IsInit() {
+		r.condition.unsetLogLevel(l...)
+	}
+	return r
+}
+
+func (r *condition) unsetLogLevel(l ...any) {
+	fname := fmname()
+	r.calls(sprintf("%s: in:%T(%v;len:%d)",
+		fname, l, l, len(l)))
+
+	r.cfg.log.unshift(l...)
+
+	r.calls(sprintf("%s: out:%T(self)",
+		fname, r))
 }
 
 /*
@@ -206,11 +331,10 @@ Logging may also be set globally using the SetDefaultLogger
 package level function. Similar semantics apply.
 */
 func (r Condition) SetLogger(logger any) Condition {
-	if r.IsZero() {
-		return r
+	if r.IsInit() {
+		r.condition.setLogger(logger)
 	}
 
-	r.condition.setLogger(logger)
 	return r
 }
 
@@ -225,46 +349,10 @@ of disabling logging outright (see Stack.SetLogger method as well
 as the SetDefaultConditionLogger package-level function for ways of
 doing this easily).
 */
-func (r Condition) Logger() *log.Logger {
-	if r.IsZero() {
-		return nil
+func (r Condition) Logger() (l *log.Logger) {
+	if r.IsInit() {
+		l = r.condition.logger()
 	}
-	return r.condition.logger()
-}
-
-/*
-assertKeyword returns a valid keyword string value based on the input value.
-If the value is a string, it is returned as-is. Else, if a custom type that
-possesses its own stringer method, the returned value from that method is
-returned.
-*/
-func assertKeyword(x any) (s string) {
-	switch tv := x.(type) {
-	case string:
-		s = tv
-	default:
-		if meth := getStringer(x); meth != nil {
-			s = meth()
-		}
-	}
-
-	return
-}
-
-/*
-tryPushPolicy will execute a push policy if one is set, and will return an error
-and a Boolean value indicative of the presence of said policy.
-*/
-func (r *condition) tryPushPolicy(x any) (err error, found bool) {
-	if found = r.cfg.ppf != nil; found {
-		// if we have a policy, always set
-		// found to true, regardless of the
-		// outcome
-		err = r.cfg.ppf(x)
-	}
-
-	// if no policy, err is always nil
-	// and found is always false
 	return
 }
 
@@ -281,11 +369,11 @@ shall potentially obscure error conditions along the way,
 as each successive method may happily overwrite any error
 instance already present.
 */
-func (r Condition) Err() error {
-	if !r.IsInit() {
-		return nil
+func (r Condition) Err() (err error) {
+	if r.IsInit() {
+		err = r.condition.getErr()
 	}
-	return r.condition.getErr()
+	return
 }
 
 /*
@@ -297,10 +385,9 @@ to extend this type by aliasing, and wish to control the
 handling of error conditions in another manner.
 */
 func (r Condition) SetErr(err error) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setErr(err)
 	}
-	r.condition.setErr(err)
 	return r
 }
 
@@ -309,9 +396,6 @@ setErr assigns an error instance, whether nil or not, to
 the underlying receiver configuration.
 */
 func (r *condition) setErr(err error) {
-	if r.cfg == nil {
-		return
-	}
 	r.cfg.setErr(err)
 }
 
@@ -348,18 +432,6 @@ defaultAssertionExpressionHandler is the catch-all private method called
 by condition.assertConditionExpressionValue.
 */
 func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
-
-	// Try to find a push policy first and, IF
-	// FOUND, run it and break out of the case
-	// statement either way.
-	if err, found := r.tryPushPolicy(x); found {
-		X = x
-		return
-	} else if err != nil {
-		r.setErr(err)
-		return
-	}
-
 	// no push policy, so we'll see if the basic
 	// guidelines were satisfied, at least ...
 	if _, ok := stackTypeAliasConverter(x); ok {
@@ -371,18 +443,8 @@ func (r condition) defaultAssertionExpressionHandler(x any) (X any) {
 		// was converted back to Stack without
 		// any issues ...
 		X = x
-
-	} else if meth := getStringer(x); meth != nil {
-		// whatever it is, it seems to have
-		// a stringer method, at least ...
+	} else {
 		X = x
-
-	} else if isKnownPrimitive(x) {
-		// value is one of go's builtin
-		// numerical primitives, which
-		// are string represented using
-		// sprintf.
-		X = primitiveStringer(x)
 	}
 
 	return
@@ -410,11 +472,9 @@ This allows for a means of identifying a particular kind of Condition in the mid
 of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.setCategory(cat)
 	}
-
-	r.condition.setCategory(cat)
 	return r
 }
 
@@ -422,11 +482,11 @@ func (r Condition) SetCategory(cat string) Condition {
 Category returns the categorical label string value assigned to the receiver, if
 set, else a zero string.
 */
-func (r Condition) Category() string {
-	if r.IsZero() {
-		return ``
+func (r Condition) Category() (cat string) {
+	if r.IsInit() {
+		cat = r.condition.getCat()
 	}
-	return r.condition.getCat()
+	return
 }
 
 /*
@@ -434,8 +494,12 @@ Cond returns an instance of Condition bearing the provided component values.
 This is intended to be used in situations where a Condition instance can be
 created in one shot.
 */
-func Cond(kw any, op Operator, ex any) Condition {
-	return Condition{newCondition(kw, op, ex)}
+func Cond(kw any, op Operator, ex any) (c Condition) {
+	c = Condition{newCondition(kw, op, ex)}
+	if err := c.Valid(); err != nil {
+		c.SetErr(err)
+	}
+	return
 }
 
 /*
@@ -465,17 +529,15 @@ If the string `_random` is provided, a 24-character alphanumeric string is
 randomly generated using math/rand and assigned as the ID.
 */
 func (r Condition) SetID(id string) Condition {
-	if !r.IsInit() {
-		return r
-	}
+	if r.IsInit() {
+		if lc(id) == `_random` {
+			id = randomID(randIDSize)
+		} else if lc(id) == `_addr` {
+			id = sprintf("%s", r.Addr())
+		}
 
-	if lc(id) == `_random` {
-		id = randomID(randIDSize)
-	} else if lc(id) == `_addr` {
-		id = sprintf("%s", r.condition.addr())
+		r.condition.cfg.setID(id)
 	}
-
-	r.condition.cfg.setID(id)
 	return r
 }
 
@@ -515,24 +577,12 @@ Addr returns the string representation of the pointer
 address for the receiver. This may be useful for logging
 or debugging operations.
 */
-func (r Condition) Addr() string {
-	if !r.IsInit() {
-		return ``
+func (r Condition) Addr() (addr string) {
+	if r.IsInit() {
+		p := r.condition
+		addr = sprintf("%p", p)
 	}
-
-	return r.condition.addr()
-}
-
-/*
-addr returns the string representation of the pointer
-address for the receiver.
-*/
-func (r condition) addr() string {
-	if r.isZero() {
-		return ``
-	}
-
-	return sprintf("%p", &r)
+	return
 }
 
 /*
@@ -540,15 +590,11 @@ Name returns the name of the receiver instance, if set, else a zero string
 will be returned. The presence or lack of a name has no effect on any of
 the receiver's mechanics, and is strictly for convenience.
 */
-func (r Condition) ID() string {
-	return r.condition.getID()
-}
-
-func (r condition) getID() string {
-	if r.isZero() {
-		return ``
+func (r Condition) ID() (id string) {
+	if r.IsInit() {
+		id = r.condition.cfg.id
 	}
-	return r.cfg.id
+	return
 }
 
 /*
@@ -556,12 +602,11 @@ IsInit will verify that the internal pointer instance of the receiver has
 been properly initialized. This method executes a preemptive execution of
 the IsZero method.
 */
-func (r Condition) IsInit() bool {
-	if r.IsZero() {
-		return false
+func (r Condition) IsInit() (is bool) {
+	if !r.IsZero() {
+		is = r.condition.isInit()
 	}
-
-	return r.condition.isInit()
+	return
 }
 
 /*
@@ -576,37 +621,23 @@ IsZero returns a Boolean value indicative of whether the receiver is nil,
 or unset.
 */
 func (r Condition) IsZero() bool {
-	if r.condition == nil {
-		return true
-	}
-
-	return r.condition.isZero()
-}
-
-func (r *condition) isZero() bool {
-	if r == nil {
-		return true
-	} else if r.cfg == nil {
-		return true
-	}
-
-	return false
+	return r.condition == nil
 }
 
 /*
-Valid returns an instance of error, identifying any issues perceived with
-the state of the receiver.
+Valid returns an instance of error, identifying any serious issues perceived
+with the state of the receiver.
+
+Non-serious (interim) errors such as denied pushes, capacity violations, etc.,
+are not shown by this method.
 
 If a ValidityPolicy was set within the receiver, it shall be executed here.
-If no ValidityPolicy was specified, only a nilness is checked
+If no ValidityPolicy was specified, only elements pertaining to basic viability
+are checked.
 */
 func (r Condition) Valid() (err error) {
-	if r.condition.isZero() {
+	if !r.IsInit() {
 		err = errorf("%T instance is nil", r)
-		return
-	}
-
-	if err = r.condition.getErr(); err != nil {
 		return
 	}
 
@@ -618,6 +649,24 @@ func (r Condition) Valid() (err error) {
 
 	// no validity policy was provided, just check
 	// what we can.
+
+	// verify keyword
+	if kw := r.Keyword(); len(kw) == 0 {
+		err = errorf("%T keyword value is zero", r)
+		return
+	}
+
+	// verify comparison operator
+	if cop := r.Operator(); cop != nil {
+		if assert, ok := cop.(ComparisonOperator); ok {
+			if !(1 <= int(assert) && int(assert) <= 6) {
+				err = errorf("%T operator value is bogus", r)
+				return
+			}
+		}
+	}
+
+	// verify expression value
 	if r.Expression() == nil {
 		err = errorf("%T expression value is nil", r)
 	}
@@ -634,12 +683,14 @@ A Boolean value returned indicative of the result. Note that if an
 instance of Evaluator was not assigned to the Condition prior to
 execution of this method, the return value shall always be false.
 */
-func (r Condition) Evaluate(x ...any) error {
-	if r.cfg.evl != nil {
-		return r.cfg.evl(r, x...)
+func (r Condition) Evaluate(x ...any) (ev any, err error) {
+	if r.IsInit() {
+		if err = errorf("No %T.%T func/meth found", r, r.cfg.evl); r.cfg.evl != nil {
+			ev, err = r.cfg.evl(x...)
+		}
 	}
 
-	return errorf("No %T function or method was set within %T")
+	return
 }
 
 /*
@@ -649,11 +700,9 @@ will allow the Evaluate method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetEvaluator(x Evaluator) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.evl = x
 	}
-
-	r.condition.cfg.evl = x
 	return r
 }
 
@@ -664,11 +713,10 @@ This will allow the Valid method to return a more meaningful result.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.vpf = x
 	}
 
-	r.condition.cfg.vpf = x
 	return r
 }
 
@@ -680,11 +728,10 @@ use when this type's String method is called.
 Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
-	if !r.IsInit() {
-		return r
+	if r.IsInit() {
+		r.condition.cfg.rpf = x
 	}
 
-	r.condition.cfg.rpf = x
 	return r
 }
 
@@ -701,11 +748,9 @@ An instance of []string with only one (1) value is identical to the act of
 providing a single string value, in that both L and R will use one value.
 */
 func (r Condition) Encap(x ...any) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
+	if r.IsInit() {
+		r.condition.cfg.setEncap(x...)
 	}
-
-	r.condition.cfg.setEncap(x...)
 	return r
 }
 
@@ -713,12 +758,11 @@ func (r Condition) Encap(x ...any) Condition {
 IsEncap returns a Boolean value indicative of whether value encapsulation
 characters have been set within the receiver.
 */
-func (r Condition) IsEncap() bool {
-	if r.IsZero() {
-		return false
+func (r Condition) IsEncap() (is bool) {
+	if r.IsInit() {
+		is = len(r.condition.getEncap()) > 0
 	}
-
-	return len(r.condition.getEncap()) > 0
+	return
 }
 
 func (r *condition) getEncap() [][]string {
@@ -738,20 +782,7 @@ current state of the nesting bit (i.e.: true->false and
 false->true)
 */
 func (r Condition) NoNesting(state ...bool) Condition {
-	if !r.IsInit() {
-		return r
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.condition.setOpt(nnest)
-		} else {
-			r.condition.unsetOpt(nnest)
-		}
-	} else {
-		r.condition.toggleOpt(nnest)
-	}
-
+	r.setState(nnest, state...)
 	return r
 }
 
@@ -762,12 +793,11 @@ or Stack type alias instance to be set as the value.
 
 See also the IsNesting method.
 */
-func (r Condition) CanNest() bool {
-	if r.IsZero() {
-		return false
+func (r Condition) CanNest() (can bool) {
+	if r.IsInit() {
+		can = !r.condition.positive(nnest)
 	}
-
-	return !r.condition.positive(nnest)
+	return
 }
 
 /*
@@ -776,12 +806,11 @@ underlying expression value is either a Stack or Stack type
 alias. If true, this indicates the expression value descends
 into another hierarchical (nested) context.
 */
-func (r Condition) IsNesting() bool {
-	if r.IsZero() {
-		return false
+func (r Condition) IsNesting() (is bool) {
+	if r.IsInit() {
+		is = r.condition.isNesting()
 	}
-
-	return r.condition.isNesting()
+	return
 }
 
 /*
@@ -806,12 +835,11 @@ expression, OR that the Stack exhibits Last-In-Last-Out behavior,
 which is the default ingress/egress scheme imposed upon instances
 of this type.
 */
-func (r Condition) IsFIFO() bool {
-	if r.condition == nil {
-		r.condition = initCondition()
-		return false
+func (r Condition) IsFIFO() (is bool) {
+	if r.IsInit() {
+		is = r.condition.isFIFO()
 	}
-	return r.condition.isFIFO()
+	return
 }
 
 /*
@@ -846,20 +874,7 @@ current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
 func (r Condition) Paren(state ...bool) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.condition.setOpt(parens)
-		} else {
-			r.condition.unsetOpt(parens)
-		}
-	} else {
-		r.condition.toggleOpt(parens)
-	}
-
+	r.setState(parens, state...)
 	return r
 }
 
@@ -868,11 +883,28 @@ IsParen returns a Boolean value indicative of whether the
 receiver is parenthetical.
 */
 func (r Condition) IsParen() bool {
-	if r.IsZero() {
-		return false
-	}
+	return r.getState(parens)
+}
 
-	return r.condition.positive(parens)
+func (r Condition) getState(cf cfgFlag) (state bool) {
+	if r.IsInit() {
+		state = r.condition.positive(cf)
+	}
+	return
+}
+
+func (r Condition) setState(cf cfgFlag, state ...bool) {
+	if r.IsInit() {
+		if len(state) > 0 {
+			if state[0] {
+				r.condition.setOpt(cf)
+			} else {
+				r.condition.unsetOpt(cf)
+			}
+		} else {
+			r.condition.toggleOpt(cf)
+		}
+	}
 }
 
 func (r *condition) setLogger(logger any) {
@@ -883,35 +915,20 @@ func (r condition) logger() *log.Logger {
 	return r.cfg.log.logger()
 }
 
-func (r *condition) toggleOpt(x cfgFlag) {
-	if r == nil {
-		r = initCondition()
-	}
-
-	r.cfg.toggleOpt(x)
+func (r *condition) toggleOpt(cf cfgFlag) {
+	r.cfg.toggleOpt(cf)
 }
 
-func (r *condition) setOpt(x cfgFlag) {
-	if r.isZero() || r == nil {
-		r = initCondition()
-	}
-
-	r.cfg.setOpt(x)
+func (r *condition) setOpt(cf cfgFlag) {
+	r.cfg.setOpt(cf)
 }
 
-func (r *condition) unsetOpt(x cfgFlag) {
-	if r == nil {
-		r = initCondition()
-	}
-
-	r.cfg.unsetOpt(x)
+func (r *condition) unsetOpt(cf cfgFlag) {
+	r.cfg.unsetOpt(cf)
 }
 
-func (r *condition) positive(x cfgFlag) bool {
-	if r == nil {
-		r = initCondition()
-	}
-	return r.cfg.positive(x)
+func (r *condition) positive(cf cfgFlag) bool {
+	return r.cfg.positive(cf)
 }
 
 /*
@@ -925,20 +942,7 @@ current state of the quotation bit (i.e.: true->false and
 false->true)
 */
 func (r Condition) NoPadding(state ...bool) Condition {
-	if r.condition == nil {
-		r.condition = initCondition()
-	}
-
-	if len(state) > 0 {
-		if state[0] {
-			r.condition.setOpt(nspad)
-		} else {
-			r.condition.unsetOpt(nspad)
-		}
-	} else {
-		r.condition.toggleOpt(nspad)
-	}
-
+	r.setState(nspad, state...)
 	return r
 }
 
@@ -946,31 +950,8 @@ func (r Condition) NoPadding(state ...bool) Condition {
 IsPadded returns a Boolean value indicative of whether the
 receiver pads its contents with a SPACE char (ASCII #32).
 */
-func (r Condition) IsPadded() bool {
-	if r.IsZero() {
-		return false
-	}
-
-	return !r.condition.positive(nspad)
-}
-
-/*
-SetPushPolicy assigns the instance of PushPolicy to the receiver. This
-will allow the Set method to control what elements may (or may not) be
-set as the expression value within the receiver.
-
-See the documentation for the Set method for information on the default
-behavior without the involvement of a PushPolicy instance.
-
-Specifying nil shall disable this capability if enabled.
-*/
-func (r Condition) SetPushPolicy(x PushPolicy) Condition {
-	if !r.IsInit() {
-		return r
-	}
-
-	r.condition.cfg.ppf = x
-	return r
+func (r Condition) IsPadded() (is bool) {
+	return !r.getState(nspad)
 }
 
 /*
@@ -978,47 +959,54 @@ Expression returns the expression value(s) stored within the receiver, or
 nil if unset. A valid receiver instance MUST always possess a non-nil
 expression value.
 */
-func (r Condition) Expression() any {
-	if r.IsZero() {
-		return nil
+func (r Condition) Expression() (ex any) {
+	if r.IsInit() {
+		ex = r.condition.ex
 	}
-
-	return r.condition.ex
+	return
 }
 
 /*
 Operator returns the Operator interface type instance found within the
 receiver.
 */
-func (r Condition) Operator() Operator {
-	if r.IsZero() {
-		return nco
+func (r Condition) Operator() (op Operator) {
+	if r.IsInit() {
+		op = r.condition.op
 	}
-	return r.condition.op
+	return
 }
 
 /*
 Keyword returns the Keyword interface type instance found within the
 receiver.
 */
-func (r Condition) Keyword() string {
-	if r.IsZero() {
-		return ``
+func (r Condition) Keyword() (kw string) {
+	if r.IsInit() {
+		kw = r.condition.kw
 	}
-
-	return r.condition.kw
+	return
 }
 
 /*
 String is a stringer method that returns the string representation
 of the receiver instance. It will only function if the receiver is
 in good standing, and passes validity checks.
+
+Note that if the underlying expression value is not a known type,
+such as a Stack or a Go primitive, this method may be uncertain
+as to what it should do. A bogus string may be returned.
+
+In such a case, it may be necessary to subvert the default string
+representation behavior demonstrated by instances of this type in
+favor of a custom instance of the PresentationPolicy closure type
+for maximum control.
 */
-func (r Condition) String() string {
-	if err := r.Valid(); err != nil {
-		return badCond
+func (r Condition) String() (s string) {
+	if err := r.Valid(); err == nil {
+		s = r.condition.string()
 	}
-	return r.condition.string()
+	return
 }
 
 /*
@@ -1032,8 +1020,14 @@ func (r condition) string() string {
 
 	// begin default presentation
 	// handler ...
+	var raw string
+	if meth := getStringer(r.ex); meth != nil {
+		raw = meth()
+	} else {
+		raw = primitiveStringer(r.ex)
+	}
 
-	val := encapValue(r.cfg.enc, sprintf("%s", r.ex))
+	val := encapValue(r.cfg.enc, raw)
 	var pad string = string(rune(32))
 	if r.cfg.positive(nspad) {
 		pad = ``
@@ -1051,71 +1045,88 @@ func (r condition) string() string {
 mkmsg is the private method called by eventDispatch for the
 purpose of Message assembly prior to submission to a logger.
 */
-func (r *condition) mkmsg(typ string) (Message, bool) {
-	if r.isZero() || len(typ) == 0 {
-		return Message{}, false
+func (r *condition) mkmsg(typ string) (m Message, ok bool) {
+	if r.isInit() {
+		if len(typ) > 0 {
+			m = Message{
+				ID:   getLogID(r.cfg.id),
+				Tag:  typ,
+				Addr: ptrString(r),
+				Type: sprintf("%T", *r),
+				Time: timestamp(),
+				Len:  -1, // initially N/A
+				Cap:  -1, // initially N/A
+			}
+			ok = true
+		}
 	}
 
-	return Message{
-		ID:   getLogID(r.getID()),
-		Tag:  typ,
-		Addr: r.addr(),
-		Type: sprintf("%T", *r),
-		Time: timestamp(),
-		Len:  -1, // initially N/A
-		Cap:  -1, // initially N/A
-	}, true
+	return
 }
 
 /*
 error conditions that are fatal and always serious
 */
-func (r condition) fatal(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+func (r *condition) fatal(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
+	}
 }
 
 /*
 error conditions that are not fatal but potentially serious
 */
-func (r condition) error(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+func (r *condition) error(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
+	}
 }
 
 /*
 extreme depth operational details
 */
-func (r condition) trace(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+func (r *condition) trace(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
+	}
 }
 
 /*
 relatively deep operational details
 */
-func (r condition) debug(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+func (r *condition) debug(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
+	}
 }
 
 /*
 policy method operational details, as well as caps, r/o, etc.
 */
-func (r condition) policy(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+func (r *condition) policy(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
+	}
 }
 
 /*
 calls records in/out signatures and realtime meta-data regarding
 individual method runtimes.
 */
-func (r condition) calls(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel1, `CALL`, data...)
+func (r *condition) calls(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel1, `CALL`, data...)
+	}
 }
 
 /*
 state records interrogations of, and changes to, the underlying
 configuration value.
 */
-func (r condition) state(x any, data ...map[string]string) {
-	r.eventDispatch(x, LogLevel3, `STATE`, data...)
+func (r *condition) state(x any, data ...map[string]string) {
+	if r != nil && x != nil {
+		r.eventDispatch(x, LogLevel3, `STATE`, data...)
+	}
 }
 
 /*
@@ -1130,26 +1141,29 @@ func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...ma
 		return
 	}
 
-	m, ok := r.mkmsg(severity)
-	if !ok {
-		return
+	printers := map[string]func(...any){
+		`FATAL`:  r.logger().Fatalln,
+		`STATE`:  r.logger().Println,
+		`ERROR`:  r.logger().Println,
+		`CALL`:   r.logger().Println,
+		`DEBUG`:  r.logger().Println,
+		`TRACE`:  r.logger().Println,
+		`POLICY`: r.logger().Println,
 	}
 
-	if ok = m.setText(x); !ok {
-		return
-	}
-
-	if len(data) > 0 {
-		if data[0] != nil {
-			m.Data = data[0]
+	if m, ok := r.mkmsg(severity); ok {
+		if ok = m.setText(x); ok {
+			if len(data) > 0 {
+				if data[0] != nil {
+					m.Data = data[0]
+					if _, ok := data[0][`FATAL`]; ok {
+						severity = `ERROR`
+					}
+				}
+			}
+			printers[severity](m)
 		}
 	}
-
-	if eq(severity, `fatal`) {
-		r.logger().Fatalln(m)
-	}
-
-	r.logger().Println(m)
 }
 
 const badCond = `<invalid_condition>`

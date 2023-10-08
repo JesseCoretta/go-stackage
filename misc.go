@@ -61,48 +61,27 @@ func timestamp() string {
 		t.Nanosecond())
 }
 
-func isETravEligible(ok bool, x any) bool {
-	return (isIntKeyedMap(x) || isSliceType(x)) && ok
-}
-
-func isIntKeyedMap(x any) bool {
-	typ := typOf(x)
-	if isPtr(x) {
-		typ = typ.Elem()
-	}
-
-	if typ.Kind() != reflect.Map {
-		return false
-	}
-	return typ.Key().Kind() == reflect.Int
-}
-
-func isSliceType(x any) bool {
-	typ := reflect.TypeOf(x)
-	if isPtr(x) {
-		typ = typ.Elem()
-	}
-
-	return typ.Kind() == reflect.Slice
-}
-
 /*
 errorf wraps errors.New and returns a non-nil instance of error
 based upon a non-nil/non-zero msg input value with optional args.
 */
-func errorf(msg any, x ...any) error {
+func errorf(msg any, x ...any) (err error) {
 	switch tv := msg.(type) {
 	case string:
 		if len(tv) > 0 {
-			return errors.New(sprintf(tv, x...))
+			err = errors.New(sprintf(tv, x...))
 		}
 	case error:
 		if tv != nil {
-			return errors.New(sprintf(tv.Error(), x...))
+			err = errors.New(sprintf(tv.Error(), x...))
 		}
 	}
 
-	return nil
+	return
+}
+
+func isPowerOfTwo(x int) bool {
+	return x&(x-1) == 0
 }
 
 /*
@@ -113,6 +92,20 @@ that case is a significant element in the matching process.
 func strInSlice(str string, slice []string) bool {
 	for i := 0; i < len(slice); i++ {
 		if str == slice[i] {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+strInSliceFold returns a Boolean value indicative of whether
+the specified string (str) is present within slice. Case is
+not significant in the matching process.
+*/
+func strInSliceFold(str string, slice []string) bool {
+	for i := 0; i < len(slice); i++ {
+		if eq(str, slice[i]) {
 			return true
 		}
 	}
@@ -177,37 +170,25 @@ of Stack. This will only work if input value u is a type alias of Stack. An
 instance of Stack is returned along with a success-indicative Boolean value.
 */
 func stackTypeAliasConverter(u any) (S Stack, converted bool) {
-	if u == nil {
-		return
-	}
+	if u != nil {
+		// If it isn't a Stack alias, but is a
+		// genuine Stack, just pass it back
+		// with a thumbs-up ...
+		if st, isStack := u.(Stack); isStack {
+			S = st
+			converted = isStack
+			return
+		}
 
-	// If it isn't a Stack alias, but is a
-	// genuine Stack, just pass it back
-	// with a thumbs-up ...
-	if st, isStack := u.(Stack); isStack {
-		S = st
-		converted = isStack
-		return
-	}
-
-	a := typOf(u) // current (src) type
-	v := valOf(u) // current (src) value
-
-	// unwrap any pointers for
-	// maximum compatibility
-	if isPtr(u) {
-		a = a.Elem()
-		v = v.Elem()
-	}
-
-	b := typOf(Stack{}) // target (dest) type
-	if a.ConvertibleTo(b) {
-		X := v.Convert(b).Interface()
-		if assert, ok := X.(Stack); ok {
-			if !assert.IsZero() {
-				S = assert
-				converted = true
-				return
+		a, v := derefPtr(u)
+		b := typOf(Stack{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Stack); ok {
+				if !assert.IsZero() {
+					S = assert
+					converted = true
+				}
 			}
 		}
 	}
@@ -221,39 +202,41 @@ of Condition. This will only work if input value u is a type alias of Condition.
 instance of Condition is returned along with a success-indicative Boolean value.
 */
 func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
-	if u == nil {
-		return
+	if u != nil {
+		// If it isn't a Condition alias, but is a
+		// genuine Condition, just pass it back
+		// with a thumbs-up ...
+		if co, isCond := u.(Condition); isCond {
+			C = co
+			converted = isCond
+			return
+		}
+
+		a, v := derefPtr(u)
+		b := typOf(Condition{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Condition); ok {
+				if !assert.IsZero() {
+					C = assert
+					converted = true
+				}
+			}
+		}
 	}
 
-	// If it isn't a Condition alias, but is a
-	// genuine Condition, just pass it back
-	// with a thumbs-up ...
-	if co, isCond := u.(Condition); isCond {
-		C = co
-		converted = isCond
-		return
-	}
+	return
+}
 
-	a := typOf(u) // current (src) type
-	v := valOf(u) // current (src) value
+func derefPtr(u any) (t reflect.Type, v reflect.Value) {
+	t = typOf(u) // current (src) type
+	v = valOf(u) // current (src) value
 
 	// unwrap any pointers for
 	// maximum compatibility
 	if isPtr(u) {
-		a = a.Elem()
+		t = t.Elem()
 		v = v.Elem()
-	}
-
-	b := typOf(Condition{}) // target (dest) type
-	if a.ConvertibleTo(b) {
-		X := v.Convert(b).Interface()
-		if assert, ok := X.(Condition); ok {
-			if !assert.IsZero() {
-				C = assert
-				converted = true
-				return
-			}
-		}
 	}
 
 	return
@@ -264,52 +247,15 @@ getStringer uses reflect to obtain and return a given
 type instance's String ("stringer") method, if present.
 If not, nil is returned.
 */
-func getStringer(x any) func() string {
-	if x == nil {
-		return nil
+func getStringer(x any) (meth func() string) {
+	if v := valOf(x); !v.IsZero() {
+		if method := v.MethodByName(`String`); method.Kind() != reflect.Invalid {
+			if _meth, ok := method.Interface().(func() string); ok {
+				meth = _meth
+			}
+		}
 	}
-
-	v := valOf(x)
-	if v.IsZero() {
-		return nil
-	}
-	method := v.MethodByName(`String`)
-	if method.Kind() == reflect.Invalid {
-		return nil
-	}
-
-	if meth, ok := method.Interface().(func() string); ok {
-		return meth
-	}
-
-	return nil
-}
-
-/*
-getIDFunc uses reflect to obtain and return a given
-type instance's ID method, if present. If not, a zero
-string is returned.
-*/
-func getIDFromAny(x any) func() string {
-	if x == nil {
-		return nil
-	}
-
-	v := valOf(x)
-	if v.IsZero() {
-		return nil
-	}
-
-	method := v.MethodByName(`ID`)
-	if method.Kind() == reflect.Invalid {
-		return nil
-	}
-
-	if meth, ok := method.Interface().(func() string); ok {
-		return meth
-	}
-
-	return nil
+	return
 }
 
 /*
@@ -370,27 +316,25 @@ func padValue(do bool, value string) string {
 foldValue will apply lc (Strings.ToLower) and uc (Strings.ToUpper)
 to the value based on the "do" disposition (do, or do not).
 */
-func foldValue(do bool, value string) string {
-	if len(value) == 0 {
-		return value // ???
-	}
-
-	if do {
-		if iuc(rune(value[0])) {
-			return lc(value) // fold to lower
+func foldValue(do bool, value string) (s string) {
+	s = value
+	if len(value) > 0 {
+		if do {
+			s = uc(value) // default to upper
+			if iuc(rune(value[0])) {
+				s = lc(value) // fold to lower
+			}
 		}
-		return uc(value) // fold to upper
 	}
 
-	return value // do not.
+	return
 }
 
-func isPtr(x any) bool {
-	if x == nil {
-		return false
+func isPtr(x any) (is bool) {
+	if x != nil {
+		is = typOf(x).Kind() == reflect.Ptr
 	}
-
-	return typOf(x).Kind() == reflect.Ptr
+	return
 }
 
 func isNumberPrimitive(x any) bool {
@@ -422,102 +366,88 @@ func isBoolPrimitive(x any) bool {
 	return false
 }
 
-func isKnownPrimitive(x any) bool {
+func isKnownPrimitive(x any) (is bool) {
 	if isStringPrimitive(x) {
-		return true
+		is = true
 	} else if isNumberPrimitive(x) {
-		return true
+		is = true
 	} else if isBoolPrimitive(x) {
-		return true
+		is = true
 	}
 
-	return false
+	return
 }
 
-func numberStringer(x any) string {
+func numberStringer(x any) (s string) {
+	s = `NaN`
 	switch tv := x.(type) {
 	case float32, float64:
-		return floatStringer(tv)
+		s = floatStringer(tv)
 	case complex64, complex128:
-		return complexStringer(tv)
+		s = complexStringer(tv)
 	case int, int8, int16, int32, int64:
-		return intStringer(tv)
+		s = intStringer(tv)
 	case uint, uint8, uint16, uint32, uint64, uintptr:
-		return uintStringer(tv)
+		s = uintStringer(tv)
 	}
 
-	return `NaN`
+	return
 }
 
-func primitiveStringer(x any) string {
-	if !isKnownPrimitive(x) {
-		return ``
-	}
-	if isBoolPrimitive(x) {
-		return boolStringer(x)
-	}
-	if isNumberPrimitive(x) {
-		return numberStringer(x)
-	}
-	if isStringPrimitive(x) {
-		return x.(string)
+func primitiveStringer(x any) (s string) {
+	s = sprintf(`unsupported_primitive_type_%T`, x)
+	if isKnownPrimitive(x) {
+		switch {
+		case isBoolPrimitive(x):
+			s = boolStringer(x)
+		case isNumberPrimitive(x):
+			s = numberStringer(x)
+		case isStringPrimitive(x):
+			s = x.(string)
+		}
 	}
 
-	return `unsupported_stringer_type`
+	return
 }
 
 func boolStringer(x any) string {
 	return sprintf("%t", x.(bool))
 }
 
-func floatStringer(x any) string {
+func floatStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case float64:
-		return sprintf("%.02f", tv)
+	case float32, float64:
+		s = sprintf("%f", tv)
 	}
 
-	return sprintf("%.02f", x.(float32))
+	return
 }
 
-func complexStringer(x any) string {
+func complexStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case complex128:
-		return sprintf("%v", tv)
+	case complex64, complex128:
+		s = sprintf("%v", tv)
 	}
 
-	return sprintf("%v", x.(complex64))
+	return
 }
 
-func uintStringer(x any) string {
+func uintStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case uint8:
-		return sprintf("%d", tv)
-	case uint16:
-		return sprintf("%d", tv)
-	case uint32:
-		return sprintf("%d", tv)
-	case uint64:
-		return sprintf("%d", tv)
-	case uintptr:
-		return sprintf("%d", tv)
+	case uint, uint8, uint16, uint32, uint64, uintptr:
+		s = sprintf("%d", tv)
 	}
 
-	return sprintf("%d", x.(uint))
+	return
 }
 
-func intStringer(x any) string {
+func intStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case int8:
-		return sprintf("%d", tv)
-	case int16:
-		return sprintf("%d", tv)
-	case int32:
-		return sprintf("%d", tv)
-	case int64:
-		return sprintf("%d", tv)
+	case int, int8, int16, int32, int64:
+		s = sprintf("%d", tv)
 	}
 
-	return sprintf("%d", x.(int))
+	return
 }
 
 /*

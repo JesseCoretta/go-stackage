@@ -74,9 +74,9 @@ const (
 )
 
 func (r logLevels) String() string {
-	if LogLevel(r) == AllLogLevels {
+	if int(r) == int(AllLogLevels) {
 		return `ALL`
-	} else if LogLevel(r) == NoLogLevels {
+	} else if int(r) == 0 {
 		return `NONE`
 	}
 
@@ -110,9 +110,6 @@ set to ^LogLevel(0) (uint16(65535)) and any remaining shifts shall be
 discarded. Predictably, "shift 65535" translates to "log everything".
 */
 func (r *logSystem) shift(l ...any) *logSystem {
-	if r == nil {
-		r = newLogSystem(devNull)
-	}
 	r.lvl.shift(l...)
 	return r
 }
@@ -124,6 +121,7 @@ logSystem struct type, et al.
 func (r *logLevels) shift(l ...any) *logLevels {
 	for i := 0; i < len(l); i++ {
 		var ll LogLevel // current iteration's resolved loglevel stored here
+		var ok bool
 
 		// Perform type-switch upon the
 		// currently iterated 'any' (#i)
@@ -133,38 +131,33 @@ func (r *logLevels) shift(l ...any) *logLevels {
 			// value could be a loglevel NAME. Try to
 			// resolve it, and pay no regard to case
 			// folding.
-			var found bool
-			if ll, found = logLevelMap[uc(tv)]; !found {
-				continue
-			}
+			ll, ok = logLevelMap[uc(tv)]
 
 		case LogLevel:
 			// value is a LogLevel instance. Just take
 			// it at face value.
 			ll = tv
-		default:
-			// no other types make sense for support,
-			// so skip to the next iteration.
-			continue
+			ok = true
+		case int:
+			ll = LogLevel(tv)
+			ok = true
 		}
 
-		if ll == NoLogLevels {
-			// clobber loglevel with zero (0) and
-			// ditch remaining iteration(s).
+		if logLevels(ll) == logLevels(0) {
 			*r = logLevels(NoLogLevels)
-			return r
-		} else if ll == AllLogLevels {
-			// clobber loglevel with ^uint16(0) (max)
-			// and ditch remaining iteration(s).
+			break
+		} else if logLevels(ll) == ^logLevels(0) {
 			*r = logLevels(AllLogLevels)
-			return r
+			break
 		}
 
 		// Loglevel is neither "all" nor "none",
 		// meaning is a singular, discrete log
 		// verbosity specifier; shift it into
 		// current value, don't clobber.
-		*r |= logLevels(ll)
+		if ok {
+			*r |= logLevels(ll)
+		}
 	}
 
 	return r
@@ -184,11 +177,6 @@ If any of l's values are LogLevel16, the receiver shall be set to zero
 in this context translates to "log nothing".
 */
 func (r *logSystem) unshift(l ...any) *logSystem {
-	if r.isZero() {
-		r = newLogSystem(devNull)
-		return r
-	}
-
 	r.lvl.unshift(l...)
 	return r
 }
@@ -196,34 +184,34 @@ func (r *logSystem) unshift(l ...any) *logSystem {
 func (r *logLevels) unshift(l ...any) *logLevels {
 	for i := 0; i < len(l); i++ {
 		var ll LogLevel
+		var ok bool
+
 		switch tv := l[i].(type) {
 		case string:
 			// value could be a loglevel NAME. Try to
 			// resolve it, and pay no regard to case
 			// folding.
-			var found bool
-			if ll, found = logLevelMap[uc(tv)]; !found {
-				continue
-			}
+			ll, ok = logLevelMap[uc(tv)]
 
 		case LogLevel:
 			// value is a LogLevel instance. Just take
 			// it at face value.
 			ll = tv
-		default:
-			// no other types make sense for support,
-			// so skip to the next iteration.
+			ok = true
+		case int:
+			ll = LogLevel(tv)
+			ok = true
+		}
+
+		if logLevels(ll) == logLevels(0) {
 			continue
+		} else if logLevels(ll) == ^logLevels(0) {
+			break
 		}
 
-		if ll == NoLogLevels {
-			continue // WAT.
-		} else if ll == AllLogLevels {
-			*r = logLevels(ll)
-			return r
+		if ok {
+			*r = (*r &^ logLevels(ll))
 		}
-
-		*r = (*r &^ logLevels(ll))
 	}
 	return r
 }
@@ -233,59 +221,50 @@ positive returns a Boolean value indicative of whether the receiver
 contains the bit value for the specified logLevel. In context, this
 means "logLevel <X>" is either active (true) or not (false).
 */
-func (r logSystem) positive(l any) bool {
-	if r.isZero() {
-		return false
+func (r logSystem) positive(l any) (posi bool) {
+	if !r.isZero() {
+		posi = r.lvl.positive(l)
 	}
-
-	return r.lvl.positive(l)
+	return
 }
 
-func (r logLevels) positive(l any) bool {
+func (r logLevels) positive(l any) (posi bool) {
 	if r == logLevels(0) {
-		return false
+		return
 	} else if r == ^logLevels(0) {
-		return true
+		posi = true
+		return
 	}
 
 	var ll LogLevel
+	var ok bool
 	switch tv := l.(type) {
-	case string:
-		// value could be a loglevel NAME. Try to
-		// resolve it, and pay no regard to case
-		// folding.
-		var found bool
-		if ll, found = logLevelMap[uc(tv)]; !found {
-			return false
-		}
-
 	case LogLevel:
 		// value is a LogLevel instance. Just take
 		// it at face value.
 		ll = tv
-	default:
-		return false
+		ok = true
 	}
 
-	result := (r & logLevels(ll)) != 0
+	if ok {
+		posi = (r & logLevels(ll)) != 0
+	}
 
-	return result
+	return
 }
 
-func (r *logSystem) isZero() bool {
-	if r == nil {
-		return true
+func (r *logSystem) isZero() (is bool) {
+	if r != nil {
+		is = r.log == nil && r.lvl == logLevels(NoLogLevels)
 	}
-
-	return r.log == nil && r.lvl == logLevels(NoLogLevels)
+	return
 }
 
-func (r logSystem) logger() *log.Logger {
-	if r.isZero() {
-		return nil
+func (r logSystem) logger() (l *log.Logger) {
+	if !r.isZero() {
+		l = r.log
 	}
-
-	return r.log
+	return
 }
 
 func (r *logSystem) setLogger(logger any) *logSystem {
@@ -333,6 +312,10 @@ SetLogger method. Similar semantics apply.
 */
 func SetDefaultConditionLogger(logger any) {
 	cLogDefault = resolveLogger(logger)
+}
+
+func DefaultConditionLogLevel() int {
+	return int(cLogLevelDefault)
 }
 
 /*
@@ -399,6 +382,10 @@ SetLogger method. Similar semantics apply.
 */
 func SetDefaultStackLogger(logger any) {
 	sLogDefault = resolveLogger(logger)
+}
+
+func DefaultStackLogLevel() int {
+	return int(sLogLevelDefault)
 }
 
 /*
@@ -510,23 +497,17 @@ type Message struct {
 }
 
 func (r *Message) setText(txt any) (ok bool) {
+	r.Msg = sprintf("Unidentified or zero debug payload (%T)", txt)
+
 	switch tv := txt.(type) {
 	case error:
-		if tv == nil {
-			break
+		if ok = tv != nil; ok {
+			r.Msg = tv.Error()
 		}
-
-		r.Msg = tv.Error()
 	case string:
-		if len(tv) == 0 {
-			break
+		if ok = len(tv) != 0; ok {
+			r.Msg = tv
 		}
-
-		r.Msg = tv
-	}
-
-	if ok = len(r.Msg) > 0; !ok {
-		r.Msg = sprintf("Unidentified or zero debug payload (%T)", txt)
 	}
 
 	return
@@ -545,38 +526,36 @@ closure type and override the string representation procedure for instances
 of this type (thus implementing any syntax or format they wish, i.e.: XML,
 YAML, et al).
 */
-func (r Message) String() string {
-	if !r.Valid() {
-		return ``
-	} else if r.PPol != nil {
-		return r.PPol()
+func (r Message) String() (data string) {
+	if r.PPol != nil {
+		data = r.PPol()
+		return
 	}
 
-	b, err := json.Marshal(&r)
-	if err != nil {
-		return ``
-	}
+	if r.Valid() {
+		if b, err := json.Marshal(&r); err == nil {
+			var replacements [][]string = [][]string{
+				{`\\u`, `\u`},
+				{`<nil>`, `nil`},
+				{` <= `, ` LE `},
+				{` >= `, ` GE `},
+				{` < `, ` LT `},
+				{` > `, ` GT `},
+				{`&&`, `SYMBOLIC_AND`},
+				{`&`, `AMPERSAND`},
+				{`||`, `SYMBOLIC_OR`},
+			}
 
-	var replacements [][]string = [][]string{
-		{`\\u`, `\u`},
-		{`<nil>`, `nil`},
-		{` <= `, ` LE `},
-		{` >= `, ` GE `},
-		{` < `, ` LT `},
-		{` > `, ` GT `},
-		{`&&`, `SYMBOLIC_AND`},
-		{`&`, `AMPERSAND`},
-		{`||`, `SYMBOLIC_OR`},
-	}
-
-	var data string = string(b)
-	for _, repl := range replacements {
-		if str, err := uq(rplc(qt(data), repl[0], repl[1])); err == nil {
-			data = string(json.RawMessage(str))
+			data = string(b)
+			for _, repl := range replacements {
+				if str, err := uq(rplc(qt(data), repl[0], repl[1])); err == nil {
+					data = string(json.RawMessage(str))
+				}
+			}
 		}
 	}
 
-	return data
+	return
 }
 
 /*

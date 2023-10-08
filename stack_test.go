@@ -1,10 +1,139 @@
 package stackage
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"testing"
 	_ "time"
 )
+
+func ExampleComparisonOperator_Context() {
+	var cop ComparisonOperator = Ge
+	fmt.Printf("Context: %s", cop.Context())
+	// Output: Context: comparison
+}
+
+func ExampleComparisonOperator_String() {
+	var cop ComparisonOperator = Ge
+	fmt.Printf("Operator: %s", cop)
+	// Output: Operator: >=
+}
+
+func ExampleStack_Addr() {
+	var c Stack = List().Push(`this`, `and`, `that`)
+	fmt.Printf("Address ID has '0x' prefix: %t", c.Addr()[:2] == `0x`)
+	// Output: Address ID has '0x' prefix: true
+}
+
+func ExampleStack_Auxiliary() {
+	// make a stack ... any type would do
+	l := List().Push(`this`, `that`, `other`)
+
+	// one can put anything they wish into this map,
+	// so we'll do a bytes.Buffer since it is simple
+	// and commonplace.
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	_, _ = buf.WriteString(`some .... data .....`)
+
+	// Create our map (one could also use make
+	// and populate it piecemeal as opposed to
+	// in-line, as we do below).
+	l.SetAuxiliary(map[string]any{
+		`buffer`: buf,
+	})
+
+	//  Call our map and call its 'Get' method in one-shot
+	if val, ok := l.Auxiliary().Get(`buffer`); ok {
+		fmt.Printf("%s", val)
+	}
+	// Output: some .... data .....
+}
+
+func ExampleAuxiliary_Get() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	val, ok := aux.Get(`value`)
+	if ok {
+		fmt.Printf("%d", val)
+	}
+	// Output: 18
+}
+
+func ExampleAuxiliary_Set() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	aux.Set(`color`, `red`)
+	aux.Set(`max`, 200)
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 3
+}
+
+func ExampleAuxiliary_Unset() {
+	var aux Auxiliary = make(Auxiliary, 0)
+	aux.Set(`value`, 18)
+	aux.Set(`color`, `red`)
+	aux.Set(`max`, 200)
+	aux.Unset(`max`)
+
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 2
+}
+
+func ExampleAuxiliary_Len() {
+	aux := Auxiliary{
+		`value`: 18,
+	}
+	fmt.Printf("Len: %d", aux.Len())
+	// Output: Len: 1
+}
+
+func ExampleSetDefaultStackLogLevel() {
+	SetDefaultStackLogLevel(
+		LogLevel1 + // 1
+			LogLevel4 + // 8
+			UserLogLevel2 + // 128
+			UserLogLevel5, // 1024
+	)
+	custom := DefaultStackLogLevel()
+
+	// turn loglevel to none
+	SetDefaultStackLogLevel(NoLogLevels)
+	off := DefaultStackLogLevel()
+
+	fmt.Printf("%d (custom), %d (off)", custom, off)
+	// Output: 1161 (custom), 0 (off)
+}
+
+func ExampleDefaultStackLogLevel() {
+	fmt.Printf("%d", DefaultStackLogLevel())
+	// Output: 0
+}
+
+/*
+This example demonstrates setting a custom logger which writes
+to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
+invoked, and an event -- the creation of a Basic Stack -- shall
+trigger log events that are funneled into our bytes.Buffer.
+
+For the sake of idempotent test results, the length of the buffer
+is checked only to ensure it is greater than 0.
+*/
+func ExampleSetDefaultStackLogger() {
+	var buf *bytes.Buffer = &bytes.Buffer{}
+	var customLogger *log.Logger = log.New(buf, ``, 0)
+	SetDefaultStackLogger(customLogger)
+	SetDefaultStackLogLevel(AllLogLevels) // highly verbose!
+
+	// do something that triggers log events ...
+	_ = Basic().Push(
+		Cond(`π`, Eq, float64(3.14159265358979323)),
+		Cond(`m`, Eq, `mc²`),
+	)
+
+	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
+	// Output: *bytes.Buffer.Len>0 (bytes): true
+}
 
 var testParens []string = []string{`(`, `)`}
 
@@ -12,6 +141,15 @@ type customStack Stack // simulates a user-defined type that aliases a Stack
 
 func (r customStack) String() string {
 	return Stack(r).String()
+}
+
+type customStruct struct {
+	Type  string
+	Value any
+}
+
+func (r customStruct) String() string {
+	return `struct_value`
 }
 
 func ExampleStack_SetAuxiliary() {
@@ -190,6 +328,8 @@ func TestStack_And001(t *testing.T) {
 		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
 		return
 	}
+
+	_, _ = got.Traverse(0, 2, 6, 19)
 }
 
 func TestStack_Insert(t *testing.T) {
@@ -223,7 +363,7 @@ func TestStack_Insert(t *testing.T) {
 }
 
 func TestStack_Replace(t *testing.T) {
-	s := List().SetDelimiter(rune(44)).Push(
+	s := List().SetDelimiter(rune(44)).NoPadding(true).Push(
 		`testing1`,
 		`testing2`,
 		`testing3`,
@@ -274,6 +414,39 @@ func TestStack_Transfer(t *testing.T) {
 	if or.Len() != 3 && stk.Len() != 0 {
 		t.Errorf("%s failed [post-transfer src reset]: want slen:%d; dlen:%d, got slen:%d; dlen:%d",
 			t.Name(), 0, 3, stk.Len(), or.Len())
+		return
+	}
+}
+
+func TestStack_Traverse(t *testing.T) {
+
+	stk := Basic().Push(
+		1,
+		Basic().Push(2),
+		Cond(`keyword`, Eq, Basic().Push(3)),
+	)
+
+	slice, _ := stk.Traverse(0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(1)
+	if _, ok := slice.(Stack); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 2", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(1, 0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 2", t.Name(), slice)
+		return
+	}
+
+	slice, _ = stk.Traverse(2, 0)
+	if _, ok := slice.(int); !ok {
+		t.Errorf("%s failed: unexpected type %T at depth 3", t.Name(), slice)
 		return
 	}
 }
@@ -415,6 +588,27 @@ func ExampleOr_symbolicOr() {
 }
 
 /*
+This example demonstrates the creation of a List stack, a stack type suitable for
+general use.
+*/
+func ExampleList() {
+	l := List().Push(
+		1.234,
+		1+3i,
+		`hello mr thompson`,
+	)
+
+	l.SetDelimiter('?')
+
+	// alternatives ...
+	//l.JoinDelim(`,`) 	//strings ok too!
+	//l.JoinDelim(`delim`)
+
+	fmt.Printf("%s", l)
+	// Output: 1.234000 ? (1+3i) ? hello mr thompson
+}
+
+/*
 This example demonstrates ANDed stack values using the double ampersand (&&) symbol.
 */
 func ExampleAnd_symbolicAnd() {
@@ -487,7 +681,7 @@ func TestList_001(t *testing.T) {
 
 func TestList_001_withNoDelim(t *testing.T) {
 
-	A := List().Push(
+	A := List().NoPadding(true).Push(
 		`(top_element_number_0)`,
 		`(top_element_number_1)`,
 		`(top_element_number_2)`,
@@ -501,7 +695,7 @@ func TestList_001_withNoDelim(t *testing.T) {
 }
 
 func TestCustomStack001(t *testing.T) {
-	A := List().SetDelimiter(`,`).Push(
+	A := List().SetDelimiter(`,`).NoPadding().Push(
 		`top_element_number_0`,
 		`top_element_number_1`,
 		`top_element_number_2`,
@@ -676,13 +870,40 @@ func TestBasic(t *testing.T) {
 	}
 }
 
+func TestFactorNegIndex(t *testing.T) {
+	b := Basic().NegativeIndices(true)
+	b.Push(
+		float64(3.14159),
+		float64(-9.378),
+		float64(109.9103),
+	)
+
+	// +1 offset for hidden cfg slice
+	for i, v := range map[int]int{
+		-1:  2,
+		-2:  1,
+		-3:  0,
+		-4:  2,
+		-5:  1,
+		-12: 0,
+		-24: 0,
+	} {
+		I := factorNegIndex(i, b.Len()) - 1
+		if I != v && I-(I*2) <= b.Len() {
+			t.Errorf("%s failed [key:%d]: want '%d', got '%d'", t.Name(), i, v, I)
+			return
+		}
+	}
+}
+
 func TestBasic_withCapacity(t *testing.T) {
-	b := Basic(2)
+	cp := 2
+	b := Basic(cp)
 
 	// make sure the instance correctly
 	// reflects the capacity imposed.
-	if got := b.Cap(); got != 2 {
-		t.Errorf("%s failed: unexpected capacity value found; want %d, got %d", t.Name(), 2, got)
+	if got := b.Cap(); got != cp {
+		t.Errorf("%s failed: unexpected capacity value found; want %d, got %d", t.Name(), cp, got)
 		return
 	}
 
@@ -694,14 +915,16 @@ func TestBasic_withCapacity(t *testing.T) {
 	)
 
 	// make sure only two (2) made it in
-	if b.Len() != 2 || !b.CapReached() {
-		t.Errorf("%s failed: maximum capacity (%d) not honored; want len:%d, got len:%d", t.Name(), b.Cap(), 2, b.Len())
+	if b.Len() != cp || !b.CapReached() {
+		t.Errorf("%s failed: maximum capacity (%d) not honored; want len:%d, got len:%d", t.Name(), b.Cap(), cp, b.Len())
 		return
 	}
 }
 
 func TestBasic_availableCapacity(t *testing.T) {
-	b := Basic(2)
+	// allocate w/ max 2
+	cp := 2
+	b := Basic(cp)
 	b.Push(
 		float64(3.14159),
 		float64(-9.378),
@@ -709,13 +932,14 @@ func TestBasic_availableCapacity(t *testing.T) {
 	)
 
 	if b.Avail() != 0 {
-		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 2, b.Avail())
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), cp, b.Avail())
 		return
 	}
 
-	b = Basic(5)
-	if b.Avail() != 5 {
-		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), 5, b.Avail())
+	// reallocate w/ max 5
+	cp = 5
+	if b = Basic(cp); b.Avail() != cp {
+		t.Errorf("%s failed: unexpected available slice count; want len:%d, got len:%d", t.Name(), cp, b.Avail())
 		return
 	}
 }
@@ -825,19 +1049,6 @@ func ExampleBasic_withCapacity() {
 	// Output: 2
 }
 
-func TestList_Join(t *testing.T) {
-	L := List().SetDelimiter(`,`).Push(
-		`item1`,
-		`item2`,
-	)
-	want := `item1,item2`
-	got := L.String()
-	if want != got {
-		t.Errorf("%s failed: want '%s', got '%s'", t.Name(), want, got)
-		return
-	}
-}
-
 /*
 This example demonstrates the creation of a list stack
 using comma delimitation.
@@ -845,12 +1056,83 @@ using comma delimitation.
 func ExampleStack_SetDelimiter() {
 	// note: one could also use a rune
 	// e.g: ',' or rune(44) for comma.
-	L := List().SetDelimiter(`,`).Push(
+	L := List().SetDelimiter(`+`).Push(
 		`item1`,
 		`item2`,
 	)
 	fmt.Printf("%s", L)
-	// Output: item1,item2
+	// Output: item1 + item2
+}
+
+func ExampleStack_Transfer() {
+	var source Stack = Basic().Push(1, 2, 3, 4)
+	var dest Stack = Basic()
+	source.Transfer(dest)
+	slice, _ := dest.Index(2)
+	fmt.Printf("%d", slice.(int))
+	// Output: 3
+}
+
+func ExampleStack_Insert() {
+	var stk Stack = Basic().Push(1, 2, 3, 5)
+	add := 4
+	idx := 3
+	stk.Insert(add, idx)
+	slice, _ := stk.Index(idx)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_ForwardIndices() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.ForwardIndices(true)
+	slice, _ := stk.Index(1000)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_NegativeIndices() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.NegativeIndices(true)
+	slice, _ := stk.Index(-1)
+	fmt.Printf("%d", slice.(int))
+	// Output: 4
+}
+
+func ExampleStack_SetID_random() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+
+	// can't predict what ID will
+	// be, so we'll check length
+	// which should always be 24.
+	stk.SetID(`_random`)
+	fmt.Printf("Random ID len: %d", len(stk.ID()))
+	// Output: Random ID len: 24
+}
+
+func ExampleStack_SetID_pointerAddress() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+
+	// can't predict what ID will be,
+	// so we'll check the prefix to
+	// be certain it begins with '0x'.
+	stk.SetID(`_addr`)
+	fmt.Printf("Address ID has '0x' prefix: %t", stk.ID()[:2] == `0x`)
+	// Output: Address ID has '0x' prefix: true
+}
+
+func ExampleStack_Category() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.SetCategory(`basic_stuff`)
+	fmt.Printf("Category: %s", stk.Category())
+	// Output: Category: basic_stuff
+}
+
+func ExampleStack_SetCategory() {
+	var stk Stack = Basic().Push(1, 2, 3, 4)
+	stk.SetCategory(`basic_stuff`)
+	fmt.Printf("Category: %s", stk.Category())
+	// Output: Category: basic_stuff
 }
 
 /*
@@ -891,6 +1173,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 					Or().Push(
 						Cond(`dayofweek`, Ne, "Wednesday"),
 						Cond(`ssf`, Ge, "128"),
+						Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
 					),
 				),
 			),
@@ -899,6 +1182,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 					Cond(`keyword2`, Lt, "someothervalue"),
 				),
 			),
+			Cond(`keyword`, Gt, Or().Push(`...`)),
 		),
 		`this2`,
 	)
@@ -913,6 +1197,7 @@ func TestStack_Reveal_experimental001(t *testing.T) {
 	table := []row{
 		{0, [][]int{{1, 2, 0, 0}, {1, 2}}, ``, nil},
 		{1, [][]int{{1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}}, ``, nil},
+		//{2, [][]int{{1, 1, 1, 0, 2, 0, 0, 0}, {1, 1, 1, 0, 2}}, ``, nil},
 	}
 
 	// Scan the target values we'll be using for
@@ -980,7 +1265,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 			),
 		),
 		nil,
-		nil,
+		Cond(`keyword`, Eq, Basic().Push(1, 2, nil, 3, nil, nil, 4)),
 		nil,
 		nil,
 		3.14159,
@@ -1006,7 +1291,7 @@ func TestDefrag_experimental_001(t *testing.T) {
 
 	// verify no errors resulted from the attempt
 	// to defragment our stack
-	if err := l.Defrag().Err(); err != nil {
+	if err := l.Defrag(-1).Err(); err != nil {
 		t.Errorf("%s failed: %v", t.Name(), err)
 		return
 	}
@@ -1020,6 +1305,193 @@ func TestDefrag_experimental_001(t *testing.T) {
 			t.Name(), offsetLen, afterLen)
 		return
 	}
+
+}
+
+func TestStack_withCap(t *testing.T) {
+	src := Basic().Push(
+		`element0`,
+		`element1`,
+		`element2`,
+		`element3`,
+		`element4`,
+		`element5`,
+		`element6`,
+		`element7`,
+		`element8`,
+		`element9`,
+	)
+
+	dst := Basic(3).Push(
+		`element0a`,
+		`element0b`,
+		`element0c`,
+	)
+
+	src.Transfer(dst)
+
+	if dst.Len() != 3 {
+		t.Errorf("%s failed; transfer process bypassed capacity constraints; want len:%d, got len:%d",
+			t.Name(), 3, dst.Len())
+		return
+	}
+
+	dst.Insert(struct{}{}, 2)
+	if dst.Len() != 3 {
+		t.Errorf("%s failed; insert process bypassed capacity constraints; want len:%d, got len:%d",
+			t.Name(), 3, dst.Len())
+		return
+	}
+}
+
+func TestStack_codecov(t *testing.T) {
+	var s Stack
+	// panic checks
+	s.debug(``)
+	s.debug(nil)
+	s.error(``)
+	s.error(nil)
+	s.trace(``)
+	s.trace(nil)
+	s.state(``)
+	s.state(nil)
+	s.calls(``)
+	s.calls(nil)
+	s.Len()
+	s.IsZero()
+	s.IsInit()
+	s.Valid()
+	s.Pop()
+
+	var ll logLevels
+	ll.shift(`trace`)
+	ll.shift(nil)
+	ll.shift('a')
+	ll.shift()
+	ll.shift(0)
+	ll.shift(65535)
+
+	ll.positive(`trace`)
+	ll.positive(nil)
+	ll.positive('a')
+	ll.positive(0)
+	ll.positive(65535)
+
+	ll.unshift(`trace`)
+	ll.unshift(nil)
+	ll.unshift('a')
+	ll.unshift()
+	ll.unshift(0)
+	ll.unshift(65535)
+
+	var lsys *logSystem = newLogSystem(sLogDefault)
+	if lsys.isZero() {
+		t.Errorf("%s failed: nil %T",
+			t.Name(), lsys.logger())
+	}
+
+	s.CanMutex()
+	s.Avail()
+	s.string()
+	s.IsEncap()
+	s.SetAuxiliary(nil)
+	s.SetLogger(nil)
+	s.NoNesting()
+	s.NoNesting(true)
+	s.NoNesting(false)
+	s.Logger()
+
+	s = List()
+	s.Pop()
+	s.Push(-1, -2, -3, -4, -5)
+	s.NegativeIndices(true)
+
+	for i := 0; i < s.Len(); i++ {
+		offset := i - (i + 1)
+
+		slice, _ := s.Index(i)
+		want, _ := slice.(int)
+
+		slice, _ = s.Index(offset - want)
+		got, _ := slice.(int)
+
+		if want != got {
+			t.Errorf("%s failed [loop:%d]: want %d, got %d",
+				t.Name(), i, want, got)
+			return
+		}
+	}
+
+	s.config()
+	s.IsEncap()
+	s.ReadOnly()
+	s.ReadOnly(true)
+	s.ReadOnly(false)
+	s.IsReadOnly()
+	s.Avail()
+	s.traverse()
+	s.string()
+	s.Paren()
+	s.Paren(true)
+	s.Paren(false)
+	s.debug(``)
+	s.debug(nil)
+	s.error(``)
+	s.error(nil)
+	s.policy(``)
+	s.policy(nil)
+	s.trace(``)
+	s.trace(nil)
+	s.state(``)
+	s.state(nil)
+	s.calls(``)
+	s.calls(nil)
+	s.NoNesting()
+	s.NoNesting(true)
+	s.CanNest()
+	s.NoNesting(false)
+	s.CanMutex()
+
+	s.ReadOnly()
+	s.ReadOnly(true)
+	s.ReadOnly(false)
+
+	s.Push(customStruct{`keyword`, `vaLUE`})
+	_ = s.String()
+
+	s.SetAuxiliary(nil)
+	s.SetLogger(nil)
+	s.Logger()
+
+	s.fatal(`test fatal`, map[string]string{
+		`FATAL`: `false`,
+	})
+
+	SetDefaultStackLogLevel(`none`)
+	SetDefaultStackLogLevel(0)
+	SetDefaultStackLogLevel(nil)
+	SetDefaultStackLogLevel('a')
+	s.SetLogger(`stderr`)
+	s.SetLogger(2)
+	s.SetLogger(`stdout`)
+	s.SetLogger(1)
+	s.SetLogger(sLogDefault)
+
+	s.SetLogLevel(8, 16)
+	s.UnsetLogLevel(8, 16)
+
+	s.SetLogLevel(LogLevel4, LogLevel5)
+	s.LogLevels()
+	s.UnsetLogLevel(LogLevel4, LogLevel5)
+	s.Logger()
+
+	s.SetErr(errorf(`this is a serious error`))         // txt err
+	s.SetErr(errorf(errorf(`this is a serious error`))) // err err
+	s.Err()
+	s.SetErr(nil)
+
+	s.SetLogger(`off`)
+	s.SetLogger(0)
 }
 
 func init() {

@@ -884,6 +884,7 @@ func TestFactorNegIndex(t *testing.T) {
 		-2:  1,
 		-3:  0,
 		-4:  2,
+		-5:  1,
 		-12: 0,
 		-24: 0,
 	} {

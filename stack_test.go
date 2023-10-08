@@ -870,6 +870,31 @@ func TestBasic(t *testing.T) {
 	}
 }
 
+func TestFactorNegIndex(t *testing.T) {
+	b := Basic().NegativeIndices(true)
+	b.Push(
+		float64(3.14159),
+		float64(-9.378),
+		float64(109.9103),
+	)
+
+	// +1 offset for hidden cfg slice
+	for i, v := range map[int]int{
+		-1:  2,
+		-2:  1,
+		-3:  0,
+		-4:  2,
+		-12: 0,
+		-24: 0,
+	} {
+		I := factorNegIndex(i, b.Len()) - 1
+		if I != v && I-(I*2) <= b.Len() {
+			t.Errorf("%s failed [key:%d]: want '%d', got '%d'", t.Name(), i, v, I)
+			return
+		}
+	}
+}
+
 func TestBasic_withCapacity(t *testing.T) {
 	cp := 2
 	b := Basic(cp)

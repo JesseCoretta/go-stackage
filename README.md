@@ -19,7 +19,7 @@ The main goal of this package is provide an extremely reliable and accommodating
   - Recursive design - Stacks can reside in Stacks. Conditions can reside in Stacks. Conditions can contain other Stacks. Whatever!
     - Eligible values are easily navigated using the Stack.Traverse method using an ordered sequence of indices, or slice index numbers
     - Conversely, recursion capabilities can also be easily disabled per instance!
-  - Observable - flexible logging facilities, using the [log](pkg.go.dev/log) package are available globally, or on a per-instance basis
+  - Observable - flexible logging facilities, using the [log](https://pkg.go.dev/log) package are available globally, or on a per-instance basis
   - Interrogable - Stacks and Conditions extend many interrogation features, allowing the many facets and "states" of an instance to be queried simply
   - Resilient - Stack writeability can be toggled easily, allowing safe (albeit naïve) read-only operation without the need for mutexing
   - Fluent-style - Types which offer methods for cumulative configuration are written in fluent-form, allowing certain commands to be optionally "chained" together

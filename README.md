@@ -23,12 +23,13 @@ The main goal of this package is provide an extremely reliable and accommodating
   - Interrogable - Stacks and Conditions extend many interrogation features, allowing the many facets and "states" of an instance to be queried simply
   - Resilient - Stack writeability can be toggled easily, allowing safe (albeit naïve) read-only operation without the need for mutexing
   - Fluent-style - Types which offer methods for cumulative configuration are written in fluent-form, allowing certain commands to be optionally "chained" together
-  - Extensible logical operator framework, allowing custom operators to be added for specialized expressions instead of the package-provided ComparisonOperator constants
-  - MuTeX capable for each Stack instance independent of its parent or child (no recursive locking mechanisms)
-  - Adopters may wish to create a type alias of the Condition and/or Stack types; this is particularly easy, and will not impact normal operations when dealing with nested instances of derivative types
-    - This is as simple as doing `type NewTypeName stackage.Stack` or `type NewTypeName stackage.Condition` in your code, and then extending/wrapping methods as needed
-  - Extended Evaluator capabilities made possible through closures
-    - Users can add their own Evaluator function to perform computational tasks, value interrogation, matching procedures, pretty much anything you could imagine
+  - Extensible
+    - Logical operator framework allows custom operators to be added for specialized expressions, instead of the package-provided ComparisonOperator constants
+    - Users can add their own Evaluator function to perform computational tasks, value interrogation, matching procedures ... pretty much anything you could imagine
+  - Stack instances are (independently) MuTeX capable, thanks to the [sync](https://pkg.go.dev/sync) package
+    - Recursive locking mechanisms are NOT supported due to my aversion to insanity
+  - Adopters may create a type alias of the Condition and/or Stack types
+    - See the [Type Aliasing](#Type+Aliasing) section below
   - Fast, reliable, useful, albeit very niche
 
 ## Status
@@ -37,5 +38,38 @@ Although fairly well-tested, this package is in its early stages and is undergoi
 
 ## License
 
-The stackage package (from [`go-stackage`](https://github.com/JesseCoretta/go-stackage)) is released under the terms of the MIT license. See the [`LICENSE`](https://github.com/JesseCoretta/go-stackage/blob/main/LICENSE) file in the repository root, or click the "MIT" badge above, for complete details.
+The stackage package, from [`go-stackage`](https://github.com/JesseCoretta/go-stackage), is released under the terms of the MIT license. See the [`LICENSE`](https://github.com/JesseCoretta/go-stackage/blob/main/LICENSE) file in the repository root, or click the License badge above, for complete details.
+
+## Type Aliasing
+
+When needed, users may opt to create their own derivative alias types of either the Stack or Condition types for more customized use in their application.
+
+The caveat, naturally, is that users will be required to extend all of the methods required (e.g.: `String`, `Push`, `Pop`, etc). However, the upside is that the user may now write wholly _new_ methods that are unique to their own application, and _without_ having to resort to potentially awkward measures, such as embedding.
+
+To create a derivative type based on the Stack type, simply do something similar to the following example in your code:
+
+```
+type MyStack stackage.Stack
+
+// Here we author a wholly new function. The input and output signatures
+// are entirely defined at the discretion of the author and are shown in
+// "pseudo code context" here.
+func (r MyStack) NewMethodName([input signature]) [<output signature>] {
+	// your custom code, do whatever!
+}
+
+// Here we extend a package-provided function, String. To
+// run the actual String method, we need to CAST the custom
+// type (r, MyStack) to a bonafide stackage.Stack instance
+// as demonstrated here. Unlike the above example, this is
+// NOT "pseudo code" and would compile just fine.
+func (r MyStack) String() string {
+ 	// return the result from a "TYPE CAST -> EXEC" call
+	return stackage.Stack(r).String()
+}
+```
+
+The procedure would be identical for a Condition alias -- just change the name and derived stackage type from the first example line and modify as desired.
+
+If you'd like to see a more complex working example of this concept in the wild, have a look at the [`go-aci`](https://github.com/JesseCoretta/go-aci) package, which makes **heavy use** of derivative stackage types.
 

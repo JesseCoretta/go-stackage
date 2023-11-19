@@ -29,7 +29,7 @@ The main goal of this package is provide an extremely reliable and accommodating
   - Stack instances are (independently) MuTeX capable, thanks to the [sync](https://pkg.go.dev/sync) package
     - Recursive locking mechanisms are NOT supported due to my aversion to insanity
   - Adopters may create a type alias of the Condition and/or Stack types
-    - See the [Type Aliasing](#Type+Aliasing) section below
+    - See the [Type Aliasing](#type-aliasing) section below
   - Fast, reliable, useful, albeit very niche
 
 ## Status

@@ -44,32 +44,38 @@ The stackage package, from [`go-stackage`](https://github.com/JesseCoretta/go-st
 
 When needed, users may opt to create their own derivative alias types of either the Stack or Condition types for more customized use in their application.
 
-The caveat, naturally, is that users will be required to extend all of the methods required (e.g.: `String`, `Push`, `Pop`, etc). However, the upside is that the user may now write wholly _new_ methods that are unique to their own application, and _without_ having to resort to potentially awkward measures, such as embedding.
+The caveat, naturally, is that users will be expected to wrap all of the package-provided methods (e.g.: `String`, `Push`, `Pop`, etc) they intend to use.
+
+However, the upside is that the user may now write (extend) wholly _new_ methods that are unique to their own application, and _without_ having to resort to potentially awkward measures, such as embedding.
 
 To create a derivative type based on the Stack type, simply do something similar to the following example in your code:
 
 ```
 type MyStack stackage.Stack
 
-// Here we author a wholly new function. The input and output signatures
+// Here we extend a wholly new function. The input and output signatures
 // are entirely defined at the discretion of the author and are shown in
 // "pseudo code context" here.
 func (r MyStack) NewMethodName([input signature]) [<output signature>] {
 	// your custom code, do whatever!
 }
 
-// Here we extend a package-provided function, String. To
-// run the actual String method, we need to CAST the custom
-// type (r, MyStack) to a bonafide stackage.Stack instance
-// as demonstrated here. Unlike the above example, this is
-// NOT "pseudo code" and would compile just fine.
+// Here we wrap a pre-existing package-provided function, String, that
+// one would probably intend to use.
+// 
+// To run the actual String method, we need to first CAST the custom
+// type (r, MyStack) to a bonafide stackage.Stack instance as shown
+// here. Unlike the above example, this is/ NOT "pseudo code" and will
+// compile just fine.
+//
+// Repeat as needed for other methods that may be used.
 func (r MyStack) String() string {
  	// return the result from a "TYPE CAST -> EXEC" call
 	return stackage.Stack(r).String()
 }
 ```
 
-The procedure would be identical for a Condition alias -- just change the name and derived stackage type from the first example line and modify as desired.
+The procedure would be identical for a Condition alias -- just change the name and the derived stackage type from the first example line and modify as desired.
 
 If you'd like to see a more complex working example of this concept in the wild, have a look at the [`go-aci`](https://github.com/JesseCoretta/go-aci) package, which makes **heavy use** of derivative stackage types.
 

@@ -1920,11 +1920,21 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 	fname := fmname()
 	r.calls(sprintf("%s: in: %T(nil:%t)", fname, x, x == nil))
 
-	// Whatever it is, it had better be one (1) of the following:
-	// • A Stack, or type alias of Stack, or ...
-	// • A Condition, or type alias of Condition, or ...
+	// str is assigned with 
+	str = `UNKNOWN`
+
+	// Whatever it is, it had better be one (1) of the following
+	// possibilities in the following evaluated order:
+	// • An initialized Stack, or type alias of Stack, or ...
+	// • An initialized Condition, or type alias of Condition, or ...
 	// • Something that has its own "stringer" (String()) method.
-	if Xs, ok := stackTypeAliasConverter(x); ok {
+	//
+	// BUG FIX: shadow the "ok" variable for conversion checks,
+	// and use (Stack|Condition).IsInit to decide whether the
+	// asserted value is usable. This resolves a panic bug that
+	// was reported within go-aci, an application that imports
+	// stackage.
+	if Xs, _ := stackTypeAliasConverter(x); Xs.IsInit() {
 		ik, ic := Xs.stack.typ() // make note of inner stack type
 		if ic == not && len(Xs.getSymbol()) == 0 {
 			// Handle NOTs a little differently
@@ -1936,15 +1946,19 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 			str = Xs.String()
 		}
 
-	} else if Xc, ok := conditionTypeAliasConverter(x); ok {
+	} else if Xc, _ := conditionTypeAliasConverter(x); Xc.IsInit() {
 		str = Xc.String()
 
 	} else if meth := getStringer(x); meth != nil {
 		// whatever it is, it seems to have
-		// a stringer method, at least ...
+		// a stringer method, at least. If the
+		// user is submitting a non-primitive
+		// like a struct or a map, and NOT a
+		// type alias of Stack/Condition, this
+		// will be the condition that matches.
 		str = padValue(!r.positive(nspad), r.encapv(meth()))
-	} else {
-		// If its a Go primitive, string it.
+	} else if isKnownPrimitive(x) {
+		// If its a Go primitive, string it (see misc.go).
 		str = padValue(!r.positive(nspad), r.encapv(primitiveStringer(x)))
 	}
 

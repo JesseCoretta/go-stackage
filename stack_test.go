@@ -26,6 +26,12 @@ func ExampleStack_Addr() {
 	// Output: Address ID has '0x' prefix: true
 }
 
+func ExampleStack_Reverse() {
+	var c Stack = List().Push(0,1,2,3,4)
+	fmt.Printf("%s", c.Reverse())
+	// Output: 4 3 2 1 0
+}
+
 func ExampleStack_Auxiliary() {
 	// make a stack ... any type would do
 	l := List().Push(`this`, `that`, `other`)

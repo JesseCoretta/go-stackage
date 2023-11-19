@@ -65,7 +65,7 @@ func (r MyStack) NewMethodName([input signature]) [<output signature>] {
 // 
 // To run the actual String method, we need to first CAST the custom
 // type (r, MyStack) to a bonafide stackage.Stack instance as shown
-// here. Unlike the above example, this is/ NOT "pseudo code" and will
+// here. Unlike the above example, this is NOT "pseudo code" and will
 // compile just fine.
 //
 // Repeat as needed for other methods that may be used.

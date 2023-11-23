@@ -1,9 +1,5 @@
 package stackage
 
-import (
-	"log"
-)
-
 /*
 Stack embeds slices of any ([]any) in pointer form
 and extends methods allowing convenient interaction
@@ -532,25 +528,6 @@ func (r Stack) SetLogger(logger any) Stack {
 		}
 	}
 	return r
-}
-
-/*
-Logger returns the *log.Logger instance. This can be used for quick
-access to the log.Logger type's methods in a manner such as:
-
-	r.Logger().Fatalf("We died")
-
-It is not recommended to modify the return instance for the purpose
-of disabling logging outright (see Stack.SetLogger method as well
-as the SetDefaultStackLogger package-level function for ways of
-doing this easily).
-*/
-func (r Stack) Logger() (l *log.Logger) {
-	if r.IsInit() {
-		l = r.stack.logger()
-	}
-	return
-
 }
 
 /*
@@ -1451,11 +1428,6 @@ func (r *stack) setLogger(logger any) {
 	r.calls(sprintf("%s: out:void", fname))
 }
 
-func (r *stack) logger() *log.Logger {
-	cfg, _ := r.config()
-	return cfg.log.logger()
-}
-
 func (r Stack) getState(cf cfgFlag) (state bool) {
 	if r.IsInit() {
 		state = r.stack.positive(cf)
@@ -1920,11 +1892,21 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 	fname := fmname()
 	r.calls(sprintf("%s: in: %T(nil:%t)", fname, x, x == nil))
 
-	// Whatever it is, it had better be one (1) of the following:
-	// • A Stack, or type alias of Stack, or ...
-	// • A Condition, or type alias of Condition, or ...
+	// str is assigned with 
+	str = `UNKNOWN`
+
+	// Whatever it is, it had better be one (1) of the following
+	// possibilities in the following evaluated order:
+	// • An initialized Stack, or type alias of Stack, or ...
+	// • An initialized Condition, or type alias of Condition, or ...
 	// • Something that has its own "stringer" (String()) method.
-	if Xs, ok := stackTypeAliasConverter(x); ok {
+	//
+	// BUG FIX: shadow the "ok" variable for conversion checks,
+	// and use (Stack|Condition).IsInit to decide whether the
+	// asserted value is usable. This resolves a panic bug that
+	// was reported within go-aci, an application that imports
+	// stackage.
+	if Xs, _ := stackTypeAliasConverter(x); Xs.IsInit() {
 		ik, ic := Xs.stack.typ() // make note of inner stack type
 		if ic == not && len(Xs.getSymbol()) == 0 {
 			// Handle NOTs a little differently
@@ -1936,15 +1918,19 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 			str = Xs.String()
 		}
 
-	} else if Xc, ok := conditionTypeAliasConverter(x); ok {
+	} else if Xc, _ := conditionTypeAliasConverter(x); Xc.IsInit() {
 		str = Xc.String()
 
 	} else if meth := getStringer(x); meth != nil {
 		// whatever it is, it seems to have
-		// a stringer method, at least ...
+		// a stringer method, at least. If the
+		// user is submitting a non-primitive
+		// like a struct or a map, and NOT a
+		// type alias of Stack/Condition, this
+		// will be the condition that matches.
 		str = padValue(!r.positive(nspad), r.encapv(meth()))
-	} else {
-		// If its a Go primitive, string it.
+	} else if isKnownPrimitive(x) {
+		// If its a Go primitive, string it (see misc.go).
 		str = padValue(!r.positive(nspad), r.encapv(primitiveStringer(x)))
 	}
 
@@ -2665,6 +2651,37 @@ func (r *stack) push(x ...any) {
 	r.calls(sprintf("%s: out %T(self)", fname, r))
 
 	return
+}
+
+/*
+Reverse shall re-order the receiver's current slices in a sequence that is the polar opposite
+of the original.
+*/
+func (r Stack) Reverse() Stack {
+	r.stack.reverse()
+	return r
+}
+
+/*
+reverse is a private niladic and void method called exclusively by Stack.Reverse.
+*/
+func (r *stack) reverse() {
+        fname := fmname()
+        r.calls(sprintf("%s: in:niladic", fname))
+
+	if r.ulen() > 0 {
+
+		r.lock()
+		defer r.unlock()
+
+		id := getLogID(r.getID())
+		for i,j := 1, r.len()-1; i < j; i, j = i+1,j-1 {
+			r.debug(sprintf("%s: %T::%s; slice swap: [%d]<->[%d]", fname, r, id, i-1, j))
+			(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
+		}
+	}
+
+	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*

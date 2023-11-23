@@ -4,10 +4,6 @@ package stackage
 cond.go contains Condition-related methods and functions.
 */
 
-import (
-	"log"
-)
-
 /*
 Condition describes a single evaluative statement, i.e.:
 
@@ -336,24 +332,6 @@ func (r Condition) SetLogger(logger any) Condition {
 	}
 
 	return r
-}
-
-/*
-Logger returns the *log.Logger instance. This can be used for quick
-access to the log.Logger type's methods in a manner such as:
-
-	r.Logger().Fatalf("We died")
-
-It is not recommended to modify the return instance for the purpose
-of disabling logging outright (see Stack.SetLogger method as well
-as the SetDefaultConditionLogger package-level function for ways of
-doing this easily).
-*/
-func (r Condition) Logger() (l *log.Logger) {
-	if r.IsInit() {
-		l = r.condition.logger()
-	}
-	return
 }
 
 /*
@@ -909,10 +887,6 @@ func (r Condition) setState(cf cfgFlag, state ...bool) {
 
 func (r *condition) setLogger(logger any) {
 	r.cfg.log.setLogger(logger)
-}
-
-func (r condition) logger() *log.Logger {
-	return r.cfg.log.logger()
 }
 
 func (r *condition) toggleOpt(cf cfgFlag) {

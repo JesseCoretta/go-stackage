@@ -1850,42 +1850,6 @@ func (r *stack) string() (assembled string) {
 }
 
 /*
-stringAssertion is the private method called during slice iteration
-during stack.string runs.
-
-DECOM
-*/
-/*
-func (r stack) stringAssertion(x any) (value string) {
-	fname := fmname()
-
-	r.calls(sprintf("%s: in:%T(nil:%t)",
-		fname, x, x == nil))
-
-	switch tv := x.(type) {
-	case string:
-		// Slice is a raw string value (which
-		// may be eligible for encapsulation)
-		value = r.encapv(tv)
-		r.trace(sprintf("%s: assert:%T->%T(%v;len:%d)",
-			fname, tv, value, value, len(value)))
-	default:
-		// Catch-all; call defaultAssertionHandler
-		// with the current interface slice as the
-		// input argument (tv).
-		value = r.defaultAssertionHandler(tv)
-		r.trace(sprintf("%s: assert fallback:%T->%T(%v;len:%d)",
-			fname, tv, value, value, len(value)))
-	}
-
-	r.calls(sprintf("%s: out:%T(%v;len:%d)",
-		fname, value, value, len(value)))
-
-	return
-}
-*/
-
-/*
 defaultAssertionHandler is a private method called by stack.string.
 */
 func (r stack) defaultAssertionHandler(x any) (str string) {
@@ -2118,26 +2082,21 @@ func (r *stack) reveal() (err error) {
 
 	// scan each slice (except the config
 	// slice) and analyze its structure.
-	for i := 0; i < r.len(); i++ {
+	for i := 0; i < r.len() && err == nil; i++ {
 		sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
 		r.trace(sprintf("%s: iterate idx:%d %T::", fname, i, sl))
-		if sl == nil {
-			continue
-		}
-
-		// If the element is a stack, begin descent
-		// through recursion.
-		if outer, ook := stackTypeAliasConverter(sl); ook && outer.Len() > 0 {
-			id := getLogID(outer.getID())
-			r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
-			if err = r.revealDescend(outer, i); err == nil {
-				continue
+		if sl != nil {
+			// If the element is a stack, begin descent
+			// through recursion.
+			if outer, ook := stackTypeAliasConverter(sl); ook && outer.Len() > 0 {
+				id := getLogID(outer.getID())
+				r.trace(sprintf("%s: descending into idx:%d %T::%s", fname, i, outer, id))
+				if err = r.revealDescend(outer, i); err != nil {
+					r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
+				}
 			}
-			r.setErr(err)
-			r.error(sprintf("%s: %T::%s %v", fname, outer, id, err))
-			break
+			r.calls(sprintf("%s: out:%T(nil:%t)", fname, err, err == nil))
 		}
-		r.calls(sprintf("%s: out:%T(nil:%t)", fname, err, err == nil))
 	}
 
 	return
@@ -2473,9 +2432,7 @@ func factorNegIndex(i, l int) int {
 	// 'idx' to a positive number that
 	// reflects the intended slice index
 	// value.
-	if i += (l * 2); i == 0 {
-		i++
-	} else if i > l-1 {
+	if i += (l * 2); i > l-1 {
 		i = (i - l) + 1
 	} else {
 		i++

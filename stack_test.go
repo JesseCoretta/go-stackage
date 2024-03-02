@@ -1169,10 +1169,12 @@ func TestInterface(t *testing.T) {
 }
 
 func TestStack_Reveal_experimental001(t *testing.T) {
+        custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
+
 	thisIsMyNightmare := And().Push(
 		`this1`,
 		Or().Mutex().Push(
-			And().Push(Cond(`keyword`, Eq, "somevalue")),
+			custom,
 			And().Push(
 				`this4`,
 				Not().Mutex().Push(

@@ -1165,7 +1165,6 @@ func TestStack_codecov(t *testing.T) {
 	s.Valid()
 	s.Pop()
 
-	s.CanMutex()
 	s.Avail()
 	s.string()
 	s.IsEncap()
@@ -1173,9 +1172,14 @@ func TestStack_codecov(t *testing.T) {
 	s.NoNesting()
 	s.NoNesting(true)
 	s.NoNesting(false)
+	_ = timestamp()
+	_ = fmname()
 
 	s = List()
+	_ = parens.String()
 	s.Pop()
+	s.CanMutex()
+	s.Mutex()
 	s.Push(-1, -2, -3, -4, -5)
 	s.NegativeIndices(true)
 

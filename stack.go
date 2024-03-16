@@ -1370,9 +1370,10 @@ the receiver. The return values shall be interpreted as follows:
 func (r Stack) Cap() (c int) {
 	if r.IsInit() {
 		offset := -1
+		c = offset
 		switch _c := r.cap(); _c {
 		case 0:
-			c = offset // interpret zero as minus 1
+			// interpret zero as minus 1
 		default:
 			// handle the cfg slice offset here, as
 			// the value is +non-zero

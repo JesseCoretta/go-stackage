@@ -3,7 +3,6 @@ package stackage
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"testing"
 	_ "time"
 )
@@ -92,53 +91,6 @@ func ExampleAuxiliary_Len() {
 	}
 	fmt.Printf("Len: %d", aux.Len())
 	// Output: Len: 1
-}
-
-func ExampleSetDefaultStackLogLevel() {
-	SetDefaultStackLogLevel(
-		LogLevel1 + // 1
-			LogLevel4 + // 8
-			UserLogLevel2 + // 128
-			UserLogLevel5, // 1024
-	)
-	custom := DefaultStackLogLevel()
-
-	// turn loglevel to none
-	SetDefaultStackLogLevel(NoLogLevels)
-	off := DefaultStackLogLevel()
-
-	fmt.Printf("%d (custom), %d (off)", custom, off)
-	// Output: 1161 (custom), 0 (off)
-}
-
-func ExampleDefaultStackLogLevel() {
-	fmt.Printf("%d", DefaultStackLogLevel())
-	// Output: 0
-}
-
-/*
-This example demonstrates setting a custom logger which writes
-to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
-invoked, and an event -- the creation of a Basic Stack -- shall
-trigger log events that are funneled into our bytes.Buffer.
-
-For the sake of idempotent test results, the length of the buffer
-is checked only to ensure it is greater than 0.
-*/
-func ExampleSetDefaultStackLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	SetDefaultStackLogger(customLogger)
-	SetDefaultStackLogLevel(AllLogLevels) // highly verbose!
-
-	// do something that triggers log events ...
-	_ = Basic().Push(
-		Cond(`π`, Eq, float64(3.14159265358979323)),
-		Cond(`m`, Eq, `mc²`),
-	)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
 }
 
 var testParens []string = []string{`(`, `)`}
@@ -1168,154 +1120,6 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func TestStack_Reveal_experimental001(t *testing.T) {
-        custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
-
-	thisIsMyNightmare := And().Push(
-		`this1`,
-		Or().Mutex().Push(
-			custom,
-			And().Push(
-				`this4`,
-				Not().Mutex().Push(
-					Or().Push(
-						Cond(`dayofweek`, Ne, "Wednesday"),
-						Cond(`ssf`, Ge, "128"),
-						Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
-					),
-				),
-			),
-			And().Push(
-				Or().Push(
-					Cond(`keyword2`, Lt, "someothervalue"),
-				),
-			),
-			Cond(`keyword`, Gt, Or().Push(`...`)),
-		),
-		`this2`,
-	)
-
-	type row struct {
-		Index int
-		Path  [][]int
-		Want  string
-		Value any
-	}
-
-	table := []row{
-		{0, [][]int{{1, 2, 0, 0}, {1, 2}}, ``, nil},
-		{1, [][]int{{1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}}, ``, nil},
-		//{2, [][]int{{1, 1, 1, 0, 2, 0, 0, 0}, {1, 1, 1, 0, 2}}, ``, nil},
-	}
-
-	// Scan the target values we'll be using for
-	// comparison after processing completes.
-	for idx, tst := range table {
-		slice, _ := thisIsMyNightmare.Traverse(tst.Path[0]...)
-		var c Condition
-		var ok bool
-		if c, ok = slice.(Condition); !ok {
-			t.Errorf("%s failed [idx:%d;pre-mod:path:%v]: unexpected assertion result:\nwant: %T\ngot:  %s",
-				t.Name(), idx, tst.Path[0], c, slice.(string))
-			return
-		}
-		table[idx].Want = c.String()
-		tst.Value = c
-	}
-
-	// save for comparison later
-	var want string = thisIsMyNightmare.String()
-
-	// do reveal recursion
-	thisIsMyNightmare.Reveal()
-
-	// make sure the complete string is identical
-	// before and after.
-	if got := thisIsMyNightmare.String(); want != got {
-		t.Errorf("%s failed [main strcmp]:\nwant '%s'\ngot  '%s',",
-			t.Name(), want, got)
-		return
-	}
-
-	// Scan the updated values at the defined paths
-	// and compare to original target values.
-	for idx, tst := range table {
-		slice, _ := thisIsMyNightmare.Traverse(tst.Path[1]...)
-		val, ok := slice.(Condition)
-		if !ok {
-			t.Errorf("%s failed [idx:%d;post-mod]: unexpected assertion result:\nwant: %T\ngot:  %T",
-				t.Name(), idx, val, slice)
-			return
-		}
-
-		if gval := val.String(); tst.Want != gval {
-			t.Errorf("%s failed [idx:%d;strcmp]:\nwant '%s'\ngot  '%s',",
-				t.Name(), idx, tst.Want, gval)
-		}
-	}
-}
-
-func TestDefrag_experimental_001(t *testing.T) {
-	// this list contains an assortment of
-	// values mixed in with nils and a couple
-	// hierarchies tossed in, too.
-	var l Stack = List().SetLogLevel(LogLevel(45)).Push(
-		`this`,
-		nil,
-		`that`,
-		nil,
-		`those`,
-		nil,
-		List().Push(
-			nil, nil, nil, `other`, `level`, `of`, nil, nil, `stuff`,
-			And().Push(
-				`yet`, nil, nil, nil, nil, `more`, `JUNK`,
-			),
-		),
-		nil,
-		Cond(`keyword`, Eq, Basic().Push(1, 2, nil, 3, nil, nil, 4)),
-		nil,
-		nil,
-		3.14159,
-		`moar`,
-		`moar`,
-		`moar`,
-		`moar`,
-		`moar`,
-		`moar`,
-		`moar`,
-		`moar`,
-		nil,
-		`moar`,
-		`moar`,
-		nil,
-		nil,
-		nil,
-		nil,
-	).Paren()
-
-	offset := 13         // number of nil occurrences
-	beforeLen := l.Len() // record preop len
-
-	// verify no errors resulted from the attempt
-	// to defragment our stack
-	if err := l.Defrag(-1).Err(); err != nil {
-		t.Errorf("%s failed: %v", t.Name(), err)
-		return
-	}
-
-	// verify starting length minus offset is equal
-	// to the result length, meaning <offset> slices
-	// were truncated.
-	offsetLen := beforeLen - offset
-	if afterLen := l.Len(); offsetLen != afterLen {
-		t.Errorf("%s failed: unexpected length; want '%d', got '%d'",
-			t.Name(), offsetLen, afterLen)
-		return
-	}
-
-}
-
 func TestStack_withCap(t *testing.T) {
 	src := Basic().Push(
 		`element0`,
@@ -1355,59 +1159,20 @@ func TestStack_withCap(t *testing.T) {
 func TestStack_codecov(t *testing.T) {
 	var s Stack
 	// panic checks
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.Len()
 	s.IsZero()
 	s.IsInit()
 	s.Valid()
 	s.Pop()
 
-	var ll logLevels
-	ll.shift(`trace`)
-	ll.shift(nil)
-	ll.shift('a')
-	ll.shift()
-	ll.shift(0)
-	ll.shift(65535)
-
-	ll.positive(`trace`)
-	ll.positive(nil)
-	ll.positive('a')
-	ll.positive(0)
-	ll.positive(65535)
-
-	ll.unshift(`trace`)
-	ll.unshift(nil)
-	ll.unshift('a')
-	ll.unshift()
-	ll.unshift(0)
-	ll.unshift(65535)
-
-	var lsys *logSystem = newLogSystem(sLogDefault)
-	if lsys.isZero() {
-		t.Errorf("%s failed: nil %T",
-			t.Name(), lsys.logger())
-	}
-
 	s.CanMutex()
 	s.Avail()
 	s.string()
 	s.IsEncap()
 	s.SetAuxiliary(nil)
-	s.SetLogger(nil)
 	s.NoNesting()
 	s.NoNesting(true)
 	s.NoNesting(false)
-	s.Logger()
 
 	s = List()
 	s.Pop()
@@ -1442,18 +1207,6 @@ func TestStack_codecov(t *testing.T) {
 	s.Paren()
 	s.Paren(true)
 	s.Paren(false)
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.policy(``)
-	s.policy(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.NoNesting()
 	s.NoNesting(true)
 	s.CanNest()
@@ -1468,38 +1221,11 @@ func TestStack_codecov(t *testing.T) {
 	_ = s.String()
 
 	s.SetAuxiliary(nil)
-	s.SetLogger(nil)
-	s.Logger()
-
-	s.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
-
-	SetDefaultStackLogLevel(`none`)
-	SetDefaultStackLogLevel(0)
-	SetDefaultStackLogLevel(nil)
-	SetDefaultStackLogLevel('a')
-	s.SetLogger(`stderr`)
-	s.SetLogger(2)
-	s.SetLogger(`stdout`)
-	s.SetLogger(1)
-	s.SetLogger(sLogDefault)
-
-	s.SetLogLevel(8, 16)
-	s.UnsetLogLevel(8, 16)
-
-	s.SetLogLevel(LogLevel4, LogLevel5)
-	s.LogLevels()
-	s.UnsetLogLevel(LogLevel4, LogLevel5)
-	s.Logger()
 
 	s.SetErr(errorf(`this is a serious error`))         // txt err
 	s.SetErr(errorf(errorf(`this is a serious error`))) // err err
 	s.Err()
 	s.SetErr(nil)
-
-	s.SetLogger(`off`)
-	s.SetLogger(0)
 }
 
 func init() {

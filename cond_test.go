@@ -3,32 +3,8 @@ package stackage
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"testing"
 )
-
-func ExampleSetDefaultConditionLogLevel() {
-	// define a custom loglevel cfg
-	SetDefaultConditionLogLevel(
-		LogLevel3 + // 4
-			UserLogLevel1 + // 64
-			UserLogLevel7, // 4096
-	)
-	custom := DefaultConditionLogLevel()
-
-	// turn loglevel to none
-	SetDefaultConditionLogLevel(NoLogLevels)
-	off := DefaultConditionLogLevel()
-
-	fmt.Printf("%d (custom), %d (off)", custom, off)
-	// Output: 4164 (custom), 0 (off)
-
-}
-
-func ExampleDefaultConditionLogLevel() {
-	fmt.Printf("%d", DefaultConditionLogLevel())
-	// Output: 0
-}
 
 func ExampleCondition_Auxiliary() {
 	var c Condition
@@ -189,28 +165,6 @@ func TestCondition_SetAuxiliary(t *testing.T) {
 			t.Name(), want, length)
 		return
 	}
-}
-
-/*
-This example demonstrates setting a custom logger which writes
-to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
-invoked, and an event -- the creation of a Condition -- shall
-trigger log events that are funneled into our bytes.Buffer.
-
-For the sake of idempotent test results, the length of the buffer
-is checked only to ensure it is greater than 0.
-*/
-func ExampleSetDefaultConditionLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	SetDefaultConditionLogger(customLogger)
-
-	// do something that triggers log events ...
-	c := Cond(`π`, Eq, float64(3.14159265358979323))
-	c.SetLogLevel(AllLogLevels)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
 }
 
 func ExampleCond() {
@@ -676,17 +630,6 @@ func ExampleCondition_Keyword() {
 	// Output: Keyword: my_keyword
 }
 
-func ExampleCondition_LogLevels() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(LogLevel1, LogLevel3)
-	fmt.Printf("Loglevels: %s", c.LogLevels())
-	// Output: Loglevels: CALLS,STATE
-}
-
 func ExampleCondition_NoNesting() {
 	var c Condition
 	c.Init()
@@ -740,54 +683,6 @@ func ExampleCondition_Len() {
 	// length with stackage.Stack: 3
 }
 
-func ExampleCondition_Logger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	fmt.Printf("%T", c.Logger())
-	// Output: *log.Logger
-}
-
-func ExampleCondition_SetLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(AllLogLevels)
-	c.SetKeyword(`keyword`)
-	c.SetOperator(Ne)
-	c.SetExpression(`bad_value`)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
-}
-
-func ExampleCondition_SetLogLevel() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(LogLevel1, LogLevel3) // calls (1) + state(4)
-	fmt.Printf("LogLevels active: %s", c.LogLevels())
-	// Output: LogLevels active: CALLS,STATE
-}
-
-func ExampleCondition_UnsetLogLevel() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(LogLevel1, LogLevel3) // calls (1) + state(4)
-	c.UnsetLogLevel(LogLevel1)          // -1
-	fmt.Printf("LogLevels active: %s", c.LogLevels())
-	// Output: LogLevels active: STATE
-}
-
 func ExampleCondition_SetID_random() {
 	var c Condition = Cond(`keyword`, Ne, `bogus`)
 
@@ -835,16 +730,6 @@ func ExampleCondition_typeAlias() {
 func TestCondition_codecov(t *testing.T) {
 	var c Condition
 	// panic checks
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
 	c.Len()
 	c.IsZero()
 	c.IsInit()
@@ -853,33 +738,7 @@ func TestCondition_codecov(t *testing.T) {
 	c.Keyword()
 	c.Valid()
 
-	var ll logLevels
-	ll.shift(`trace`)
-	ll.shift(nil)
-	ll.shift('a')
-	ll.shift()
-	ll.shift(0)
-	ll.shift(65535)
-
-	ll.positive(`trace`)
-	ll.positive(nil)
-	ll.positive('a')
-	ll.positive(0)
-	ll.positive(65535)
-
-	ll.unshift(`trace`)
-	ll.unshift(nil)
-	ll.unshift('a')
-	ll.unshift(0)
-	ll.unshift(65535)
-
 	c.SetAuxiliary(nil)
-
-	var lsys *logSystem = newLogSystem(cLogDefault)
-	if lsys.isZero() {
-		t.Errorf("%s failed: nil %T",
-			t.Name(), lsys.logger())
-	}
 
 	c.Init()
 	c.Paren()
@@ -909,39 +768,6 @@ func TestCondition_codecov(t *testing.T) {
 	c.Encap(`<<`, `<<`)
 	c.Encap(`"`)
 	c.Valid()
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.policy(``)
-	c.policy(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
-	_ = c.condition.cfg.log.lvl.String()
-
-	c.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
-
-	c.SetLogLevel(LogLevel5)
-	c.SetLogLevel(AllLogLevels)
-	_ = c.condition.cfg.log.lvl.String()
-	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
-	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
-	c.UnsetLogLevel(`all`)
-
-	SetDefaultConditionLogLevel(`none`)
-	SetDefaultConditionLogLevel(0)
-	SetDefaultConditionLogLevel(nil)
-	SetDefaultConditionLogLevel('a')
-
-	c.calls("this is a message", map[string]string{
-		`content`: `hello`,
-	})
 
 	type customCondition Condition
 	var cx Condition = Cond(`keyword`, Ne, `Value`)
@@ -950,23 +776,3 @@ func TestCondition_codecov(t *testing.T) {
 	}
 }
 
-func TestMessage_PPol(t *testing.T) {
-	sout := `string_output`
-	ppol := func(...any) string {
-		return sout
-	}
-
-	var m Message = Message{
-		Type: `S`,
-		ID:   `identifier`,
-		Time: `20230927011732`,
-		Tag:  `tag`,
-		PPol: ppol,
-	}
-
-	if m.String() != sout {
-		t.Errorf("%s failed: want '%s', got '%s'",
-			t.Name(), sout, m)
-		return
-	}
-}

@@ -3,7 +3,6 @@ package stackage
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand" // not for crypto, don't worry :)
 	"reflect"
 	"runtime"
@@ -600,10 +599,4 @@ type Interface interface {
 	// deem "valid". See the SetValidityPolicy method for Condition and Stack
 	// instances for details.
 	Valid() error
-
-	// Logger returns the underlying instance of *log.Logger, which may be set by
-	// the package by defaults, or supplied by the user in a piecemeal manner.
-	//
-	// See also the SetLogger method for Condition and Stack instances.
-	Logger() *log.Logger
 }

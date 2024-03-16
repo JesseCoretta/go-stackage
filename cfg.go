@@ -22,7 +22,6 @@ type nodeConfig struct {
 	ppf PushPolicy         // closure filterer
 	vpf ValidityPolicy     // closure validator
 	rpf PresentationPolicy // closure stringer
-	log *logSystem         // logging subsystem
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)

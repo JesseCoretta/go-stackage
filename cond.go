@@ -87,20 +87,9 @@ func initCondition() (r *condition) {
 
 	r = new(condition)
 	r.cfg = new(nodeConfig)
-	r.cfg.log = newLogSystem(cLogDefault)
-	r.cfg.log.lvl = logLevels(NoLogLevels)
 
 	r.cfg.typ = cond
 	data[`type`] = cond.String()
-
-	if !logDiscard(r.cfg.log.log) {
-		data[`laddr`] = sprintf("%p", r.cfg.log.log)
-		data[`lpfx`] = r.cfg.log.log.Prefix()
-		data[`lflags`] = sprintf("%d", r.cfg.log.log.Flags())
-		data[`lwriter`] = sprintf("%T", r.cfg.log.log.Writer())
-	}
-
-	r.debug(`ALLOC`, data)
 
 	return
 }
@@ -127,31 +116,18 @@ func (r Condition) SetAuxiliary(aux ...Auxiliary) Condition {
 setAuxiliary is a private method called by Condition.SetAuxiliary.
 */
 func (r *condition) setAuxiliary(aux ...Auxiliary) {
-	fname := fmname()
-	r.calls(sprintf("%s: in: variadic %T(len:%d)",
-		fname, aux, len(aux)))
-
 	var _aux Auxiliary
 	if len(aux) == 0 {
-		r.trace(sprintf("%s: ALLOC %T (no variadic input)",
-			fname, _aux))
 		_aux = make(Auxiliary, 0)
 	} else {
 		if aux[0] == nil {
-			r.trace(sprintf("%s: ALLOC %T (nil variadic slice)",
-				fname, _aux))
 			_aux = make(Auxiliary, 0)
 		} else {
-			r.trace(sprintf("%s: assign user %T(len:%d)",
-				fname, _aux, _aux.Len()))
 			_aux = aux[0]
 		}
 	}
 
 	r.cfg.aux = _aux
-	r.debug(sprintf("%s: registered %T(len:%d)",
-		fname, r.cfg.aux, r.cfg.aux.Len()))
-	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -167,16 +143,8 @@ func (r Condition) Auxiliary() (aux Auxiliary) {
 /*
 auxiliary is a private method called by Condition.Auxiliary.
 */
-func (r condition) auxiliary() (aux Auxiliary) {
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-	aux = r.cfg.aux
-	r.debug(sprintf("%s: get %T(len:%d)",
-		fname, aux, aux.Len()))
-	r.calls(sprintf("%s: out:%T(%d)",
-		fname, aux, aux.Len()))
-
-	return
+func (r condition) auxiliary() Auxiliary {
+	return r.cfg.aux
 }
 
 /*
@@ -234,104 +202,6 @@ func (r *condition) setExpression(ex any) {
 	if v, ok := r.assertConditionExpressionValue(ex); ok {
 		r.ex = v
 	}
-}
-
-/*
-SetLogLevel enables the specified LogLevel instance(s), thereby
-instructing the logging subsystem to accept events for submission
-and transcription to the underlying logger.
-
-Users may also sum the desired bit values manually, and cast the
-product as a LogLevel. For example, if STATE (4), DEBUG (8) and
-TRACE (32) logging were desired, entering LogLevel(44) would be
-the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
-variadic fashion.
-*/
-func (r Condition) SetLogLevel(l ...any) Condition {
-	if r.IsInit() {
-		r.condition.setLogLevel(l...)
-	}
-	return r
-}
-
-func (r *condition) setLogLevel(l ...any) {
-	r.calls(sprintf("%s: in:%T(%v;len:%d)",
-		fmname(), l, l, len(l)))
-
-	r.cfg.log.shift(l...)
-
-	r.calls(sprintf("%s: out:%T(self)",
-		fmname(), r))
-}
-
-/*
-LogLevels returns the string representation of a comma-delimited list
-of all active LogLevel values within the receiver.
-*/
-func (r Condition) LogLevels() (l string) {
-	if r.IsInit() {
-		l = r.condition.logLevels()
-	}
-	return
-}
-
-func (r condition) logLevels() (l string) {
-	return r.cfg.log.lvl.String()
-}
-
-/*
-UnsetLogLevel disables the specified LogLevel instance(s), thereby
-instructing the logging subsystem to discard events submitted for
-transcription to the underlying logger.
-*/
-func (r Condition) UnsetLogLevel(l ...any) Condition {
-	if r.IsInit() {
-		r.condition.unsetLogLevel(l...)
-	}
-	return r
-}
-
-func (r *condition) unsetLogLevel(l ...any) {
-	fname := fmname()
-	r.calls(sprintf("%s: in:%T(%v;len:%d)",
-		fname, l, l, len(l)))
-
-	r.cfg.log.unshift(l...)
-
-	r.calls(sprintf("%s: out:%T(self)",
-		fname, r))
-}
-
-/*
-SetLogger assigns the specified logging facility to the receiver
-instance.
-
-Logging is available but is set to discard all events by default.
-
-An active logging subsystem within the receiver supercedes the
-default package logger.
-
-The following types/values are permitted:
-
-  - string: `none`, `off`, `null`, `discard` will turn logging off
-  - string: `stdout` will set basic STDOUT logging
-  - string: `stderr` will set basic STDERR logging
-  - int: 0 will turn logging off
-  - int: 1 will set basic STDOUT logging
-  - int: 2 will set basic STDERR logging
-  - *log.Logger: user-defined *log.Logger instance will be set; it should not be nil
-
-Case is not significant in the string matching process.
-
-Logging may also be set globally using the SetDefaultLogger
-package level function. Similar semantics apply.
-*/
-func (r Condition) SetLogger(logger any) Condition {
-	if r.IsInit() {
-		r.condition.setLogger(logger)
-	}
-
-	return r
 }
 
 /*
@@ -824,17 +694,9 @@ func (r Condition) IsFIFO() (is bool) {
 isFIFO is a private method called by the Condition.IsFIFO method.
 */
 func (r condition) isFIFO() (result bool) {
-
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-
 	if stk, ok := stackTypeAliasConverter(r.ex); ok {
 		result = stk.IsFIFO()
 	}
-
-	r.calls(sprintf("%s: out:%T(%v)",
-		fmname(), result, result))
-
 	return
 }
 
@@ -883,10 +745,6 @@ func (r Condition) setState(cf cfgFlag, state ...bool) {
 			r.condition.toggleOpt(cf)
 		}
 	}
-}
-
-func (r *condition) setLogger(logger any) {
-	r.cfg.log.setLogger(logger)
 }
 
 func (r *condition) toggleOpt(cf cfgFlag) {
@@ -1007,137 +865,12 @@ func (r condition) string() string {
 		pad = ``
 	}
 
-	s := sprintf("%s%s%s%s%s", r.kw, pad, r.op, pad, val)
+	s := r.kw + pad + r.op.String() + pad + val
 	if r.cfg.positive(parens) {
-		s = sprintf("(%s%s%s)", pad, s, pad)
+		s = `(` + pad + s + pad + `)`
 	}
 
 	return s
-}
-
-/*
-mkmsg is the private method called by eventDispatch for the
-purpose of Message assembly prior to submission to a logger.
-*/
-func (r *condition) mkmsg(typ string) (m Message, ok bool) {
-	if r.isInit() {
-		if len(typ) > 0 {
-			m = Message{
-				ID:   getLogID(r.cfg.id),
-				Tag:  typ,
-				Addr: ptrString(r),
-				Type: sprintf("%T", *r),
-				Time: timestamp(),
-				Len:  -1, // initially N/A
-				Cap:  -1, // initially N/A
-			}
-			ok = true
-		}
-	}
-
-	return
-}
-
-/*
-error conditions that are fatal and always serious
-*/
-func (r *condition) fatal(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
-	}
-}
-
-/*
-error conditions that are not fatal but potentially serious
-*/
-func (r *condition) error(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
-	}
-}
-
-/*
-extreme depth operational details
-*/
-func (r *condition) trace(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
-	}
-}
-
-/*
-relatively deep operational details
-*/
-func (r *condition) debug(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
-	}
-}
-
-/*
-policy method operational details, as well as caps, r/o, etc.
-*/
-func (r *condition) policy(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
-	}
-}
-
-/*
-calls records in/out signatures and realtime meta-data regarding
-individual method runtimes.
-*/
-func (r *condition) calls(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel1, `CALL`, data...)
-	}
-}
-
-/*
-state records interrogations of, and changes to, the underlying
-configuration value.
-*/
-func (r *condition) state(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel3, `STATE`, data...)
-	}
-}
-
-/*
-eventDispatch is the main dispatcher of events of any severity.
-A severity of FATAL (in any case) will result in a logger-driven
-call of os.Exit.
-*/
-func (r condition) eventDispatch(x any, ll LogLevel, severity string, data ...map[string]string) {
-	if !(r.cfg.log.positive(ll) ||
-		eq(severity, `FATAL`) ||
-		r.cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	printers := map[string]func(...any){
-		`FATAL`:  r.logger().Fatalln,
-		`STATE`:  r.logger().Println,
-		`ERROR`:  r.logger().Println,
-		`CALL`:   r.logger().Println,
-		`DEBUG`:  r.logger().Println,
-		`TRACE`:  r.logger().Println,
-		`POLICY`: r.logger().Println,
-	}
-
-	if m, ok := r.mkmsg(severity); ok {
-		if ok = m.setText(x); ok {
-			if len(data) > 0 {
-				if data[0] != nil {
-					m.Data = data[0]
-					if _, ok := data[0][`FATAL`]; ok {
-						severity = `ERROR`
-					}
-				}
-			}
-			printers[severity](m)
-		}
-	}
 }
 
 const badCond = `<invalid_condition>`

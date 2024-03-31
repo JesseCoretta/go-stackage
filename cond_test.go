@@ -798,16 +798,6 @@ func ExampleCondition_typeAlias() {
 func TestCondition_codecov(t *testing.T) {
 	var c Condition
 	// panic checks
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
 	c.Len()
 	c.IsZero()
 	c.IsInit()
@@ -815,6 +805,9 @@ func TestCondition_codecov(t *testing.T) {
 	c.Operator()
 	c.Keyword()
 	c.Valid()
+	_ = cond.String()
+
+	SetDefaultConditionLogger(nil)
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -872,39 +865,17 @@ func TestCondition_codecov(t *testing.T) {
 	c.Encap(`<<`, `<<`)
 	c.Encap(`"`)
 	c.Valid()
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.policy(``)
-	c.policy(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
 	_ = c.condition.cfg.log.lvl.String()
-
-	c.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
 
 	c.SetLogLevel(LogLevel5)
 	c.SetLogLevel(AllLogLevels)
 	_ = c.condition.cfg.log.lvl.String()
-	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
-	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
 	c.UnsetLogLevel(`all`)
 
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)
 	SetDefaultConditionLogLevel(nil)
 	SetDefaultConditionLogLevel('a')
-
-	c.calls("this is a message", map[string]string{
-		`content`: `hello`,
-	})
 
 	type customCondition Condition
 	var cx Condition = Cond(`keyword`, Ne, `Value`)
@@ -913,23 +884,3 @@ func TestCondition_codecov(t *testing.T) {
 	}
 }
 
-func TestMessage_PPol(t *testing.T) {
-	sout := `string_output`
-	ppol := func(...any) string {
-		return sout
-	}
-
-	var m Message = Message{
-		Type: `S`,
-		ID:   `identifier`,
-		Time: `20230927011732`,
-		Tag:  `tag`,
-		PPol: ppol,
-	}
-
-	if m.String() != sout {
-		t.Errorf("%s failed: want '%s', got '%s'",
-			t.Name(), sout, m)
-		return
-	}
-}

@@ -1406,21 +1406,14 @@ func TestStack_withCap(t *testing.T) {
 func TestStack_codecov(t *testing.T) {
 	var s Stack
 	// panic checks
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.Len()
 	s.IsZero()
 	s.IsInit()
 	s.Valid()
 	s.Pop()
+
+	SetDefaultStackLogger(nil)
+	_ = lonce.String()
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -1493,18 +1486,6 @@ func TestStack_codecov(t *testing.T) {
 	s.Paren()
 	s.Paren(true)
 	s.Paren(false)
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.policy(``)
-	s.policy(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.NoNesting()
 	s.NoNesting(true)
 	s.CanNest()
@@ -1521,10 +1502,6 @@ func TestStack_codecov(t *testing.T) {
 	s.SetAuxiliary(nil)
 	s.SetLogger(nil)
 	s.Logger()
-
-	s.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
 
 	SetDefaultStackLogLevel(`none`)
 	SetDefaultStackLogLevel(0)

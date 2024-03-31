@@ -1405,8 +1405,9 @@ func (r *stack) config() (sc *nodeConfig, err error) {
 		var ok bool
 		// verify slice #0 is a *nodeConfig
 		// instance, or bail out.
-		if sc, ok = (*r)[0].(*nodeConfig); !ok {
-			err = errorf("Receiver does not contain an expected instance; aborting")
+		err = unexpectedReceiverState
+		if sc, ok = (*r)[0].(*nodeConfig); ok {
+			err = nil
 		}
 	}
 
@@ -1457,19 +1458,15 @@ the receiver. The return values shall be interpreted as follows:
   - A minus one (-1) value indicates infinite capacity is available; no limit is imposed
 */
 func (r Stack) Cap() (c int) {
-	if r.IsInit() {
-		offset := -1
-		switch _c := r.cap(); _c {
-		case 0:
-			c = offset // interpret zero as minus 1
-		default:
-			// handle the cfg slice offset here, as
-			// the value is +non-zero
-			c = _c + offset // cfg.cap minus 1
-		}
-	}
+        if r.IsInit() {
+                offset := -1
+                c = offset
+                if _c := r.cap(); _c > 0 {
+                        c = _c + offset // cfg.cap minus 1
+                }
+        }
 
-	return
+        return
 }
 
 /*
@@ -1831,23 +1828,21 @@ func (r *stack) revealDescend(inner Stack, idx int) (err error) {
 			err = inner.reveal()
 			updated = inner
 		}
+	}
 
-		if err != nil {
-			return
+	if err == nil {
+		// If we have an updated reference
+		// in-hand, replace whatever was
+		// already present at index idx
+		// within the receiver instance.
+		if updated != nil {
+			r.replace(updated, idx)
 		}
-	}
 
-	// If we have an updated reference
-	// in-hand, replace whatever was
-	// already present at index idx
-	// within the receiver instance.
-	if updated != nil {
-		r.replace(updated, idx)
+		// Begin second pass-over before
+		// return.
+		err = inner.reveal()
 	}
-
-	// Begin second pass-over before
-	// return.
-	err = inner.reveal()
 
 	return
 }
@@ -2557,132 +2552,6 @@ getValidityPolicy is a private method called by Stack.Valid.
 func (r *stack) getValidityPolicy() ValidityPolicy {
 	sc, _ := r.config()
 	return sc.vpf
-}
-
-/*
-mkmsg is the private method called by eventDispatch for the
-purpose of Message assembly prior to submission to a logger.
-*/
-func (r *stack) mkmsg(typ string) (m Message, ok bool) {
-	if r.isInit() {
-		if len(typ) > 0 {
-			m = Message{
-				ID:   getLogID(r.getID()),
-				Tag:  typ,
-				Addr: ptrString(r),
-				Type: `stack`,
-				Time: timestamp(),
-				Len:  r.ulen(),
-				Cap:  Stack{r}.Cap(), // user-facing cap is preferred
-			}
-			ok = true
-		}
-	}
-
-	return
-}
-
-/*
-error conditions that are fatal and always serious
-*/
-func (r *stack) fatal(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel5, `FATAL`, data...)
-	}
-}
-
-/*
-error conditions that are not fatal but potentially serious
-*/
-func (r *stack) error(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel5, `ERROR`, data...)
-	}
-}
-
-/*
-relatively deep operational details
-*/
-func (r *stack) debug(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel4, `DEBUG`, data...)
-	}
-}
-
-/*
-extreme depth operational details
-*/
-func (r *stack) trace(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel6, `TRACE`, data...)
-	}
-}
-
-/*
-policy method operational details, as well as caps, r/o, etc.
-*/
-func (r *stack) policy(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel2, `POLICY`, data...)
-	}
-}
-
-/*
-calls records in/out signatures and realtime meta-data regarding
-individual method runtimes.
-*/
-func (r *stack) calls(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel1, `CALL`, data...)
-	}
-}
-
-/*
-state records interrogations of, and changes to, the underlying
-configuration value.
-*/
-func (r *stack) state(x any, data ...map[string]string) {
-	if r != nil && x != nil {
-		r.eventDispatch(x, LogLevel3, `STATE`, data...)
-	}
-}
-
-/*
-eventDispatch is the main dispatcher of events of any severity.
-A severity of FATAL (in any case) will result in a logger-driven
-call of os.Exit.
-*/
-func (r stack) eventDispatch(x any, ll LogLevel, severity string, data ...map[string]string) {
-	cfg, _ := r.config()
-	if !(cfg.log.positive(ll) ||
-		eq(severity, `FATAL`) ||
-		cfg.log.lvl == logLevels(AllLogLevels)) {
-		return
-	}
-
-	printers := map[string]func(...any){
-		`FATAL`:  r.logger().Fatalln,
-		`ERROR`:  r.logger().Println,
-		`STATE`:  r.logger().Println,
-		`CALL`:   r.logger().Println,
-		`DEBUG`:  r.logger().Println,
-		`TRACE`:  r.logger().Println,
-		`POLICY`: r.logger().Println,
-	}
-
-	if m, ok := r.mkmsg(severity); ok {
-		if ok = m.setText(x); ok {
-			if len(data) > 0 {
-				if data[0] != nil {
-					m.Data = data[0]
-					if _, ok := data[0][`FATAL`]; ok {
-						severity = `ERROR`
-					}
-				}
-			}
-			printers[severity](m)
-		}
-	}
 }
 
 const badStack = `<invalid_stack>`

@@ -6,7 +6,7 @@ import (
 	"log"
 	"math/rand" // not for crypto, don't worry :)
 	"reflect"
-	"runtime"
+	//"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -269,11 +269,13 @@ func getStringer(x any) (meth func() string) {
 /*
 a quick means of getting the caller name for logging purposes.
 */
+/*
 func fmname() string {
 	x, _, _, _ := runtime.Caller(1)
 	name := split(runtime.FuncForPC(x).Name(), string(rune(46)))
 	return uc(name[len(name)-1])
 }
+*/
 
 /*
 encapValue will encapsulate value v using encapsulation scheme
@@ -635,3 +637,7 @@ type Interface interface {
 	// See also the SetLogger method for Condition and Stack instances.
 	Logger() *log.Logger
 }
+
+var (
+	unexpectedReceiverState error = errorf("Receiver does not contain an expected instance; aborting")
+)

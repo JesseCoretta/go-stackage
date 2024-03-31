@@ -63,3 +63,43 @@ func TestDeref(t *testing.T) {
 		return
 	}
 }
+
+func TestMiscCodecov(t *testing.T) {
+	for idx, val := range []any{
+		uint(1),
+		int(1),
+		uint8(1),
+		int8(1),
+		uint16(1),
+		int16(1),
+		uint32(1),
+		int32(1),
+		uint64(1),
+		int64(1),
+	} {
+		if idx%2 == 0 {
+			_ = uintStringer(val)
+		} else {
+			_ = intStringer(val)
+		}
+	}
+
+	for _, val := range []any{
+		complex64(1),
+		complex128(1),
+	} {
+		_ = complexStringer(val)
+	}
+
+	var ls logSystem
+	_ = ls.positive(1)
+
+	ls = logSystem{
+		log: cLogDefault,
+	}
+	_ = ls.positive(1)
+	logDiscard(nil)
+	logDiscard(sLogDefault)
+
+	_ = timestamp()
+}

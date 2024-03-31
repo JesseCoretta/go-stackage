@@ -191,31 +191,9 @@ func TestCondition_SetAuxiliary(t *testing.T) {
 	}
 }
 
-/*
-This example demonstrates setting a custom logger which writes
-to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
-invoked, and an event -- the creation of a Condition -- shall
-trigger log events that are funneled into our bytes.Buffer.
-
-For the sake of idempotent test results, the length of the buffer
-is checked only to ensure it is greater than 0.
-*/
-func ExampleSetDefaultConditionLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	SetDefaultConditionLogger(customLogger)
-
-	// do something that triggers log events ...
-	c := Cond(`π`, Eq, float64(3.14159265358979323))
-	c.SetLogLevel(AllLogLevels)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
-}
-
 func ExampleCond() {
-	fmt.Printf("%s", Cond(`π`, Eq, float64(3.14159265358979323)))
-	// Output: π = 3.141593
+	fmt.Printf("%s", Cond(`π`, Eq, float64(3.141592653589793)))
+	// Output: π = 3.141592653589793
 }
 
 func ExampleCondition_CanNest() {
@@ -285,7 +263,7 @@ func ExampleCondition_IsEncap() {
 func ExampleCondition_Err() {
 	var c Condition = Cond(``, ComparisonOperator(7), `ThisIsBogus`)
 	fmt.Printf("%v", c.Err())
-	// Output: stackage.Condition keyword value is zero
+	// Output: keyword value is zero
 }
 
 /*
@@ -640,7 +618,7 @@ func ExampleCondition_Paren() {
 	c.SetOperator(Ge)
 	c.SetExpression(1.456)
 	fmt.Printf("%s", c)
-	// Output: ( keyword >= 1.456000 )
+	// Output: ( keyword >= 1.456 )
 }
 
 func ExampleCondition_IsParen() {
@@ -750,21 +728,6 @@ func ExampleCondition_Logger() {
 	// Output: *log.Logger
 }
 
-func ExampleCondition_SetLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(AllLogLevels)
-	c.SetKeyword(`keyword`)
-	c.SetOperator(Ne)
-	c.SetExpression(`bad_value`)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
-}
-
 func ExampleCondition_SetLogLevel() {
 	var buf *bytes.Buffer = &bytes.Buffer{}
 	var customLogger *log.Logger = log.New(buf, ``, 0)
@@ -835,16 +798,6 @@ func ExampleCondition_typeAlias() {
 func TestCondition_codecov(t *testing.T) {
 	var c Condition
 	// panic checks
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
 	c.Len()
 	c.IsZero()
 	c.IsInit()
@@ -852,6 +805,9 @@ func TestCondition_codecov(t *testing.T) {
 	c.Operator()
 	c.Keyword()
 	c.Valid()
+	_ = cond.String()
+
+	SetDefaultConditionLogger(nil)
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -909,39 +865,17 @@ func TestCondition_codecov(t *testing.T) {
 	c.Encap(`<<`, `<<`)
 	c.Encap(`"`)
 	c.Valid()
-	c.debug(``)
-	c.debug(nil)
-	c.error(``)
-	c.error(nil)
-	c.policy(``)
-	c.policy(nil)
-	c.trace(``)
-	c.trace(nil)
-	c.state(``)
-	c.state(nil)
-	c.calls(``)
-	c.calls(nil)
 	_ = c.condition.cfg.log.lvl.String()
-
-	c.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
 
 	c.SetLogLevel(LogLevel5)
 	c.SetLogLevel(AllLogLevels)
 	_ = c.condition.cfg.log.lvl.String()
-	c.eventDispatch(errorf(`this is an error`), LogLevel5, `ERROR`)
-	c.eventDispatch(`this is an error, too`, LogLevel5, `ERROR`)
 	c.UnsetLogLevel(`all`)
 
 	SetDefaultConditionLogLevel(`none`)
 	SetDefaultConditionLogLevel(0)
 	SetDefaultConditionLogLevel(nil)
 	SetDefaultConditionLogLevel('a')
-
-	c.calls("this is a message", map[string]string{
-		`content`: `hello`,
-	})
 
 	type customCondition Condition
 	var cx Condition = Cond(`keyword`, Ne, `Value`)
@@ -950,23 +884,3 @@ func TestCondition_codecov(t *testing.T) {
 	}
 }
 
-func TestMessage_PPol(t *testing.T) {
-	sout := `string_output`
-	ppol := func(...any) string {
-		return sout
-	}
-
-	var m Message = Message{
-		Type: `S`,
-		ID:   `identifier`,
-		Time: `20230927011732`,
-		Tag:  `tag`,
-		PPol: ppol,
-	}
-
-	if m.String() != sout {
-		t.Errorf("%s failed: want '%s', got '%s'",
-			t.Name(), sout, m)
-		return
-	}
-}

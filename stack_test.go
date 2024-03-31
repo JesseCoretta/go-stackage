@@ -3,10 +3,86 @@ package stackage
 import (
 	"bytes"
 	"fmt"
-	"log"
+	//"log"
+	//"net/http"
+	//_ "net/http/pprof"
 	"testing"
 	_ "time"
 )
+
+// Uncomment this test func (and the http+log imports above)
+// to allow continuous pprof access via HTTP. Replace actions
+// within the 'for loop' below with whatever expensive calls
+// or activities you want to debug.
+//
+// You can run this test directly via the following command
+// (which assumes your cwd is this package):
+//
+//   $ go test -run TestStackagePerf .
+//
+// While this test is running, in a separate terminal run
+// the following command to acquire samples:
+//
+//   $ go tool pprof http://localhost:1234/debug/pprof/profile?seconds=60
+//
+// Alter this URL as needed (e.g.: use a different sampling
+// duration, such as seconds=300).
+//
+// After N seconds (whatever duration you've used), you will
+// be dropped into a pprof shell.  I like to enter 'svg' and
+// obtain a profileNNN.svg file, but there are other options
+// for use.
+//
+// Once you've been dropped into the pprof shell, this means
+// the sample data has been acquired. At this point, you may
+// kill the running test in the other terminal via CTRL+C,
+// unless you plan on acquiring more samples.
+//
+// Don't forget to re-comment this function before running
+// other tests else you'll hang at some point!  Definitely
+// don't repackage/redistribute this package while this test
+// function is UNcommented.
+/*
+func TestStackagePerf(t *testing.T) {
+        ch := make(chan bool)
+        go func() {
+		// edit this listener (e.g.: use TCP/8080) as
+		// seen fit.
+                log.Println(http.ListenAndServe(":1234", nil))
+        }()
+
+        for {
+        	custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
+		//thisIsMyNightmare := And().Push(
+		_ = And().Push(
+		        `this1`,
+		        Or().Mutex().Push(
+		                custom,
+		                And().Push(
+		                        `this4`,
+		                        Not().Mutex().Push(
+		                                Or().Push(
+		                                        Cond(`dayofweek`, Ne, "Wednesday"),
+		                                        Cond(`ssf`, Ge, "128"),
+		                                        Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
+		                                ),
+		                        ),
+		                ),
+		                And().Push(
+		                        Or().Push(
+		                                Cond(`keyword2`, Lt, "someothervalue"),
+		                        ),
+		                ),
+		                Cond(`keyword`, Gt, Or().Push(`...`)),
+		        ),
+		        `this2`,
+		)
+
+		//os.Stdout.Write([]byte(thisIsMyNightmare.String()))
+        }
+        <-ch
+}
+*/
 
 func ExampleComparisonOperator_Context() {
 	var cop ComparisonOperator = Ge
@@ -27,7 +103,7 @@ func ExampleStack_Addr() {
 }
 
 func ExampleStack_Reverse() {
-	var c Stack = List().Push(0,1,2,3,4)
+	var c Stack = List().Push(0, 1, 2, 3, 4)
 	fmt.Printf("%s", c.Reverse())
 	// Output: 4 3 2 1 0
 }
@@ -114,31 +190,6 @@ func ExampleSetDefaultStackLogLevel() {
 func ExampleDefaultStackLogLevel() {
 	fmt.Printf("%d", DefaultStackLogLevel())
 	// Output: 0
-}
-
-/*
-This example demonstrates setting a custom logger which writes
-to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
-invoked, and an event -- the creation of a Basic Stack -- shall
-trigger log events that are funneled into our bytes.Buffer.
-
-For the sake of idempotent test results, the length of the buffer
-is checked only to ensure it is greater than 0.
-*/
-func ExampleSetDefaultStackLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	SetDefaultStackLogger(customLogger)
-	SetDefaultStackLogLevel(AllLogLevels) // highly verbose!
-
-	// do something that triggers log events ...
-	_ = Basic().Push(
-		Cond(`π`, Eq, float64(3.14159265358979323)),
-		Cond(`m`, Eq, `mc²`),
-	)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
 }
 
 var testParens []string = []string{`(`, `)`}
@@ -611,7 +662,7 @@ func ExampleList() {
 	//l.JoinDelim(`delim`)
 
 	fmt.Printf("%s", l)
-	// Output: 1.234000 ? (1+3i) ? hello mr thompson
+	// Output: 1.234 ? (1+3i) ? hello mr thompson
 }
 
 /*
@@ -1169,7 +1220,7 @@ func TestInterface(t *testing.T) {
 }
 
 func TestStack_Reveal_experimental001(t *testing.T) {
-        custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
+	custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
 
 	thisIsMyNightmare := And().Push(
 		`this1`,
@@ -1355,21 +1406,14 @@ func TestStack_withCap(t *testing.T) {
 func TestStack_codecov(t *testing.T) {
 	var s Stack
 	// panic checks
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.Len()
 	s.IsZero()
 	s.IsInit()
 	s.Valid()
 	s.Pop()
+
+	SetDefaultStackLogger(nil)
+	_ = lonce.String()
 
 	var ll logLevels
 	ll.shift(`trace`)
@@ -1442,18 +1486,6 @@ func TestStack_codecov(t *testing.T) {
 	s.Paren()
 	s.Paren(true)
 	s.Paren(false)
-	s.debug(``)
-	s.debug(nil)
-	s.error(``)
-	s.error(nil)
-	s.policy(``)
-	s.policy(nil)
-	s.trace(``)
-	s.trace(nil)
-	s.state(``)
-	s.state(nil)
-	s.calls(``)
-	s.calls(nil)
 	s.NoNesting()
 	s.NoNesting(true)
 	s.CanNest()
@@ -1470,10 +1502,6 @@ func TestStack_codecov(t *testing.T) {
 	s.SetAuxiliary(nil)
 	s.SetLogger(nil)
 	s.Logger()
-
-	s.fatal(`test fatal`, map[string]string{
-		`FATAL`: `false`,
-	})
 
 	SetDefaultStackLogLevel(`none`)
 	SetDefaultStackLogLevel(0)

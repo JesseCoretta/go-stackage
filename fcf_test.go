@@ -255,7 +255,7 @@ func ExampleStack_SetValidityPolicy() {
 				if tv.Type == `text` {
 					if assert, _ := tv.Value.(string); assert != `healthy stuff` {
 						// What a piece of junk!
-						err = fmt.Errorf("Undesirable string value '%s' detected in struct Value field [%T @ idx:%d]", assert, myStack, i)
+						err = errorf("embedded instance is invalid")
 					}
 				}
 			}
@@ -273,7 +273,7 @@ func ExampleStack_SetValidityPolicy() {
 	// Execute Stack.Valid, which returns an error instance,
 	// directly into a fmt.Printf call.
 	fmt.Printf("%v", myStack.Valid())
-	// Output: Undesirable string value 'complete_garbage' detected in struct Value field [stackage.Stack @ idx:4]
+	// Output: embedded instance is invalid
 }
 
 func ExampleCondition_SetValidityPolicy() {

@@ -1,7 +1,7 @@
 package stackage
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"io"
 	"log"
 	"os"
@@ -472,8 +472,12 @@ func stringResolveLogger(logger string) (l *log.Logger) {
 	return
 }
 
-func logDiscard(logger *log.Logger) bool {
-	return logger.Writer() == io.Discard
+func logDiscard(logger *log.Logger) (is bool) {
+	if logger != nil {
+		is = logger.Writer() == io.Discard
+	}
+
+	return
 }
 
 /*
@@ -483,6 +487,7 @@ been initialized and provided to one (1) or more Stack or Condition instances.
 Instances of this type shall contain diagnostic, error and debug information
 pertaining to current operations of the given Stack or Condition instance.
 */
+/*
 type Message struct {
 	ID   string             `json:"id"`
 	Msg  string             `json:"txt"`
@@ -512,6 +517,7 @@ func (r *Message) setText(txt any) (ok bool) {
 
 	return
 }
+*/
 
 /*
 String is a stringer method that returns the string representation of
@@ -526,6 +532,7 @@ closure type and override the string representation procedure for instances
 of this type (thus implementing any syntax or format they wish, i.e.: XML,
 YAML, et al).
 */
+/*
 func (r Message) String() (data string) {
 	if r.PPol != nil {
 		data = r.PPol()
@@ -557,18 +564,22 @@ func (r Message) String() (data string) {
 
 	return
 }
+*/
 
 /*
 Valid returns a Boolean value indicative of whether the receiver
 is perceived to be valid.
 */
+/*
 func (r Message) Valid() bool {
 	return (r.Type != `UNKNOWN` &&
 		len(r.Time) > 0 &&
 		len(r.Msg) > 0 &&
 		len(r.Tag) > 0)
 }
+*/
 
+/*
 func getLogID(elem string) (id string) {
 	id = `no_identifier`
 	if _id := elem; len(_id) > 0 {
@@ -576,12 +587,13 @@ func getLogID(elem string) (id string) {
 	}
 	return
 }
+*/
 
 /*
 Logger returns the *log.Logger instance. This can be used for quick
 access to the log.Logger type's methods in a manner such as:
 
-        r.Logger().Fatalf("We died")
+	r.Logger().Fatalf("We died")
 
 It is not recommended to modify the return instance for the purpose
 of disabling logging outright (see Stack.SetLogger method as well
@@ -589,23 +601,23 @@ as the SetDefaultStackLogger package-level function for ways of
 doing this easily).
 */
 func (r Stack) Logger() (l *log.Logger) {
-        if r.IsInit() {
-                l = r.stack.logger()
-        }
-        return
+	if r.IsInit() {
+		l = r.stack.logger()
+	}
+	return
 
 }
 
 func (r *stack) logger() *log.Logger {
-        cfg, _ := r.config()
-        return cfg.log.logger()
+	cfg, _ := r.config()
+	return cfg.log.logger()
 }
 
 /*
 Logger returns the *log.Logger instance. This can be used for quick
 access to the log.Logger type's methods in a manner such as:
 
-        r.Logger().Fatalf("We died")
+	r.Logger().Fatalf("We died")
 
 It is not recommended to modify the return instance for the purpose
 of disabling logging outright (see Stack.SetLogger method as well
@@ -613,14 +625,14 @@ as the SetDefaultConditionLogger package-level function for ways of
 doing this easily).
 */
 func (r Condition) Logger() (l *log.Logger) {
-        if r.IsInit() {
-                l = r.condition.logger()
-        }
-        return
+	if r.IsInit() {
+		l = r.condition.logger()
+	}
+	return
 }
 
 func (r condition) logger() *log.Logger {
-        return r.cfg.log.logger()
+	return r.cfg.log.logger()
 }
 
 func init() {

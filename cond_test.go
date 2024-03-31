@@ -191,31 +191,9 @@ func TestCondition_SetAuxiliary(t *testing.T) {
 	}
 }
 
-/*
-This example demonstrates setting a custom logger which writes
-to a bytes.Buffer io.Writer qualifier. A loglevel of "all" is
-invoked, and an event -- the creation of a Condition -- shall
-trigger log events that are funneled into our bytes.Buffer.
-
-For the sake of idempotent test results, the length of the buffer
-is checked only to ensure it is greater than 0.
-*/
-func ExampleSetDefaultConditionLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	SetDefaultConditionLogger(customLogger)
-
-	// do something that triggers log events ...
-	c := Cond(`π`, Eq, float64(3.14159265358979323))
-	c.SetLogLevel(AllLogLevels)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
-}
-
 func ExampleCond() {
-	fmt.Printf("%s", Cond(`π`, Eq, float64(3.14159265358979323)))
-	// Output: π = 3.141593
+	fmt.Printf("%s", Cond(`π`, Eq, float64(3.141592653589793)))
+	// Output: π = 3.141592653589793
 }
 
 func ExampleCondition_CanNest() {
@@ -285,7 +263,7 @@ func ExampleCondition_IsEncap() {
 func ExampleCondition_Err() {
 	var c Condition = Cond(``, ComparisonOperator(7), `ThisIsBogus`)
 	fmt.Printf("%v", c.Err())
-	// Output: stackage.Condition keyword value is zero
+	// Output: keyword value is zero
 }
 
 /*
@@ -640,7 +618,7 @@ func ExampleCondition_Paren() {
 	c.SetOperator(Ge)
 	c.SetExpression(1.456)
 	fmt.Printf("%s", c)
-	// Output: ( keyword >= 1.456000 )
+	// Output: ( keyword >= 1.456 )
 }
 
 func ExampleCondition_IsParen() {
@@ -748,21 +726,6 @@ func ExampleCondition_Logger() {
 	c.SetLogger(customLogger)
 	fmt.Printf("%T", c.Logger())
 	// Output: *log.Logger
-}
-
-func ExampleCondition_SetLogger() {
-	var buf *bytes.Buffer = &bytes.Buffer{}
-	var customLogger *log.Logger = log.New(buf, ``, 0)
-	var c Condition
-	c.Init()
-	c.SetLogger(customLogger)
-	c.SetLogLevel(AllLogLevels)
-	c.SetKeyword(`keyword`)
-	c.SetOperator(Ne)
-	c.SetExpression(`bad_value`)
-
-	fmt.Printf("%T.Len>0 (bytes): %t", buf, buf.Len() > 0)
-	// Output: *bytes.Buffer.Len>0 (bytes): true
 }
 
 func ExampleCondition_SetLogLevel() {

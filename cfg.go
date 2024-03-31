@@ -261,12 +261,10 @@ func (r *nodeConfig) kind() (kind string) {
 valid returns an error if the receiver is considered to be
 invalid or nil.
 */
-func (r *nodeConfig) valid() (err error) {
-	err = errorf("%T instance is nil; aborting", r)
+func (r *nodeConfig) valid() (is bool) {
 	if !r.isZero() {
-		err = errorf("%T instance defines no stack \"kind\", or %T is invalid", r, r)
 		if r.typ != 0x0 {
-			err = nil
+			is = true
 		}
 	}
 
@@ -278,7 +276,7 @@ positive returns a Boolean value indicative of whether the specified
 cfgFlag input value is "on" within the receiver's opt field.
 */
 func (r nodeConfig) positive(x cfgFlag) (is bool) {
-	if err := r.valid(); err == nil {
+	if r.valid() {
 		is = r.opt.positive(x)
 	}
 	return
@@ -297,7 +295,7 @@ setOpt sets the specified cfgFlag to "on" within the receiver's
 opt field.
 */
 func (r *nodeConfig) setOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err == nil {
+	if r.valid() {
 		r.opt.shift(x)
 	}
 	return
@@ -437,7 +435,7 @@ setMutex enables the receiver's mutual exclusion
 locking capabilities.
 */
 func (r *nodeConfig) setMutex() {
-	if err := r.valid(); err == nil {
+	if r.valid() {
 		if r.mtx == nil {
 			r.mtx = &sync.Mutex{}
 		}
@@ -449,7 +447,7 @@ unsetOpt sets the specified cfgFlag to "off" within the receiver's
 opt field.
 */
 func (r *nodeConfig) unsetOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err == nil {
+	if r.valid() {
 		r.opt.unshift(x)
 	}
 	return
@@ -469,7 +467,7 @@ to its current value in terms of the input value. In other words, if the
 state is "on" for a flag, it will be toggled to "off" and vice versa.
 */
 func (r *nodeConfig) toggleOpt(x cfgFlag) (err error) {
-	if err = r.valid(); err == nil {
+	if r.valid() {
 		r.opt.toggle(x)
 	}
 	return

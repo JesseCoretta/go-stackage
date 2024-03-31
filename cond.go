@@ -83,7 +83,6 @@ of *condition, which is the embedded type instance found within
 (properly initialized) Condition instances.
 */
 func initCondition() (r *condition) {
-	var data map[string]string = make(map[string]string, 0)
 
 	r = new(condition)
 	r.cfg = new(nodeConfig)
@@ -91,16 +90,6 @@ func initCondition() (r *condition) {
 	r.cfg.log.lvl = logLevels(NoLogLevels)
 
 	r.cfg.typ = cond
-	data[`type`] = cond.String()
-
-	if !logDiscard(r.cfg.log.log) {
-		data[`laddr`] = sprintf("%p", r.cfg.log.log)
-		data[`lpfx`] = r.cfg.log.log.Prefix()
-		data[`lflags`] = sprintf("%d", r.cfg.log.log.Flags())
-		data[`lwriter`] = sprintf("%T", r.cfg.log.log.Writer())
-	}
-
-	r.debug(`ALLOC`, data)
 
 	return
 }
@@ -127,31 +116,18 @@ func (r Condition) SetAuxiliary(aux ...Auxiliary) Condition {
 setAuxiliary is a private method called by Condition.SetAuxiliary.
 */
 func (r *condition) setAuxiliary(aux ...Auxiliary) {
-	fname := fmname()
-	r.calls(sprintf("%s: in: variadic %T(len:%d)",
-		fname, aux, len(aux)))
-
 	var _aux Auxiliary
 	if len(aux) == 0 {
-		r.trace(sprintf("%s: ALLOC %T (no variadic input)",
-			fname, _aux))
 		_aux = make(Auxiliary, 0)
 	} else {
 		if aux[0] == nil {
-			r.trace(sprintf("%s: ALLOC %T (nil variadic slice)",
-				fname, _aux))
 			_aux = make(Auxiliary, 0)
 		} else {
-			r.trace(sprintf("%s: assign user %T(len:%d)",
-				fname, _aux, _aux.Len()))
 			_aux = aux[0]
 		}
 	}
 
 	r.cfg.aux = _aux
-	r.debug(sprintf("%s: registered %T(len:%d)",
-		fname, r.cfg.aux, r.cfg.aux.Len()))
-	r.calls(sprintf("%s: out:void", fname))
 }
 
 /*
@@ -168,14 +144,7 @@ func (r Condition) Auxiliary() (aux Auxiliary) {
 auxiliary is a private method called by Condition.Auxiliary.
 */
 func (r condition) auxiliary() (aux Auxiliary) {
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
 	aux = r.cfg.aux
-	r.debug(sprintf("%s: get %T(len:%d)",
-		fname, aux, aux.Len()))
-	r.calls(sprintf("%s: out:%T(%d)",
-		fname, aux, aux.Len()))
-
 	return
 }
 
@@ -255,13 +224,7 @@ func (r Condition) SetLogLevel(l ...any) Condition {
 }
 
 func (r *condition) setLogLevel(l ...any) {
-	r.calls(sprintf("%s: in:%T(%v;len:%d)",
-		fmname(), l, l, len(l)))
-
 	r.cfg.log.shift(l...)
-
-	r.calls(sprintf("%s: out:%T(self)",
-		fmname(), r))
 }
 
 /*
@@ -292,14 +255,7 @@ func (r Condition) UnsetLogLevel(l ...any) Condition {
 }
 
 func (r *condition) unsetLogLevel(l ...any) {
-	fname := fmname()
-	r.calls(sprintf("%s: in:%T(%v;len:%d)",
-		fname, l, l, len(l)))
-
 	r.cfg.log.unshift(l...)
-
-	r.calls(sprintf("%s: out:%T(self)",
-		fname, r))
 }
 
 /*
@@ -511,7 +467,7 @@ func (r Condition) SetID(id string) Condition {
 		if lc(id) == `_random` {
 			id = randomID(randIDSize)
 		} else if lc(id) == `_addr` {
-			id = sprintf("%s", r.Addr())
+			id = r.Addr()
 		}
 
 		r.condition.cfg.setID(id)
@@ -554,6 +510,8 @@ func (r Condition) Len() int {
 Addr returns the string representation of the pointer
 address for the receiver. This may be useful for logging
 or debugging operations.
+
+Note: this method calls fmt.Sprintf.
 */
 func (r Condition) Addr() (addr string) {
 	if r.IsInit() {
@@ -615,7 +573,7 @@ are checked.
 */
 func (r Condition) Valid() (err error) {
 	if !r.IsInit() {
-		err = errorf("%T instance is nil", r)
+		err = errorf("condition instance is nil")
 		return
 	}
 
@@ -630,7 +588,7 @@ func (r Condition) Valid() (err error) {
 
 	// verify keyword
 	if kw := r.Keyword(); len(kw) == 0 {
-		err = errorf("%T keyword value is zero", r)
+		err = errorf("keyword value is zero")
 		return
 	}
 
@@ -638,7 +596,7 @@ func (r Condition) Valid() (err error) {
 	if cop := r.Operator(); cop != nil {
 		if assert, ok := cop.(ComparisonOperator); ok {
 			if !(1 <= int(assert) && int(assert) <= 6) {
-				err = errorf("%T operator value is bogus", r)
+				err = errorf("operator value is bogus")
 				return
 			}
 		}
@@ -646,7 +604,7 @@ func (r Condition) Valid() (err error) {
 
 	// verify expression value
 	if r.Expression() == nil {
-		err = errorf("%T expression value is nil", r)
+		err = errorf("expression value is nil")
 	}
 
 	return
@@ -663,7 +621,7 @@ execution of this method, the return value shall always be false.
 */
 func (r Condition) Evaluate(x ...any) (ev any, err error) {
 	if r.IsInit() {
-		if err = errorf("No %T.%T func/meth found", r, r.cfg.evl); r.cfg.evl != nil {
+		if err = errorf("No func/meth found"); r.cfg.evl != nil {
 			ev, err = r.cfg.evl(x...)
 		}
 	}
@@ -825,15 +783,9 @@ isFIFO is a private method called by the Condition.IsFIFO method.
 */
 func (r condition) isFIFO() (result bool) {
 
-	fname := fmname()
-	r.calls(sprintf("%s: in:niladic", fname))
-
 	if stk, ok := stackTypeAliasConverter(r.ex); ok {
 		result = stk.IsFIFO()
 	}
-
-	r.calls(sprintf("%s: out:%T(%v)",
-		fmname(), result, result))
 
 	return
 }
@@ -1007,9 +959,9 @@ func (r condition) string() string {
 		pad = ``
 	}
 
-	s := sprintf("%s%s%s%s%s", r.kw, pad, r.op, pad, val)
+	s := r.kw + pad + r.op.String() + pad + val
 	if r.cfg.positive(parens) {
-		s = sprintf("(%s%s%s)", pad, s, pad)
+		s = `(` + pad + s + pad + `)`
 	}
 
 	return s
@@ -1026,7 +978,7 @@ func (r *condition) mkmsg(typ string) (m Message, ok bool) {
 				ID:   getLogID(r.cfg.id),
 				Tag:  typ,
 				Addr: ptrString(r),
-				Type: sprintf("%T", *r),
+				Type: `condition`,
 				Time: timestamp(),
 				Len:  -1, // initially N/A
 				Cap:  -1, // initially N/A

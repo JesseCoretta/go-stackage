@@ -29,6 +29,7 @@ var (
 	rplc    func(string, string, string) string = strings.ReplaceAll
 	qt      func(string) string                 = strconv.Quote
 	uq      func(string) (string, error)        = strconv.Unquote
+	itoa    func(int) string                    = strconv.Itoa
 	split   func(string, string) []string       = strings.Split
 	trimS   func(string) string                 = strings.TrimSpace
 	join    func([]string, string) string       = strings.Join
@@ -39,6 +40,13 @@ const (
 	randChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	randIDSize = 24
 )
+
+func bool2str(b bool) string {
+	if b {
+		return `true`
+	}
+	return `false`
+}
 
 func randomID(n int) string {
 	id := make([]byte, n)
@@ -69,11 +77,11 @@ func errorf(msg any, x ...any) (err error) {
 	switch tv := msg.(type) {
 	case string:
 		if len(tv) > 0 {
-			err = errors.New(sprintf(tv, x...))
+			err = errors.New(tv)
 		}
 	case error:
 		if tv != nil {
-			err = errors.New(sprintf(tv.Error(), x...))
+			err = errors.New(tv.Error())
 		}
 	}
 
@@ -281,10 +289,10 @@ func encapValue(enc [][]string, v string) string {
 		switch len(sl) {
 		case 1:
 			// use char 0 for both L and R
-			v = sprintf("%s%s%s", sl[0], v, sl[0])
+			v = sl[0] + v + sl[0]
 		case 2:
 			// char 0 = L, char 1 = R
-			v = sprintf("%s%s%s", sl[0], v, sl[1])
+			v = sl[0] + v + sl[1]
 		}
 	}
 
@@ -309,7 +317,7 @@ func padValue(do bool, value string) string {
 	if len(value) == 0 {
 		return ``
 	}
-	return sprintf("%s%s%s", pad, value, pad)
+	return pad + value + pad
 }
 
 /*
@@ -341,7 +349,7 @@ func isNumberPrimitive(x any) bool {
 	switch x.(type) {
 	case int, int8, int16, int32, int64,
 		float32, float64, complex64, complex128,
-		uint, uint8, uint16, uint32, uint64, uintptr:
+		uint, uint8, uint16, uint32, uint64:
 		return true
 	}
 
@@ -387,7 +395,7 @@ func numberStringer(x any) (s string) {
 		s = complexStringer(tv)
 	case int, int8, int16, int32, int64:
 		s = intStringer(tv)
-	case uint, uint8, uint16, uint32, uint64, uintptr:
+	case uint, uint8, uint16, uint32, uint64:
 		s = uintStringer(tv)
 	}
 
@@ -395,7 +403,7 @@ func numberStringer(x any) (s string) {
 }
 
 func primitiveStringer(x any) (s string) {
-	s = sprintf(`unsupported_primitive_type_%T`, x)
+	s = `unsupported_primitive_type`
 	if isKnownPrimitive(x) {
 		switch {
 		case isBoolPrimitive(x):
@@ -411,13 +419,15 @@ func primitiveStringer(x any) (s string) {
 }
 
 func boolStringer(x any) string {
-	return sprintf("%t", x.(bool))
+	return bool2str(x.(bool))
 }
 
 func floatStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case float32, float64:
-		s = sprintf("%f", tv)
+	case float32:
+		s = strconv.FormatFloat(float64(tv), 'g', -1, 32)
+	case float64:
+		s = strconv.FormatFloat(tv, 'g', -1, 64)
 	}
 
 	return
@@ -425,8 +435,10 @@ func floatStringer(x any) (s string) {
 
 func complexStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case complex64, complex128:
-		s = sprintf("%v", tv)
+	case complex64:
+		s = strconv.FormatComplex(complex128(tv), 'g', -1, 64)
+	case complex128:
+		s = strconv.FormatComplex(tv, 'g', -1, 128)
 	}
 
 	return
@@ -434,8 +446,16 @@ func complexStringer(x any) (s string) {
 
 func uintStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case uint, uint8, uint16, uint32, uint64, uintptr:
-		s = sprintf("%d", tv)
+	case uint:
+		s = strconv.FormatUint(uint64(tv), 10)
+	case uint8:
+		s = strconv.FormatUint(uint64(tv), 10)
+	case uint16:
+		s = strconv.FormatUint(uint64(tv), 10)
+	case uint32:
+		s = strconv.FormatUint(uint64(tv), 10)
+	case uint64:
+		s = strconv.FormatUint(tv, 10)
 	}
 
 	return
@@ -443,8 +463,16 @@ func uintStringer(x any) (s string) {
 
 func intStringer(x any) (s string) {
 	switch tv := x.(type) {
-	case int, int8, int16, int32, int64:
-		s = sprintf("%d", tv)
+	case int:
+		s = strconv.FormatInt(int64(tv), 10)
+	case int8:
+		s = strconv.FormatInt(int64(tv), 10)
+	case int16:
+		s = strconv.FormatInt(int64(tv), 10)
+	case int32:
+		s = strconv.FormatInt(int64(tv), 10)
+	case int64:
+		s = strconv.FormatInt(tv, 10)
 	}
 
 	return

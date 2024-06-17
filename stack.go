@@ -11,53 +11,54 @@ type Stack struct {
 
 /*
 stack represents the underlying ordered slice type, which
-is embedded (in pointer form) within instances of Stack.
+is embedded (in pointer form) within instances of [Stack].
 */
 type stack []any
 
 /*
-List initializes and returns a new instance of Stack
-configured as a simple list. Stack instances of this
-design can be delimited using the SetDelimiter method.
+List initializes and returns a new instance of [Stack]
+configured as a simple list. [Stack] instances of this
+design can be delimited using the [Stack.SetDelimiter]
+method.
 */
 func List(capacity ...int) Stack {
 	return Stack{newStack(list, false, capacity...)}
 }
 
 /*
-And initializes and returns a new instance of Stack
-configured as a Boolean ANDed stack.
+And initializes and returns a new instance of [Stack]
+configured as a Boolean [And] stack.
 */
 func And(capacity ...int) Stack {
 	return Stack{newStack(and, false, capacity...)}
 }
 
 /*
-Or initializes and returns a new instance of Stack
-configured as a Boolean ORed stack.
+Or initializes and returns a new instance of [Stack]
+configured as a Boolean [Or] stack.
 */
 func Or(capacity ...int) Stack {
 	return Stack{newStack(or, false, capacity...)}
 }
 
 /*
-Not initializes and returns a new instance of Stack
-configured as a Boolean NOTed stack.
+Not initializes and returns a new instance of [Stack]
+configured as a Boolean [Not] stack.
 */
 func Not(capacity ...int) Stack {
 	return Stack{newStack(not, false, capacity...)}
 }
 
 /*
-Basic initializes and returns a new instance of Stack, set
+Basic initializes and returns a new instance of [Stack], set
 for basic operation only.
 
 Please note that instances of this design are not eligible
 for string representation, value encaps, delimitation, and
 other presentation-related string methods. As such, a zero
-string (“) shall be returned should String() be executed.
+string (“) shall be returned should [Stack.String] be executed.
 
-PresentationPolicy instances cannot be assigned to Stack
+[PresentationPolicy] instances cannot be assigned to [Stack]
 instances of this design.
 */
 func Basic(capacity ...int) Stack {
@@ -68,13 +69,13 @@ func Basic(capacity ...int) Stack {
 newStack initializes a new instance of *stack, configured
 with the kind (t) requested by the user. This function
 should only be executed when creating new instances of
-Stack (or a Stack type alias), which embeds the *stack
+[Stack](or a [Stack] type alias), which embeds the *stack
 type instance.
 */
 func newStack(t stackType, fifo bool, c ...int) *stack {
 	var (
-		cfg  *nodeConfig       = new(nodeConfig)
-		st   stack
+		cfg *nodeConfig = new(nodeConfig)
+		st  stack
 	)
 
 	cfg.log = newLogSystem(sLogDefault)
@@ -107,14 +108,14 @@ func (r Stack) IsZero() bool {
 }
 
 /*
-isZero is a private method called by Stack.IsZero.
+isZero is a private method called by [Stack.IsZero].
 */
 func (r *stack) isZero() bool {
 	return r == nil
 }
 
 /*
-SetLogLevel enables the specified LogLevel instance(s), thereby
+SetLogLevel enables the specified [LogLevel] instance(s), thereby
 instructing the logging subsystem to accept events for submission
 and transcription to the underlying logger.
 
@@ -133,7 +134,7 @@ func (r Stack) SetLogLevel(l ...any) Stack {
 
 /*
 LogLevels returns the string representation of a comma-delimited list
-of all active LogLevel values within the receiver.
+of all active [LogLevel] values within the receiver.
 */
 func (r Stack) LogLevels() string {
 	cfg, _ := r.config()
@@ -141,7 +142,7 @@ func (r Stack) LogLevels() string {
 }
 
 /*
-UnsetLogLevel disables the specified LogLevel instance(s), thereby
+UnsetLogLevel disables the specified [LogLevel] instance(s), thereby
 instructing the logging subsystem to discard events submitted for
 transcription to the underlying logger.
 */
@@ -152,11 +153,10 @@ func (r Stack) UnsetLogLevel(l ...any) Stack {
 }
 
 /*
-Addr returns the string representation of the pointer
-address for the receiver. This may be useful for logging
-or debugging operations.
+Addr returns the string representation of the pointer address for the
+receiver. This may be useful for logging or debugging operations.
 
-Note: this call uses fmt.Sprintf.
+Note: this call uses [fmt.Sprintf].
 */
 func (r Stack) Addr() string {
 	return ptrString(r.stack)
@@ -171,11 +171,141 @@ func ptrString(x any) (addr string) {
 }
 
 /*
+Less returns a Boolean value indicative of whether the slice at index
+i is deemed to be less than the slice at j in the context of ordering.
+
+This method is intended to satisfy the func(int,int) bool signature
+required by [sort.Interface].
+
+See also [Stack.SetLessFunc] method for a means of specifying instances
+of this function.
+
+If no custom closure was assigned, the package-default closure is used,
+which evaluates the string representation of values in order to conduct
+alphabetical sorting. This means that both i and j must reference slice
+values in one of the following states:
+
+  - Type of slice instance must have its own String method
+  - Value is a go primitive, such as a string or int
+
+Equal values return false, as do zero string values.
+*/
+func (r Stack) Less(i, j int) (less bool) {
+	if r.IsInit() {
+		cfg, _ := r.stack.config()
+		if meth := cfg.lss; meth != nil {
+			less = meth(i, j)
+		} else {
+			less = r.stack.defaultLesser(i, j)
+		}
+	}
+
+	return
+}
+
+func (r stack) defaultLesser(idx1, idx2 int) bool {
+	slice1, _, _ := r.index(idx1)
+	slice2, _, _ := r.index(idx2)
+
+	var strs []string = make([]string, 2)
+	for idx, slice := range []any{
+		slice1,
+		slice2,
+	} {
+		if slice != nil {
+			var ok bool
+			if strs[idx], ok = slice.(string); !ok {
+				if meth := getStringer(slice); meth != nil {
+					strs[idx] = meth()
+				} else if isKnownPrimitive(slice) {
+					strs[idx] = primitiveStringer(slice)
+				}
+			}
+
+			if strs[idx] == `` {
+				return false
+			}
+		}
+	}
+
+	switch scmp(strs[0], strs[1]) {
+	case -1:
+		return true
+	}
+
+	return false
+}
+
+/*
+SetLessFunc assigns the provided closure instance to the receiver instance,
+thereby allowing effective use of the [Stack.Less] method.
+
+If a nil value, or no values, are submitted, the package-default sorting
+mechanism will take precedence.
+*/
+func (r Stack) SetLessFunc(function ...func(int, int) bool) Stack {
+	if r.IsInit() {
+		r.stack.setLessFunc(function...)
+	}
+
+	return r
+}
+
+func (r *stack) setLessFunc(function ...func(int, int) bool) {
+	var funk func(int, int) bool
+	if len(function) > 0 {
+		if function[0] == nil {
+			funk = r.defaultLesser
+		} else {
+			funk = function[0]
+		}
+	} else {
+		funk = r.defaultLesser
+	}
+
+	if !r.positive(ronly) {
+		cfg, _ := r.config()
+		cfg.lss = funk
+	}
+
+	return
+}
+
+/*
+Swap implements the func(int,int) signature required by the [sort.Interface]
+signature. See also the [Stack.SetSwapFunc] method for a means of specifying
+user-authored instances of this function.
+*/
+func (r Stack) Swap(i, j int) {
+	if r.IsInit() {
+		r.stack.swap(i, j)
+	}
+}
+
+func (r *stack) swap(i, j int) {
+	if !r.positive(ronly) {
+		if ok := i <= r.ulen(); !ok {
+			return
+		} else if ok = j <= r.ulen(); !ok {
+			return
+		}
+
+		i++
+		j++
+
+		r.lock()
+		defer r.unlock()
+
+		(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
+	}
+}
+
+/*
 SetAuxiliary assigns aux, as initialized and optionally populated as
 needed by the user, to the receiver instance. The aux input value may
 be nil.
 
-If no variadic input is provided, the default Auxiliary allocation
+If no variadic input is provided, the default [Auxiliary] allocation
 shall occur.
 
 Note that this method shall obliterate any instance that may already
@@ -189,7 +319,7 @@ func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
 }
 
 /*
-setAuxiliary is a private method called by Stack.SetAuxiliary.
+setAuxiliary is a private method called by [Stack.SetAuxiliary].
 */
 func (r *stack) setAuxiliary(aux ...Auxiliary) {
 	cfg, _ := r.config()
@@ -209,7 +339,7 @@ func (r *stack) setAuxiliary(aux ...Auxiliary) {
 }
 
 /*
-Auxiliary returns the instance of Auxiliary from within the receiver.
+Auxiliary returns the instance of [Auxiliary] from within the receiver.
 */
 func (r Stack) Auxiliary() (aux Auxiliary) {
 	if r.IsInit() {
@@ -219,7 +349,7 @@ func (r Stack) Auxiliary() (aux Auxiliary) {
 }
 
 /*
-auxiliary is a private method called by Stack.Auxiliary.
+auxiliary is a private method called by [Stack.Auxiliary].
 */
 func (r stack) auxiliary() (aux Auxiliary) {
 	sc, _ := r.config()
@@ -245,7 +375,7 @@ func (r Stack) IsFIFO() (is bool) {
 }
 
 /*
-isFIFO is a private method called by the Stack.IsFIFO method, et al.
+isFIFO is a private method called by the [Stack.IsFIFO] method, et al.
 */
 func (r stack) isFIFO() bool {
 	sc, _ := r.config()
@@ -262,8 +392,9 @@ to be honored.
   - A value of false (the default) shall impose Last-In-First-Out behavior
 
 This setting shall impose no influence on any methods other than
-the Pop method. In other words, Push, Defrag, Remove, Replace, et
-al., will all operate in the same manner regardless.
+the [Stack.Pop] method. In other words, [Stack.Push], [Stack.Defrag],
+[Stack.Remove], [Stack.Replace], et al., will all operate in the same
+manner regardless.
 
 Once set to the non-default value of true, this setting cannot be
 changed nor toggled ever again for this instance and shall not be
@@ -356,7 +487,7 @@ func (r stack) kind() string {
 Valid returns an error if the receiver lacks a configuration
 value, or is unset as a whole. This method does not check to
 see whether the receiver is in an error condition regarding
-user content operations (see the E method).
+user content operations (see the [Stack.Err] method).
 */
 func (r Stack) Valid() (err error) {
 	if r.stack == nil {
@@ -369,7 +500,7 @@ func (r Stack) Valid() (err error) {
 }
 
 /*
-valid is a private method called by Stack.Valid.
+valid is a private method called by [Stack.Valid].
 */
 func (r *stack) valid() (is bool) {
 	if r.isInit() {
@@ -392,11 +523,11 @@ IsInit returns a Boolean value indicative of whether the
 receiver has been initialized using any of the following
 package-level functions:
 
-  - And
-  - Or
-  - Not
-  - List
-  - Basic
+  - [And]
+  - [Or]
+  - [Not]
+  - [List]
+  - [Basic]
 
 This method does not take into account the presence (or
 absence) of any user-provided values (e.g.: a length of
@@ -410,7 +541,7 @@ func (r Stack) IsInit() (is bool) {
 }
 
 /*
-isInit is a private method called by Stack.IsInit.
+isInit is a private method called by [Stack.IsInit].
 */
 func (r *stack) isInit() bool {
 	//var err error
@@ -435,12 +566,12 @@ The following types/values are permitted:
   - int: 0 will turn logging off
   - int: 1 will set basic STDOUT logging
   - int: 2 will set basic STDERR logging
-  - *log.Logger: user-defined *log.Logger instance will be set; it should not be nil
+  - *[log.Logger]: user-defined *[log.Logger] instance will be set; it should not be nil
 
 Case is not significant in the string matching process.
 
-Logging may also be set globally using the SetDefaultLogger
-package level function. Similar semantics apply.
+Logging may also be set globally using the [SetDefaultLogger] package-level
+function. Similar semantics apply.
 */
 func (r Stack) SetLogger(logger any) Stack {
 	if r.IsInit() {
@@ -463,8 +594,8 @@ The following circumstances will result in a false return:
 
 The receiver instance (r) is not modified in any way as a
 result of calling this method. If the receiver (source) should
-undergo a call to its Reset() method following a call to the
-Transfer method, only the source will be emptied, and of the
+undergo a call to its [Stack.Reset] method following a call to the
+[Stack.Transfer] method, only the source will be emptied, and of the
 slices that have since been transferred instance shall remain
 in the destination instance.
 */
@@ -476,7 +607,7 @@ func (r Stack) Transfer(dest Stack) (ok bool) {
 }
 
 /*
-transfer is a private method executed by the Stack.Transfer
+transfer is a private method executed by the [Stack.Transfer]
 method. It will return a *stack instance containing the same
 slices as the receiver (r). Configuration is not copied, nor
 is a destination *stack subject to initialization within this
@@ -570,7 +701,7 @@ func (r Stack) Insert(x any, left int) (ok bool) {
 }
 
 /*
-insert is a private method called by Stack.Insert.
+insert is a private method called by [Stack.Insert].
 */
 func (r *stack) insert(x any, left int) (ok bool) {
 	// note the len before we start
@@ -643,7 +774,7 @@ func (r Stack) Reset() {
 }
 
 /*
-reset is a private method called by Stack.Reset.
+reset is a private method called by [Stack.Reset].
 */
 func (r *stack) reset() {
 	if !r.positive(ronly) {
@@ -676,7 +807,7 @@ func (r Stack) Remove(idx int) (slice any, ok bool) {
 }
 
 /*
-remove is a private method called by Stack.Remove.
+remove is a private method called by [Stack.Remove].
 */
 func (r *stack) remove(idx int) (slice any, ok bool) {
 
@@ -737,7 +868,7 @@ func (r Stack) Paren(state ...bool) Stack {
 
 /*
 IsNesting returns a Boolean value indicative of whether
-at least one (1) slice member is either a Stack or Stack
+at least one (1) slice member is either a [Stack] or [Stack]
 type alias. If true, this indicates the relevant slice
 descends into another hierarchical (nested) context.
 */
@@ -750,14 +881,14 @@ func (r Stack) IsNesting() (is bool) {
 }
 
 /*
-isNesting is a private method called by Stack.IsNesting.
+isNesting is a private method called by [Stack.IsNesting].
 
 When called, this method returns a Boolean value indicative
 of whether the receiver contains one (1) or more slice elements
 that match either of the following conditions:
 
-  - Slice type is a stackage.Stack native type instance, OR ...
-  - Slice type is a stackage.Stack type-aliased instance
+  - Slice type is a [Stack] native type instance, OR ...
+  - Slice type is a [Stack] type-aliased instance
 
 A return value of true is thrown at the first of either
 occurrence. Length of matched candidates is not significant
@@ -806,7 +937,7 @@ func (r Stack) IsParen() bool {
 }
 
 /*
-Stack will fold the case of logical Boolean operators which
+Fold will fold the case of logical Boolean operators which
 are not represented through symbols. For example, `AND`
 becomes `and`, or vice versa. This won't have any effect
 on List-based receivers, or if symbols are used in place
@@ -823,9 +954,9 @@ func (r Stack) Fold(state ...bool) Stack {
 }
 
 /*
-NegativeIndices will enable negative index support when
-using the Index method extended by this type. See the
-method documentation for further details.
+NegativeIndices will enable negative index support when using
+the [Stack.Index] method extended by this type. See the method
+documentation for further details.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
@@ -839,7 +970,7 @@ func (r Stack) NegativeIndices(state ...bool) Stack {
 
 /*
 ForwardIndices will enable forward index support when using
-the Index method extended by this type. See the method
+the [Stack.Index] method extended by this type. See the method
 documentation for further details.
 
 A Boolean input value explicitly sets the bit as intended.
@@ -854,7 +985,7 @@ func (r Stack) ForwardIndices(state ...bool) Stack {
 
 /*
 SetDelimiter accepts input characters (as string, or a single rune) for use
-in controlled stack value joining when the underlying stack type is a LIST.
+in controlled [Stack] value joining when the underlying [Stack] type is a LIST.
 In such a case, the input value shall be used for delimitation of all slice
 values during the string representation process.
 
@@ -863,7 +994,7 @@ this value within the receiver.
 
 If this method is executed using any other stack type, the operation has no
 effect. If using Boolean AND, OR or NOT stacks and a character delimiter is
-preferred over a Boolean WORD, see the Stack.Symbol method.
+preferred over a Boolean WORD, see the [Stack.Symbol] method.
 */
 func (r Stack) SetDelimiter(x any) Stack {
 	if r.IsInit() {
@@ -877,9 +1008,9 @@ func (r Stack) SetDelimiter(x any) Stack {
 
 /*
 assertListDelimiter is a private function called (indirectly)
-by the Stack.SetDelimiter method for the purpose of handing
+by the [Stack.SetDelimiter] method for the purpose of handing
 type assertion for values that may express a particular value
-intended to serve as delimiter character for a LIST Stack when
+intended to serve as delimiter character for a LIST [Stack] when
 string representation is requested.
 */
 func assertListDelimiter(x any) (v string) {
@@ -906,7 +1037,7 @@ func (r Stack) Delimiter() string {
 }
 
 /*
-setListDelimiter is a private method called by Stack.SetDelimiter
+setListDelimiter is a private method called by [Stack.SetDelimiter]
 */
 func (r *stack) setListDelimiter(x any) {
 	sc, _ := r.config()
@@ -914,7 +1045,7 @@ func (r *stack) setListDelimiter(x any) {
 }
 
 /*
-getListDelimiter is a private method called by Stack.Delimiter.
+getListDelimiter is a private method called by [Stack.Delimiter].
 */
 func (r *stack) getListDelimiter() string {
 	sc, _ := r.config()
@@ -923,7 +1054,7 @@ func (r *stack) getListDelimiter() string {
 }
 
 /*
-Encap accepts input characters for use in controlled stack value
+Encap accepts input characters for use in controlled [Stack] value
 encapsulation.
 
 A single string value will be used for both L and R encapsulation.
@@ -933,7 +1064,7 @@ encapsulation using the first and second slice values respectively.
 
 An instance of []string with only one (1) value is identical to the
 act of providing a single string value, in that both L and R will use
-one (1) value.
+the one value.
 */
 func (r Stack) Encap(x ...any) Stack {
 	if r.IsInit() {
@@ -946,7 +1077,7 @@ func (r Stack) Encap(x ...any) Stack {
 }
 
 /*
-setEncap is a private method called by Stack.Encap.
+setEncap is a private method called by [Stack.Encap].
 */
 func (r *stack) setEncap(x ...any) {
 	sc, _ := r.config()
@@ -995,7 +1126,7 @@ func (r Stack) SetID(id string) Stack {
 }
 
 /*
-setID is a private method called by Stack.SetID.
+setID is a private method called by [Stack.SetID].
 */
 func (r *stack) setID(id string) {
 	sc, _ := r.config()
@@ -1026,7 +1157,7 @@ func (r Stack) SetCategory(cat string) Stack {
 }
 
 /*
-setCat is a private method called by Stack.SetCategory.
+setCat is a private method called by [Stack.SetCategory].
 */
 func (r *stack) setCat(cat string) {
 	sc, _ := r.config()
@@ -1045,7 +1176,7 @@ func (r Stack) Category() (cat string) {
 }
 
 /*
-getCat is a private method called by Stack.Category.
+getCat is a private method called by [Stack.Category].
 */
 func (r *stack) getCat() (cat string) {
 	sc, _ := r.config()
@@ -1066,7 +1197,7 @@ func (r Stack) ID() (id string) {
 }
 
 /*
-getID is a private method called by Stack.ID.
+getID is a private method called by [Stack.ID].
 */
 func (r *stack) getID() string {
 	sc, _ := r.config()
@@ -1106,20 +1237,20 @@ func (r Stack) NoPadding(state ...bool) Stack {
 
 /*
 NoNesting sets the no-nesting bit within the receiver. If
-set to true, the receiver shall ignore any Stack or Stack
-type alias instance when pushed using the Push method. In
-such a case, only primitives, Conditions, etc., shall be
-honored during the Push operation.
+set to true, the receiver shall ignore any [Stack] or [Stack]
+type alias instance when pushed using the [Stack.Push] method.
+In such a case, only primitives, [Condition] instances, etc.,
+shall be honored during the [Stack.Push] operation.
 
 Note this will only have an effect when not using a custom
-PushPolicy. When using a custom PushPolicy, the user has
+[PushPolicy]. When using a custom [PushPolicy], the user has
 total control -- and full responsibility -- in deciding
 what may or may not be pushed.
 
 Also note that setting or unsetting this bit shall not, in
-any way, have an impact on pre-existing Stack or Stack type
+any way, have an impact on pre-existing [Stack] or [Stack] type
 alias instances within the receiver. This bit only has an
-influence on the Push method and only when set to true.
+influence on the [Stack.Push] method and only when set to true.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
@@ -1133,10 +1264,10 @@ func (r Stack) NoNesting(state ...bool) Stack {
 
 /*
 CanNest returns a Boolean value indicative of whether
-the no-nesting bit is unset, thereby allowing the Push
-of Stack and/or Stack type alias instances.
+the no-nesting bit is unset, thereby allowing the push
+of [Stack] and/or [Stack] type alias instances.
 
-See also the IsNesting method.
+See also the [Stack.IsNesting] method.
 */
 func (r Stack) CanNest() bool {
 	return r.getState(nnest)
@@ -1182,7 +1313,7 @@ Execution of this method with no arguments empty the symbol
 store within the receiver, thereby returning to the default
 word-based behavior.
 
-This method has no effect on list-style stacks.
+This method has no effect on list-style [Stack] instances.
 */
 func (r Stack) Symbol(c ...any) Stack {
 	if r.IsInit() {
@@ -1206,7 +1337,7 @@ func (r Stack) Symbol(c ...any) Stack {
 }
 
 /*
-setSymbol is a private method called by Stack.Symbol.
+setSymbol is a private method called by [Stack.Symbol].
 */
 func (r *stack) setSymbol(sym string) {
 	sc, _ := r.config()
@@ -1322,10 +1453,10 @@ func (r stack) positive(x cfgFlag) bool {
 /*
 Mutex enables the receiver's mutual exclusion locking capabilities.
 
-Subsequent calls of write-related methods, such as Push, Pop, Remove
-and others, shall invoke MuTeX locking at the latest possible state
-of processing, thereby minimizing the duration of a lock as much as
-possible.
+Subsequent calls of write-related methods, such as [Stack.Push],
+[Stack.Pop], [Stack.Remove] and others, shall invoke MuTeX locking at
+the latest possible state of processing, thereby minimizing the duration
+of a lock.
 */
 func (r Stack) Mutex() Stack {
 	if r.IsInit() {
@@ -1335,7 +1466,7 @@ func (r Stack) Mutex() Stack {
 }
 
 /*
-setMutex is a private method called by Stack.Mutex.
+setMutex is a private method called by [Stack.Mutex].
 */
 func (r *stack) setMutex() {
 	sc, _ := r.config()
@@ -1356,7 +1487,7 @@ func (r Stack) CanMutex() (can bool) {
 }
 
 /*
-canMutex is a private method called by Stack.CanMutex.
+canMutex is a private method called by [Stack.CanMutex].
 */
 func (r stack) canMutex() bool {
 	sc, _ := r.config()
@@ -1458,15 +1589,15 @@ the receiver. The return values shall be interpreted as follows:
   - A minus one (-1) value indicates infinite capacity is available; no limit is imposed
 */
 func (r Stack) Cap() (c int) {
-        if r.IsInit() {
-                offset := -1
-                c = offset
-                if _c := r.cap(); _c > 0 {
-                        c = _c + offset // cfg.cap minus 1
-                }
-        }
+	if r.IsInit() {
+		offset := -1
+		c = offset
+		if _c := r.cap(); _c > 0 {
+			c = _c + offset // cfg.cap minus 1
+		}
+	}
 
-        return
+	return
 }
 
 /*
@@ -1522,11 +1653,11 @@ func (r Stack) Kind() (k string) {
 }
 
 /*
-String is a stringer method that returns the string representation
-of the receiver.
+String is a stringer method that returns the string representation of
+the receiver.
 
-Note that invalid Stack instances, as well as basic Stacks, are not
-eligible for string representation.
+Note that invalid [Stack] instances, as well as basic [Stack] instances,
+are not eligible for string representation.
 */
 func (r Stack) String() (s string) {
 	if r.IsInit() {
@@ -1546,7 +1677,7 @@ func (r *stack) canString() (can bool, ot string, oc stackType) {
 }
 
 /*
-string is a private method called by Stack.String.
+string is a private method called by [Stack.String].
 */
 func (r *stack) string() (assembled string) {
 	if can, ot, oc := r.canString(); can {
@@ -1703,8 +1834,8 @@ a success-indicative Boolean value.
 
 The semantics of "traversability" are as follows:
 
-  - Any "nesting" instance must be a Stack or Stack type alias
-  - Condition instances must either be the final requested element, OR must contain a Stack or Stack type alias instance through which the traversal process may continue
+  - Any "nesting" instance must be a [Stack] or [Stack] type alias
+  - [Condition] instances must either be the final requested element, OR must contain a [Stack] or [Stack] type alias instance through which the traversal process may continue
   - All other value types are returned as-is
 
 If the traversal ended at any given value, it will be returned along with a
@@ -1724,7 +1855,7 @@ func (r Stack) Traverse(indices ...int) (slice any, ok bool) {
 }
 
 /*
-traverse is a private method called by Stack.Traverse.
+traverse is a private method called by [Stack.Traverse].
 */
 func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 	if r.valid() {
@@ -1756,7 +1887,7 @@ func (r stack) traverse(indices ...int) (slice any, ok, done bool) {
 
 /*
 Reveal processes the receiver instance and disenvelops needlessly
-enveloped Stack slices.
+enveloped [Stack] slices.
 */
 func (r Stack) Reveal() Stack {
 	if r.IsInit() {
@@ -1768,7 +1899,7 @@ func (r Stack) Reveal() Stack {
 }
 
 /*
-reveal is a private method called by Stack.Reveal.
+reveal is a private method called by [Stack.Reveal].
 */
 func (r *stack) reveal() (err error) {
 	r.lock()
@@ -1792,9 +1923,9 @@ func (r *stack) reveal() (err error) {
 
 /*
 revealDescend is a private method called by stack.reveal. It engages the second
-level of processing of the provided inner Stack instance.
+level of processing of the provided inner [Stack] instance.
 
-Its first order of business is to determine the length of the inner Stack instance
+Its first order of business is to determine the length of the inner [Stack] instance
 and take action based on the result:
 
 - A length of zero (0) results in the deletion of the provided inner stack (at the
@@ -1852,12 +1983,12 @@ revealSingle is a private method called by stack.revealDescend. It engages the t
 level of processing of the receiver's slice instance found at the provided index (idx).
 An error is returned at the conclusion of processing.
 
-If a single Condition or Condition type alias instance (whether pointer-based or not)
+If a single [Condition] or [Condition] type alias instance (whether pointer-based or not)
 is found at the slice index indicated, its Expression value is checked for the presence
-of a Stack or Stack type alias. If one is present, a new top-level stack.reveal recursion
+of a [Stack] or [Stack] type alias. If one is present, a new top-level stack.reveal recursion
 is launched.
 
-If, on the other hand, a Stack or Stack type alias (again, pointer or not) is found at
+If, on the other hand, a [Stack] or [Stack] type alias (again, pointer or not) is found at
 the slice index indicates, a new top-level stack.reveal recursion is launched into it
 directly.
 */
@@ -1886,7 +2017,7 @@ func (r *stack) revealSingle(idx int) (err error) {
 
 /*
 traverseAssertionHandler handles the type assertion processes during traversal of one (1) or more
-nested Stack/Stack alias instances that may or may not reside in Condition/Condition alias instances.
+nested [Stack]/[Stack] alias instances that may or may not reside in [Condition]/[Condition] alias instances.
 */
 func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice any, ok, done bool) {
 
@@ -1916,7 +2047,7 @@ func (r stack) traverseAssertionHandler(x any, idx int, indices ...int) (slice a
 
 /*
 traverseStackInCondition is the private recursive helper method for the stack.traverse method. This
-method will traverse either a Stack *OR* Stack alias type fashioned by the user that is the Condition
+method will traverse either a [Stack] *OR* [Stack] alias type fashioned by the user that is the [Condition]
 instance's own value (i.e.: recurse stacks that reside in conditions, etc ...).
 */
 func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice any, ok, done bool) {
@@ -1940,7 +2071,7 @@ func (r stack) traverseStackInCondition(u any, idx int, indices ...int) (slice a
 
 /*
 traverseStack is the private recursive helper method for the stack.traverse method. This
-method will traverse either a Stack *OR* Stack alias type fashioned by the user.
+method will traverse either a [Stack] *OR* [Stack] alias type fashioned by the user.
 */
 func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, done bool) {
 	if s, sOK := stackTypeAliasConverter(u); sOK {
@@ -1968,21 +2099,21 @@ on the configuration of the receiver.
 
 Negatives: When negative index support is enabled, a negative index
 will not panic, rather the index number will be increased such that it
-becomes positive and within the bounds of the stack length, and (perhaps
+becomes positive and within the bounds of the [Stack] length, and (perhaps
 most importantly) aligned with the relative (intended) slice. To offer an
 example, -2 would return the second-to-last slice. When negative index
 support is NOT enabled, nil is returned for any index out of bounds along
 with a Boolean value of false, although no panic will occur.
 
 Positives: When forward index support is enabled, an index greater than
-the length of the stack shall be reduced to the highest valid slice index.
-For example, if an index of twenty (20) were used on a stack instance of
+the length of the [Stack] shall be reduced to the highest valid slice index.
+For example, if an index of twenty (20) were used on a [Stack] instance of
 a length of ten (10), the index would transform to nine (9). When forward
 index support is NOT enabled, nil is returned for any index out of bounds
 along with a Boolean value of false, although no panic will occur.
 
-In any scenario, a valid index within the bounds of the stack's length
-returns the intended slice along with Boolean value of true.
+In any scenario, a valid index within the bounds of the [Stack] instance's
+length returns the intended slice along with Boolean value of true.
 */
 func (r Stack) Index(idx int) (slice any, ok bool) {
 	if r.IsInit() {
@@ -1992,7 +2123,7 @@ func (r Stack) Index(idx int) (slice any, ok bool) {
 }
 
 /*
-index is a private method called by Stack.Index.
+index is a private method called by [Stack.Index].
 */
 func (r stack) index(i int) (slice any, idx int, ok bool) {
 	if L := r.ulen(); L > 0 {
@@ -2096,7 +2227,7 @@ an actual slice value was found.
 The requisite slice shall be one (1) of the following, depending on
 ordering mode in effect:
 
-  - In the default mode -- LIFO -- this shall be the final slice (index "Stack.Len() - 1", or the "far right" element)
+  - In the default mode -- LIFO -- this shall be the final slice (index [Stack.Len] - 1", or the "far right" element)
   - In the alternative mode -- FIFO -- this shall be the first slice (index 0, or the "far left" element)
 
 Note that if the receiver is in an invalid state, or has a zero length,
@@ -2113,7 +2244,7 @@ func (r Stack) Pop() (popped any, ok bool) {
 }
 
 /*
-pop is a private method called by Stack.Pop.
+pop is a private method called by [Stack.Pop].
 */
 func (r *stack) pop() (slice any, ok bool) {
 
@@ -2145,12 +2276,12 @@ func (r *stack) pop() (slice any, ok bool) {
 }
 
 /*
-Push appends the provided value(s) to the receiver,
-and returns the receiver in fluent form.
+Push appends the provided value(s) to the receiver, and returns the
+receiver in fluent form.
 
-Note that if the receiver is in an invalid state, or
-if maximum capacity has been set and reached, each of
-the values intended for append shall be ignored.
+Note that if the receiver is in an invalid state, or if maximum capacity
+has been set and reached, each of the values intended for append shall
+be ignored.
 */
 func (r Stack) Push(y ...any) Stack {
 	if r.IsInit() {
@@ -2162,7 +2293,7 @@ func (r Stack) Push(y ...any) Stack {
 }
 
 /*
-push is a private method called by Stack.Push.
+push is a private method called by [Stack.Push].
 */
 func (r *stack) push(x ...any) {
 
@@ -2194,7 +2325,7 @@ func (r Stack) Reverse() Stack {
 }
 
 /*
-reverse is a private niladic and void method called exclusively by Stack.Reverse.
+reverse is a private niladic and void method called exclusively by [Stack.Reverse].
 */
 func (r *stack) reverse() {
 
@@ -2229,16 +2360,16 @@ The max integer, which defaults to fifty (50) when unset, shall result in the sc
 when the number of nil slices encountered consecutively reaches the maximum. This is to prevent the
 process from looping into eternity.
 
-If run on a Stack or Stack type-alias that is currently in possession of one (1) or more nested Stack
-or Stack type-alias instances, Defrag shall hierarchically traverse the structure and process it no
+If run on a [Stack] or [Stack] type-alias that is currently in possession of one (1) or more nested [Stack]
+or [Stack] type-alias instances, Defrag shall hierarchically traverse the structure and process it no
 differently than the top-level instance. This applies to such Stack values nested with an instance of
-Condition or Condition type-alias as well.
+[Condition] or [Condition] type-alias as well.
 
 This is potentially a destructive method and is still very much considered EXPERIMENTAL. While all
 tests yield expected results, those who use this method are advised to exercise extreme caution. The
 most obvious note of caution pertains to the volatility of index numbers, which shall shift according
-to the defragmentation's influence on the instance in question.  By necessity, Len return values shall
-also change accordingly.
+to the defragmentation's influence on the instance in question.  By necessity, [Stack.Len] return
+values shall also change accordingly.
 */
 func (r Stack) Defrag(max ...int) Stack {
 	if r.IsInit() {
@@ -2276,7 +2407,7 @@ func (r Stack) Defrag(max ...int) Stack {
 }
 
 /*
-calculateDefragMax is a private function executed exclusively by Stack.Defrag, and
+calculateDefragMax is a private function executed exclusively by [Stack.Defrag], and
 exists simply to keep cyclomatics factors <=9 in the caller.
 */
 func calculateDefragMax(max ...int) (m int) {
@@ -2422,7 +2553,7 @@ func (r Stack) CapReached() (cr bool) {
 }
 
 /*
-capReached is a private method called by Stack.CapReached.
+capReached is a private method called by [Stack.CapReached].
 */
 func (r stack) capReached() (rc bool) {
 	if r.cap() == 0 {
@@ -2450,10 +2581,10 @@ func (r *stack) genericAppend(x ...any) {
 }
 
 /*
-SetPushPolicy assigns the provided PushPolicy closure function
+SetPushPolicy assigns the provided [PushPolicy] closure function
 to the receiver, thereby enabling protection against undesired
-appends to the Stack. The provided function shall be executed
-by the Push method for each individual item being added.
+appends to the [Stack]. The provided function shall be executed
+by the [Stack.Push] method for each individual item being added.
 */
 func (r Stack) SetPushPolicy(ppol PushPolicy) Stack {
 	if r.IsInit() {
@@ -2465,7 +2596,7 @@ func (r Stack) SetPushPolicy(ppol PushPolicy) Stack {
 }
 
 /*
-setPushPolicy is a private method called by Stack.SetPushPolicy.
+setPushPolicy is a private method called by [Stack.SetPushPolicy].
 */
 func (r *stack) setPushPolicy(ppol PushPolicy) *stack {
 	sc, _ := r.config()
@@ -2474,7 +2605,7 @@ func (r *stack) setPushPolicy(ppol PushPolicy) *stack {
 }
 
 /*
-getPushPolicy is a private method called by Stack.Push.
+getPushPolicy is a private method called by [Stack.Push].
 */
 func (r *stack) getPushPolicy() PushPolicy {
 	sc, _ := r.config()
@@ -2482,11 +2613,11 @@ func (r *stack) getPushPolicy() PushPolicy {
 }
 
 /*
-SetPresentationPolicy assigns the provided PresentationPolicy
+SetPresentationPolicy assigns the provided [PresentationPolicy]
 closure function to the receiver, thereby enabling full control
-over the stringification of the receiver. Execution of this type's
-String() method will execute the provided policy instead of the
-package-provided routine.
+over the stringification of the receiver.  Execution of the
+[Stack.String] method will execute the provided policy instead
+of the package-provided routine.
 */
 func (r Stack) SetPresentationPolicy(ppol PresentationPolicy) Stack {
 	if r.IsInit() {
@@ -2498,7 +2629,7 @@ func (r Stack) SetPresentationPolicy(ppol PresentationPolicy) Stack {
 }
 
 /*
-setPresentationPolicy is a private method called by Stack.SetPresentationPolicy.
+setPresentationPolicy is a private method called by [Stack.SetPresentationPolicy].
 */
 func (r *stack) setPresentationPolicy(ppol PresentationPolicy) *stack {
 
@@ -2522,11 +2653,10 @@ func (r *stack) getPresentationPolicy() PresentationPolicy {
 }
 
 /*
-SetValidityPolicy assigns the provided ValidityPolicy closure
-function instance to the receiver, thereby allowing users to
-introduce inline verification checks of a Stack to better
-gauge its validity. The provided function shall be executed
-by the Valid method.
+SetValidityPolicy assigns the provided [ValidityPolicy] closure function
+instance to the receiver, thereby allowing users to introduce inline
+verification checks of a [Stack] to better gauge its validity. The provided
+function shall be executed by the [Stack.Valid] method.
 */
 func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
 	if r.IsInit() {
@@ -2538,7 +2668,7 @@ func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
 }
 
 /*
-setValidityPolicy is a private method called by Stack.SetValidityPolicy.
+setValidityPolicy is a private method called by [Stack.SetValidityPolicy].
 */
 func (r *stack) setValidityPolicy(vpol ValidityPolicy) *stack {
 	sc, _ := r.config()
@@ -2547,7 +2677,7 @@ func (r *stack) setValidityPolicy(vpol ValidityPolicy) *stack {
 }
 
 /*
-getValidityPolicy is a private method called by Stack.Valid.
+getValidityPolicy is a private method called by [Stack.Valid].
 */
 func (r *stack) getValidityPolicy() ValidityPolicy {
 	sc, _ := r.config()

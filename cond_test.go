@@ -883,4 +883,3 @@ func TestCondition_codecov(t *testing.T) {
 		t.Errorf("%s failed: %T->%T conversion failure", t.Name(), cx, Cx)
 	}
 }
-

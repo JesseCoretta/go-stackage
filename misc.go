@@ -33,6 +33,7 @@ var (
 	split   func(string, string) []string       = strings.Split
 	trimS   func(string) string                 = strings.TrimSpace
 	join    func([]string, string) string       = strings.Join
+	scmp    func(string, string) int            = strings.Compare
 	now     func() time.Time                    = time.Now
 )
 
@@ -484,13 +485,13 @@ func intStringer(x any) (s string) {
 Interface is an interface type qualified through instances of the
 following types (whether native, or type-aliased):
 
-  - Stack
-  - Condition
+  - [Stack]
+  - [Condition]
 
 This interface type offers users an alternative to the tedium of
-repeated type assertion for every Stack and Condition instance they
+repeated type assertion for every [Stack] and [Condition] instance they
 encounter. This may be particularly useful in situations where the
-act of traversal is conducted upon a Stack instance that contains
+act of traversal is conducted upon a [Stack] instance that contains
 myriad hierarchies and nested contexts of varying types.
 
 This is not a complete "replacement" for the explicit use of package

@@ -28,32 +28,34 @@ type nodeConfig struct {
 	err error              // error pertaining to the outer type state (Condition/Stack)
 	aux Auxiliary          // auxiliary admin-related object storage, user managed
 
-	typ stackType   // stacks only: defines the typ/kind of stack
-	sym string      // stacks only: user-controlled symbol char(s)
-	ljc string      // [list] stacks only: joining delim
-	mtx *sync.Mutex // stacks only: optional locking system
-	ldr *time.Time  // for lock duration; ephemeral, nil if not locked / no locking capabilities
-	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
+	lss func(int, int) bool // stacks only: for sort.Interface qualification
+	typ stackType           // stacks only: defines the typ/kind of stack
+	sym string              // stacks only: user-controlled symbol char(s)
+	ljc string              // [list] stacks only: joining delim
+	mtx *sync.Mutex         // stacks only: optional locking system
+	ldr *time.Time          // for lock duration; ephemeral, nil if not locked / no locking capabilities
+	ord bool                // true = FIFO, false = LIFO (default); applies to stacks only
 }
 
 /*
 Auxiliary is a map[string]any type alias extended by this package. It
-can be created within any Stack instance when [re]initialized using
-the SetAuxiliary method extended through instances of the Stack type,
-and can be accessed using the Auxiliary() method in similar fashion.
+can be created within any [Stack] instance when [re]initialized using
+the [Stack.SetAuxiliary] method extended through instances of the [Stack]
+type, and can be accessed using the [Stack.Auxiliary] method in similar
+fashion.
 
-The Auxiliary type extends four (4) methods: Get, Set, Len and Unset.
-These are purely for convenience. Given that instances of this type
-can easily be cast to standard map[string]any by the user, the use of
-these methods is entirely optional.
+The [Auxiliary] type extends four (4) methods: [Auxiliary.Get], [Auxiliary.Set],
+[Auxiliary.Len] and [Auxiliary.Unset]. These are purely for convenience.  Given
+that instances of this type can easily be cast to standard map[string]any by the
+user, the use of these methods is entirely optional.
 
-The Auxiliary map instance is available to be leveraged in virtually
+The [Auxiliary] map instance is available to be leveraged in virtually
 any way deemed appropriate by the user. Its primary purpose is for
 storage of any instance(s) pertaining to the *administration of the
 stack*, as opposed to the storage of content normally submitted *into*
-said stack.
+said [Stack].
 
-Examples of suitable instance types for storage within the Auxiliary
+Examples of suitable instance types for storage within the [Auxiliary]
 map include, but are certainly not limited to:
 
   - HTTP server listener / mux
@@ -66,7 +68,7 @@ map include, but are certainly not limited to:
   - text/template instances
   - channels
 
-Which instances are considered suitable for storage within Auxiliary map
+Which instances are considered suitable for storage within [Auxiliary] map
 instances is entirely up to the user. This package shall not impose ANY
 controls or restrictions regarding the content within this instances of
 this type, nor its behavior.
@@ -100,7 +102,7 @@ func (r Auxiliary) Get(key string) (value any, ok bool) {
 
 /*
 Set associates key with value, and assigns to receiver instance. See
-also the Unset method.
+also the [Auxiliary.Unset] method.
 
 If the receiver is not initialized, a new allocation is made.
 */
@@ -113,7 +115,7 @@ func (r Auxiliary) Set(key string, value any) Auxiliary {
 
 /*
 Unset removes the key/value pair, identified by key, from the receiver
-instance, if found. See also the Set method.
+instance, if found. See also the [Auxiliary.Set] method.
 
 This method internally calls the following builtin:
 

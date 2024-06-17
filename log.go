@@ -1,7 +1,6 @@
 package stackage
 
 import (
-	//"encoding/json"
 	"io"
 	"log"
 	"os"
@@ -29,18 +28,6 @@ type logSystem struct {
 	log *log.Logger
 }
 
-/*
-LogLevel is a uint16 type alias used to define compound logging
-verbosity configuration values.
-
-LogLevel consts zero (0) through four (4) are as follows:
-
-  - NoLogLevels defines the lack of any logging level
-  - LogLevel1 defines basic function and method call event logging
-  - LogLevel2 defines the logging of events relating to configuration state changes
-  - LogLevel3
-  - LogLevel4
-*/
 type LogLevel uint16
 
 const NoLogLevels LogLevel = 0 // silent
@@ -286,13 +273,13 @@ func newLogSystem(logger any, l ...any) (lsys *logSystem) {
 
 /*
 SetDefaultConditionLogger is a package-level function that will define
-which logging facility new instances of Condition or equivalent type
+which logging facility new instances of [Condition] or equivalent type
 alias shall be assigned during initialization procedures.
 
 Logging is available but is set to discard all events by default. Note
 that enabling this will have no effect on instances already created.
 
-An active logging subsystem within any given Condition shall supercede
+An active logging subsystem within any given [Condition] shall supercede
 this default package logger.
 
 The following types/values are permitted:
@@ -303,12 +290,12 @@ The following types/values are permitted:
   - int: 0 will turn logging off
   - int: 1 will set basic STDOUT logging
   - int: 2 will set basic STDERR logging
-  - *log.Logger: user-defined *log.Logger instance will be set
+  - *[log.Logger]: user-defined *[log.Logger] instance will be set
 
 Case is not significant in the string matching process.
 
-Logging may also be set for individual Condition instances using the
-SetLogger method. Similar semantics apply.
+Logging may also be set for individual [Condition] instances using the
+[Condition.SetLogger] method. Similar semantics apply.
 */
 func SetDefaultConditionLogger(logger any) {
 	cLogDefault = resolveLogger(logger)
@@ -319,7 +306,7 @@ func DefaultConditionLogLevel() int {
 }
 
 /*
-SetDefaultConditionLogLevel sets the instance of LogLevel (lvl)
+SetDefaultConditionLogLevel sets the instance of [LogLevel] (lvl)
 as a LITERAL value, as the verbosity indicator. When set with
 appropriate level identifiers, this will increase or decrease
 log verbosity accordingly. This value shall be used for logging
@@ -327,10 +314,10 @@ verbosity (or lack thereof) for any newly created (and qualified)
 instances.
 
 Note that the input value(s) are NOT shifted. Users are expected
-to either sum the values and cast the product as a LogLevel, OR
-settle for one of the predefined LogLevel constants.
+to either sum the values and cast the product as a [LogLevel], OR
+settle for one of the predefined [LogLevel] constants.
 
-The default is NoLogLevels, which implies a loglevel of zero (0).
+The default is [NoLogLevels], which implies a loglevel of zero (0).
 */
 func SetDefaultConditionLogLevel(lvl any) {
 	var level LogLevel
@@ -355,14 +342,14 @@ func SetDefaultConditionLogLevel(lvl any) {
 
 /*
 SetDefaultStackLogger is a package-level function that will define
-which logging facility new instances of Stack or equivalent type
+which logging facility new instances of [Stack] or equivalent type
 alias shall be assigned during initialization procedures.
 
 Logging is available but is set to discard all events by default.
 Note that enabling this will have no effect on instances already
 created.
 
-An active logging subsystem within any given Stack shall supercede
+An active logging subsystem within any given [Stack] shall supersede
 this default package logger.
 
 The following types/values are permitted:
@@ -377,8 +364,8 @@ The following types/values are permitted:
 
 Case is not significant in the string matching process.
 
-Logging may also be set for individual Stack instances using the
-SetLogger method. Similar semantics apply.
+Logging may also be set for individual [Stack] instances using the
+[Stack.SetLogger] method. Similar semantics apply.
 */
 func SetDefaultStackLogger(logger any) {
 	sLogDefault = resolveLogger(logger)
@@ -389,7 +376,7 @@ func DefaultStackLogLevel() int {
 }
 
 /*
-SetDefaultStackLogLevel sets the instance of LogLevel (lvl)
+SetDefaultStackLogLevel sets the instance of [LogLevel] (lvl)
 as a LITERAL value, as the verbosity indicator. When set with
 appropriate level identifiers, this will increase or decrease
 log verbosity accordingly. This value shall be used for logging
@@ -397,10 +384,10 @@ verbosity (or lack thereof) for any newly created (and qualified)
 instances.
 
 Note that the input value(s) are NOT shifted. Users are expected
-to either sum the values and cast the product as a LogLevel, OR
-settle for one of the predefined LogLevel constants.
+to either sum the values and cast the product as a [LogLevel], OR
+settle for one of the predefined [LogLevel] constants.
 
-The default is NoLogLevels, which implies a loglevel of zero
+The default is [NoLogLevels], which implies a loglevel of zero
 (0).
 */
 func SetDefaultStackLogLevel(lvl any) {
@@ -481,123 +468,14 @@ func logDiscard(logger *log.Logger) (is bool) {
 }
 
 /*
-Message is an optional type for use when a user-supplied Message channel has
-been initialized and provided to one (1) or more Stack or Condition instances.
-
-Instances of this type shall contain diagnostic, error and debug information
-pertaining to current operations of the given Stack or Condition instance.
-*/
-/*
-type Message struct {
-	ID   string             `json:"id"`
-	Msg  string             `json:"txt"`
-	Tag  string             `json:"tag"`
-	Type string             `json:"type"`
-	Addr string             `json:"addr,omitempty"`
-	Time string             `json:"time"` // YYYYMMDDhhmmss.nnnnnnnnn
-	Len  int                `json:"len"`
-	Cap  int                `json:"max_len"`
-	Data map[string]string  `json:"data,omitempty"`
-	PPol PresentationPolicy `json:"-"`
-}
-
-func (r *Message) setText(txt any) (ok bool) {
-	r.Msg = sprintf("Unidentified or zero debug payload (%T)", txt)
-
-	switch tv := txt.(type) {
-	case error:
-		if ok = tv != nil; ok {
-			r.Msg = tv.Error()
-		}
-	case string:
-		if ok = len(tv) != 0; ok {
-			r.Msg = tv
-		}
-	}
-
-	return
-}
-*/
-
-/*
-String is a stringer method that returns the string representation of
-the receiver instance. By default, this method returns JSON content.
-
-Instances of this type are used for the logging subsystem only, and do
-not serve any purpose elsewhere. Use of the logging system as a whole
-is entirely optional.
-
-Users may author their own stringer method by way of the PresentationPolicy
-closure type and override the string representation procedure for instances
-of this type (thus implementing any syntax or format they wish, i.e.: XML,
-YAML, et al).
-*/
-/*
-func (r Message) String() (data string) {
-	if r.PPol != nil {
-		data = r.PPol()
-		return
-	}
-
-	if r.Valid() {
-		if b, err := json.Marshal(&r); err == nil {
-			var replacements [][]string = [][]string{
-				{`\\u`, `\u`},
-				{`<nil>`, `nil`},
-				{` <= `, ` LE `},
-				{` >= `, ` GE `},
-				{` < `, ` LT `},
-				{` > `, ` GT `},
-				{`&&`, `SYMBOLIC_AND`},
-				{`&`, `AMPERSAND`},
-				{`||`, `SYMBOLIC_OR`},
-			}
-
-			data = string(b)
-			for _, repl := range replacements {
-				if str, err := uq(rplc(qt(data), repl[0], repl[1])); err == nil {
-					data = string(json.RawMessage(str))
-				}
-			}
-		}
-	}
-
-	return
-}
-*/
-
-/*
-Valid returns a Boolean value indicative of whether the receiver
-is perceived to be valid.
-*/
-/*
-func (r Message) Valid() bool {
-	return (r.Type != `UNKNOWN` &&
-		len(r.Time) > 0 &&
-		len(r.Msg) > 0 &&
-		len(r.Tag) > 0)
-}
-*/
-
-/*
-func getLogID(elem string) (id string) {
-	id = `no_identifier`
-	if _id := elem; len(_id) > 0 {
-		id = elem
-	}
-	return
-}
-*/
-
-/*
-Logger returns the *log.Logger instance. This can be used for quick
-access to the log.Logger type's methods in a manner such as:
+Logger returns the *[log.Logger] instance. This can be used for quick
+access to the [log.Logger] type's methods in a manner such as:
 
 	r.Logger().Fatalf("We died")
 
 It is not recommended to modify the return instance for the purpose
-of disabling logging outright (see Stack.SetLogger method as well
-as the SetDefaultStackLogger package-level function for ways of
+of disabling logging outright (see [Stack.SetLogger] method as well
+as the [SetDefaultStackLogger] package-level function for ways of
 doing this easily).
 */
 func (r Stack) Logger() (l *log.Logger) {
@@ -614,14 +492,14 @@ func (r *stack) logger() *log.Logger {
 }
 
 /*
-Logger returns the *log.Logger instance. This can be used for quick
-access to the log.Logger type's methods in a manner such as:
+Logger returns the *[log.Logger] instance. This can be used for quick
+access to the [log.Logger] type's methods in a manner such as:
 
 	r.Logger().Fatalf("We died")
 
 It is not recommended to modify the return instance for the purpose
-of disabling logging outright (see Stack.SetLogger method as well
-as the SetDefaultConditionLogger package-level function for ways of
+of disabling logging outright (see [Condition.SetLogger] method as well
+as the [SetDefaultConditionLogger] package-level function for ways of
 doing this easily).
 */
 func (r Condition) Logger() (l *log.Logger) {

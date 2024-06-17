@@ -6,6 +6,8 @@ import (
 	//"log"
 	//"net/http"
 	//_ "net/http/pprof"
+	"sort"
+	"strings"
 	"testing"
 	_ "time"
 )
@@ -83,6 +85,79 @@ func TestStackagePerf(t *testing.T) {
         <-ch
 }
 */
+
+/*
+This example demonstrates basic support for stack sorting via the
+[sort.Stable] method using basic string values.
+*/
+func ExampleStack_String_withSort() {
+	var names Stack = List().SetDelimiter(' ')
+	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
+	sort.Stable(names)
+	fmt.Println(names)
+	// Output: Anna Betty Frank Jim Xavier aly fargus
+}
+
+/*
+This example demonstrates a simple "swapping" of indexed values by way
+of the [Stack.Swap] method.
+*/
+func ExampleStack_Swap() {
+	var names Stack = List().SetDelimiter(' ')
+	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
+	names.Swap(0, 5)
+	slice, _ := names.Index(0)
+	fmt.Println(slice)
+	// Output: Jim
+}
+
+/*
+This example demonstrates a simple order-based comparison using two
+string values by way of the [Stack.Less] method.  In this scenario,
+a value of false is returned because "Frank" does not alphabetically
+precede "Anna".
+
+Note that the semantics of [Stack.Less] apply, in that certain conditions
+with regards to the values must be satified, else a custom Less closure
+needs to be devised by the end-user.  See the [Stack.SetLessFunc] method.
+*/
+func ExampleStack_Less() {
+	var names Stack = List().SetDelimiter(' ')
+	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
+	fmt.Println(names.Less(0, 1))
+	// Output: false
+}
+
+/*
+This example demonstrates custom stack sorting by way of a user-defined
+closure set within the stack via the [Stack.SetLessFunc] value, thereby
+allowing support with the [sort.Stable] method, et al.
+*/
+func ExampleStack_SetLessFunc() {
+	var names Stack = List().SetDelimiter(' ')
+	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
+
+	// Submit our custom closure
+	names.SetLessFunc(func(i, j int) bool {
+		// Note we are just presuming the values are
+		// strings merely for simplicity.  Index and
+		// type checks should always be done in real
+		// life scenarios, else you risk panics, etc.
+		slice1, _ := names.Index(i)
+		slice2, _ := names.Index(j)
+		s1 := strings.ToLower(slice1.(string))
+		s2 := strings.ToLower(slice2.(string))
+		switch strings.Compare(s1, s2) {
+		case -1:
+			return true
+		}
+		return false
+	})
+
+	sort.Stable(names)
+	fmt.Println(names)
+	// Output: aly Anna Betty fargus Frank Jim Xavier
+}
 
 func ExampleComparisonOperator_Context() {
 	var cop ComparisonOperator = Ge
@@ -1512,6 +1587,21 @@ func TestStack_codecov(t *testing.T) {
 	s.SetLogger(`stdout`)
 	s.SetLogger(1)
 	s.SetLogger(sLogDefault)
+
+	s.Less(3, 6)
+	s.Less(6, 3)
+	s.Less(1, 2)
+	s.Swap(101, 48)
+	s.Swap(-1, 480)
+	s.Push(
+		customStack(List().Push(1, `&`)),
+		customStack(List().Push(`_n`, `?!?`, 5)),
+		``)
+	sort.Stable(s)
+	s.Less(0, 1)
+	s.Less(0, 2)
+	s.SetLessFunc(nil)
+	s.SetLessFunc()
 
 	s.SetLogLevel(8, 16)
 	s.UnsetLogLevel(8, 16)

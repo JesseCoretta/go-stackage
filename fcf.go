@@ -8,7 +8,7 @@ interface definitions.
 /*
 Evaluator is a first-class function signature type which may
 be leveraged by users in order to compose matching functions
-by which a given Condition shall be measured/compared, etc.
+by which a given [Condition] shall be measured/compared, etc.
 
 In other words, this type takes this package one step forward:
 it no longer merely creates various expressions in the abstract
@@ -30,27 +30,27 @@ type Evaluator func(...any) (any, error)
 /*
 PushPolicy is a first-class (closure) function signature
 that may be leveraged by users in order to control what
-types instances may be pushed into a Stack instance when
-using its 'Push' method.
+types instances may be pushed into a [Stack] instance when
+using its [Stack.Push] method.
 
 When authoring functions or methods that conform to this
 signature, the idea is to return true for any value that
 should be pushed, and false for all others.  This allows
 for an opportunity to interdict potentially undesirable
-Stack additions, unsupported types, etc.
+[Stack] additions, unsupported types, etc.
 
-A PushPolicy function or method is executed for each
-element being added to a Stack via its Push method.
+A PushPolicy function or method is executed for each element
+being added to a [Stack] via its [Stack.Push] method.
 */
 type PushPolicy func(...any) error
 
 /*
 ValidityPolicy is a first-class (closure) function signature
 that may be leveraged by users in order to better gauge the
-validity of a stack based on its configuration and/or values.
+validity of a [Stack] based on its configuration and/or values.
 
-A ValidityPolicy function or method is executed via the Stack
-method Valid.
+A ValidityPolicy function or method is executed via the
+[Stack.Valid] method.
 */
 type ValidityPolicy func(...any) error
 
@@ -62,7 +62,7 @@ one may write their own "stringer" (String()) function or method
 and use it to override the default behavior of the package based
 String method(s).
 
-Note that basic Stack instances are ineligible for the process of
+Note that basic [Stack] instances are ineligible for the process of
 string representation, thus no PresentationPolicy may be set.
 */
 type PresentationPolicy func(...any) string

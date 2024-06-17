@@ -9,8 +9,8 @@ a whole.
 
 /*
 Operator is an interface type that allows user-defined operators to be used within instances
-of Condition. In rare cases, users may wish to utilize operators that go beyond the package
-provided ComparisonOperator definitions (or just represent the same operators in a different
+of [Condition]. In rare cases, users may wish to utilize operators that go beyond the package
+provided [ComparisonOperator] definitions (or just represent the same operators in a different
 way). Defining types that conform to the signature of this interface type allows just that.
 */
 type Operator interface {
@@ -62,7 +62,7 @@ operators:
   - Less Than Or Equal (<=)
   - Greater Than Or Equal (>=)
 
-Instances of this type should be passed to Cond as the 'op' value.
+Instances of this type should be passed to [Cond] as the 'op' value.
 */
 type ComparisonOperator uint8
 

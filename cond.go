@@ -20,7 +20,7 @@ string construct against which the expression value (ex) is to be
 evaluated in some manner.
 
 The disposition of the evaluation is expressed through one (1) of
-several ComparisonOperator (op) instances made available through
+several [ComparisonOperator] (op) instances made available through
 this package:
 
   - Eq, or "equal to" (=)
@@ -36,17 +36,17 @@ defined Operator interface.
 By default, permitted expression (ex) values must honor these guidelines:
 
   - Must be a non-zero string, OR ...
-  - Must be a valid instance of Stack (or an *alias* of Stack that is convertible back to the Stack type), OR ...
-  - Must be a valid instance of any type that exports a stringer method (String()) intended to produce the Condition's final expression string representation
+  - Must be a valid instance of [Stack] (or an *alias* of [Stack] that is convertible back to the [Stack] type), OR ...
+  - Must be a valid instance of any type that exports a stringer method (String()) intended to produce the [Condition] instances final expression string representation
 
-However when a PushPolicy function or method is added to an instance of this type,
+However when a [PushPolicy] function or method is added to an instance of this type,
 greater control is afforded to the user in terms of what values will be accepted,
 as well as the quality or state of such values.
 
-Instances of this type -- similar to Stack instances -- MUST be initialized before use.
-Initialization can occur as a result of executing the Cond package-level function, or
-using the Init method extended through instances of this type. Initialization state may
-be checked using the IsInit method.
+Instances of this type -- similar to [Stack] instances -- MUST be initialized before use.
+Initialization can occur as a result of executing the [Cond] package-level function, or
+using the [Condition.Init] method extended through instances of this type. Initialization
+state may be checked using the [Condition.IsInit] method.
 */
 type Condition struct {
 	*condition
@@ -99,7 +99,7 @@ SetAuxiliary assigns aux, as initialized and optionally populated as
 needed by the user, to the receiver instance. The aux input value may
 be nil.
 
-If no variadic input is provided, the default Auxiliary allocation
+If no variadic input is provided, the default [Auxiliary] allocation
 shall occur.
 
 Note that this method shall obliterate any instance that may already
@@ -131,7 +131,7 @@ func (r *condition) setAuxiliary(aux ...Auxiliary) {
 }
 
 /*
-Auxiliary returns the instance of Auxiliary from within the receiver.
+Auxiliary returns the instance of [Auxiliary] from within the receiver.
 */
 func (r Condition) Auxiliary() (aux Auxiliary) {
 	if r.IsInit() {
@@ -141,7 +141,7 @@ func (r Condition) Auxiliary() (aux Auxiliary) {
 }
 
 /*
-auxiliary is a private method called by Condition.Auxiliary.
+auxiliary is a private method called by [Condition.Auxiliary].
 */
 func (r condition) auxiliary() (aux Auxiliary) {
 	aux = r.cfg.aux
@@ -172,8 +172,8 @@ func (r *condition) setKeyword(kw any) {
 }
 
 /*
-SetOperator sets the receiver's comparison operator using the
-specified Operator-qualifying input argument (op).
+SetOperator sets the receiver's [ComparisonOperator] using the
+specified [Operator]-qualifying input argument (op).
 */
 func (r Condition) SetOperator(op Operator) Condition {
 	if r.IsInit() {
@@ -190,7 +190,8 @@ func (r *condition) setOperator(op Operator) {
 
 /*
 SetExpression sets the receiver's expression value(s) using the
-specified ex input argument.
+specified ex input argument.  See also the [Condition.Expression]
+method.
 */
 func (r Condition) SetExpression(ex any) Condition {
 	if r.IsInit() {
@@ -206,12 +207,12 @@ func (r *condition) setExpression(ex any) {
 }
 
 /*
-SetLogLevel enables the specified LogLevel instance(s), thereby
+SetLogLevel enables the specified [LogLevel] instance(s), thereby
 instructing the logging subsystem to accept events for submission
 and transcription to the underlying logger.
 
 Users may also sum the desired bit values manually, and cast the
-product as a LogLevel. For example, if STATE (4), DEBUG (8) and
+product as a [LogLevel]. For example, if STATE (4), DEBUG (8) and
 TRACE (32) logging were desired, entering LogLevel(44) would be
 the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
 variadic fashion.
@@ -229,7 +230,7 @@ func (r *condition) setLogLevel(l ...any) {
 
 /*
 LogLevels returns the string representation of a comma-delimited list
-of all active LogLevel values within the receiver.
+of all active [LogLevel] values within the receiver.
 */
 func (r Condition) LogLevels() (l string) {
 	if r.IsInit() {
@@ -243,7 +244,7 @@ func (r condition) logLevels() (l string) {
 }
 
 /*
-UnsetLogLevel disables the specified LogLevel instance(s), thereby
+UnsetLogLevel disables the specified [LogLevel] instance(s), thereby
 instructing the logging subsystem to discard events submitted for
 transcription to the underlying logger.
 */
@@ -275,11 +276,11 @@ The following types/values are permitted:
   - int: 0 will turn logging off
   - int: 1 will set basic STDOUT logging
   - int: 2 will set basic STDERR logging
-  - *log.Logger: user-defined *log.Logger instance will be set; it should not be nil
+  - *[log.Logger]: user-defined *[log.Logger] instance will be set; it should not be nil
 
 Case is not significant in the string matching process.
 
-Logging may also be set globally using the SetDefaultLogger
+Logging may also be set globally using the [SetDefaultLogger]
 package level function. Similar semantics apply.
 */
 func (r Condition) SetLogger(logger any) Condition {
@@ -401,9 +402,9 @@ func (r condition) getCat() string {
 }
 
 /*
-SetCategory assigns the provided string to the receiver internal category value.
-This allows for a means of identifying a particular kind of Condition in the midst
-of many.
+SetCategory assigns the provided string to the receiver internal category
+value. This allows for a means of identifying a particular kind of [Condition]
+in the midst of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
 	if r.IsInit() {
@@ -424,8 +425,8 @@ func (r Condition) Category() (cat string) {
 }
 
 /*
-Cond returns an instance of Condition bearing the provided component values.
-This is intended to be used in situations where a Condition instance can be
+Cond returns an instance of [Condition] bearing the provided component values.
+This is intended to be used in situations where a [Condition] instance can be
 created in one shot.
 */
 func Cond(kw any, op Operator, ex any) (c Condition) {
@@ -444,8 +445,8 @@ the receiver instance shall be totally annihilated.
 This method is niladic and fluent in nature. No input is required, and the only
 element returned is the receiver itself.
 
-This method may be useful in situations where a Condition will be assembled in a
-"piecemeal" fashion (i.e.: incrementally), or if a Condition instance is slated to
+This method may be useful in situations where a [Condition] will be assembled in a
+"piecemeal" fashion (i.e.: incrementally), or if a [Condition] instance is slated to
 be repurposed for use elsewhere (possibly in a repetative manner).
 */
 func (r *Condition) Init() Condition {
@@ -455,7 +456,7 @@ func (r *Condition) Init() Condition {
 
 /*
 SetID assigns the provided string value (or lack thereof) to the receiver.
-This is optional, and is usually only needed in complex Condition structures
+This is optional, and is usually only needed in complex [Condition] structures
 in which "labeling" certain components may be advantageous. It has no effect
 on an evaluation, nor should a name ever cause a validity check to fail.
 
@@ -480,15 +481,15 @@ Len returns a "perceived" abstract length relating to the content (or lack
 thereof) assigned to the receiver instance:
 
   - An uninitialized or zero instance returns zero (0)
-  - An initialized instance with no Expression assigned (nil) returns zero (0)
-  - A Stack or Stack type alias assigned as the Expression shall impose its own stack length as the return value (even if zero (0))
+  - An initialized instance with no [Condition.Expression] assigned (nil) returns zero (0)
+  - A [Stack] or [Stack] type alias assigned as the [Condition.Expression] shall impose its own length as the return value (even if zero (0))
 
-All other type instances assigned as an Expression shall result in a
+All other type instances assigned as an [Condition.Expression] shall result in a
 return of one (1); this includes slice types, maps, arrays and any other
 type that supports multiple values.
 
-This capability was added to this type to mirror that of the Stack type in
-order to allow additional functionality to be added to the Interface interface.
+This capability was added to this type to mirror that of the [Stack] type in
+order to allow additional functionality to be added to the [Interface] interface.
 */
 func (r Condition) Len() int {
 	if !r.IsInit() {
@@ -511,7 +512,7 @@ Addr returns the string representation of the pointer
 address for the receiver. This may be useful for logging
 or debugging operations.
 
-Note: this method calls fmt.Sprintf.
+Note: this method calls [fmt.Sprintf].
 */
 func (r Condition) Addr() (addr string) {
 	if r.IsInit() {
@@ -536,7 +537,7 @@ func (r Condition) ID() (id string) {
 /*
 IsInit will verify that the internal pointer instance of the receiver has
 been properly initialized. This method executes a preemptive execution of
-the IsZero method.
+the [Condition.IsZero] method.
 */
 func (r Condition) IsInit() (is bool) {
 	if !r.IsZero() {
@@ -567,8 +568,8 @@ with the state of the receiver.
 Non-serious (interim) errors such as denied pushes, capacity violations, etc.,
 are not shown by this method.
 
-If a ValidityPolicy was set within the receiver, it shall be executed here.
-If no ValidityPolicy was specified, only elements pertaining to basic viability
+If a [ValidityPolicy] was set within the receiver, it shall be executed here.
+If no [ValidityPolicy] was specified, only elements pertaining to basic viability
 are checked.
 */
 func (r Condition) Valid() (err error) {
@@ -611,12 +612,12 @@ func (r Condition) Valid() (err error) {
 }
 
 /*
-Evaluate uses the Evaluator closure function to apply the value (x)
+Evaluate uses the [Evaluator] closure function to apply the value (x)
 to the receiver in order to conduct a matching/assertion test or
 analysis for some reason. This is entirely up to the user.
 
-A Boolean value returned indicative of the result. Note that if an
-instance of Evaluator was not assigned to the Condition prior to
+An expression value is returned alongside an error. Note that if an
+instance of [Evaluator] was not assigned to the [Condition] prior to
 execution of this method, the return value shall always be false.
 */
 func (r Condition) Evaluate(x ...any) (ev any, err error) {
@@ -630,8 +631,9 @@ func (r Condition) Evaluate(x ...any) (ev any, err error) {
 }
 
 /*
-SetEvaluator assigns the instance of Evaluator to the receiver. This
-will allow the Evaluate method to return a more meaningful result.
+SetEvaluator assigns the instance of [Evaluator] to the receiver. This
+will allow the [Condition.Evaluate] method to return a more meaningful
+result.
 
 Specifying nil shall disable this capability if enabled.
 */
@@ -643,8 +645,9 @@ func (r Condition) SetEvaluator(x Evaluator) Condition {
 }
 
 /*
-SetValidityPolicy assigns the instance of ValidityPolicy to the receiver.
-This will allow the Valid method to return a more meaningful result.
+SetValidityPolicy assigns the instance of [ValidityPolicy] to the receiver.
+This will allow the [Condition.Valid] method to return a more meaningful
+result.
 
 Specifying nil shall disable this capability if enabled.
 */
@@ -657,9 +660,9 @@ func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
 }
 
 /*
-SetPresentationPolicy assigns the instance of PresentationPolicy to the receiver.
+SetPresentationPolicy assigns the instance of [PresentationPolicy] to the receiver.
 This will allow the user to leverage their own "stringer" method for automatic
-use when this type's String method is called.
+use when the [Condition.String] method is called.
 
 Specifying nil shall disable this capability if enabled.
 */
@@ -681,7 +684,7 @@ An instance of []string with two (2) values will be used for L and R
 encapsulation using the first and second slice values respectively.
 
 An instance of []string with only one (1) value is identical to the act of
-providing a single string value, in that both L and R will use one value.
+providing a single string value, in that both L and R will use the one value.
 */
 func (r Condition) Encap(x ...any) Condition {
 	if r.IsInit() {
@@ -707,10 +710,10 @@ func (r *condition) getEncap() [][]string {
 
 /*
 NoNesting sets the no-nesting bit within the receiver. If
-set to true, the receiver shall ignore any Stack or Stack
-type alias instance when assigned using the SetExpression
-method. In such a case, only primitives, etc., shall be
-honored during the SetExpression operation.
+set to true, the receiver shall ignore any [Stack] or [Stack]
+type alias instance when assigned using the [Condition.SetExpression]
+method. In such a case, only primitives, etc., shall be honored during
+the [Condition.SetExpression] operation.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
@@ -724,10 +727,10 @@ func (r Condition) NoNesting(state ...bool) Condition {
 
 /*
 CanNest returns a Boolean value indicative of whether
-the no-nesting bit is unset, thereby allowing a Stack
-or Stack type alias instance to be set as the value.
+the no-nesting bit is unset, thereby allowing a [Stack]
+or [Stack] type alias instance to be set as the value.
 
-See also the IsNesting method.
+See also the [Condition.IsNesting] method.
 */
 func (r Condition) CanNest() (can bool) {
 	if r.IsInit() {
@@ -738,7 +741,7 @@ func (r Condition) CanNest() (can bool) {
 
 /*
 IsNesting returns a Boolean value indicative of whether the
-underlying expression value is either a Stack or Stack type
+underlying expression value is either a [Stack] or [Stack] type
 alias. If true, this indicates the expression value descends
 into another hierarchical (nested) context.
 */
@@ -761,13 +764,13 @@ func (r condition) isNesting() bool {
 
 /*
 IsFIFO returns a Boolean value indicative of whether the underlying
-receiver instance's Expression value represents a Stack (or Stack
-type alias) instance which exhibits First-In-First-Out behavior as
-it pertains to the act of appending and truncating the receiver's
-slices.
+receiver instance's [Condition.Expression] value represents a [Stack]
+(or [Stack] type alias) instance which exhibits First-In-First-Out
+behavior as it pertains to the act of appending and truncating the
+receiver's slices.
 
-A value of false implies that no such Stack instance is set as the
-expression, OR that the Stack exhibits Last-In-Last-Out behavior,
+A value of false implies that no such [Stack] instance is set as the
+expression, OR that the [Stack] exhibits Last-In-Last-Out behavior,
 which is the default ingress/egress scheme imposed upon instances
 of this type.
 */
@@ -796,7 +799,7 @@ expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
 representation process. Individual string values shall not
 be encapsulated in parenthesis, only the whole (current)
-stack.
+[Stack] instance.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
@@ -893,7 +896,7 @@ func (r Condition) Expression() (ex any) {
 }
 
 /*
-Operator returns the Operator interface type instance found within the
+Operator returns the [Operator] interface type instance found within the
 receiver.
 */
 func (r Condition) Operator() (op Operator) {
@@ -920,12 +923,12 @@ of the receiver instance. It will only function if the receiver is
 in good standing, and passes validity checks.
 
 Note that if the underlying expression value is not a known type,
-such as a Stack or a Go primitive, this method may be uncertain
+such as a [Stack] or a Go primitive, this method may be uncertain
 as to what it should do. A bogus string may be returned.
 
 In such a case, it may be necessary to subvert the default string
 representation behavior demonstrated by instances of this type in
-favor of a custom instance of the PresentationPolicy closure type
+favor of a custom instance of the [PresentationPolicy] closure type
 for maximum control.
 */
 func (r Condition) String() (s string) {

@@ -171,19 +171,24 @@ func ptrString(x any) (addr string) {
 }
 
 /*
-Less implements the func(int,int) bool signature required by the
-[sort.Interface] signature.  See also [Stack.SetLessFunc] method
-for a means of specifying instances of this function.
+Less returns a Boolean value indicative of whether the slice at index
+i is deemed to be less than the slice at j in the context of ordering.
 
-If no custom closure was assigned, the package-default closure
-is used, which evaluates the string representation of values in
-order to conduct alphabetical sorting. This means that both i
-and j must reference slice values in one of the following states:
+This method is intended to satisfy the func(int,int) bool signature
+required by [sort.Interface].
+
+See also [Stack.SetLessFunc] method for a means of specifying instances
+of this function.
+
+If no custom closure was assigned, the package-default closure is used,
+which evaluates the string representation of values in order to conduct
+alphabetical sorting. This means that both i and j must reference slice
+values in one of the following states:
 
   - Type of slice instance must have its own String method
   - Value is a go primitive, such as a string or int
 
-Equal values return false.
+Equal values return false, as do zero string values.
 */
 func (r Stack) Less(i, j int) (less bool) {
 	if r.IsInit() {
@@ -215,6 +220,10 @@ func (r stack) defaultLesser(idx1, idx2 int) bool {
 				} else if isKnownPrimitive(slice) {
 					strs[idx] = primitiveStringer(slice)
 				}
+			}
+
+			if strs[idx] == `` {
+				return false
 			}
 		}
 	}
@@ -264,7 +273,7 @@ func (r *stack) setLessFunc(function ...func(int, int) bool) {
 
 /*
 Swap implements the func(int,int) signature required by the [sort.Interface]
-signature.  See also the [Stack.SetSwapFunc] method for a means of specifying
+signature. See also the [Stack.SetSwapFunc] method for a means of specifying
 user-authored instances of this function.
 */
 func (r Stack) Swap(i, j int) {
@@ -976,7 +985,7 @@ func (r Stack) ForwardIndices(state ...bool) Stack {
 
 /*
 SetDelimiter accepts input characters (as string, or a single rune) for use
-in controlled stack value joining when the underlying [Stack] type is a LIST.
+in controlled [Stack] value joining when the underlying [Stack] type is a LIST.
 In such a case, the input value shall be used for delimitation of all slice
 values during the string representation process.
 
@@ -1045,7 +1054,7 @@ func (r *stack) getListDelimiter() string {
 }
 
 /*
-Encap accepts input characters for use in controlled stack value
+Encap accepts input characters for use in controlled [Stack] value
 encapsulation.
 
 A single string value will be used for both L and R encapsulation.
@@ -2090,21 +2099,21 @@ on the configuration of the receiver.
 
 Negatives: When negative index support is enabled, a negative index
 will not panic, rather the index number will be increased such that it
-becomes positive and within the bounds of the stack length, and (perhaps
+becomes positive and within the bounds of the [Stack] length, and (perhaps
 most importantly) aligned with the relative (intended) slice. To offer an
 example, -2 would return the second-to-last slice. When negative index
 support is NOT enabled, nil is returned for any index out of bounds along
 with a Boolean value of false, although no panic will occur.
 
 Positives: When forward index support is enabled, an index greater than
-the length of the stack shall be reduced to the highest valid slice index.
-For example, if an index of twenty (20) were used on a stack instance of
+the length of the [Stack] shall be reduced to the highest valid slice index.
+For example, if an index of twenty (20) were used on a [Stack] instance of
 a length of ten (10), the index would transform to nine (9). When forward
 index support is NOT enabled, nil is returned for any index out of bounds
 along with a Boolean value of false, although no panic will occur.
 
-In any scenario, a valid index within the bounds of the stack's length
-returns the intended slice along with Boolean value of true.
+In any scenario, a valid index within the bounds of the [Stack] instance's
+length returns the intended slice along with Boolean value of true.
 */
 func (r Stack) Index(idx int) (slice any, ok bool) {
 	if r.IsInit() {
@@ -2359,7 +2368,7 @@ differently than the top-level instance. This applies to such Stack values neste
 This is potentially a destructive method and is still very much considered EXPERIMENTAL. While all
 tests yield expected results, those who use this method are advised to exercise extreme caution. The
 most obvious note of caution pertains to the volatility of index numbers, which shall shift according
-to the defragmentation's influence on the instance in question.  By necessity, [stack.Len] return
+to the defragmentation's influence on the instance in question.  By necessity, [Stack.Len] return
 values shall also change accordingly.
 */
 func (r Stack) Defrag(max ...int) Stack {

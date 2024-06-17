@@ -1595,8 +1595,11 @@ func TestStack_codecov(t *testing.T) {
 	s.Swap(-1, 480)
 	s.Push(
 		customStack(List().Push(1, `&`)),
-		customStack(List().Push(`_n`, `?!?`, 5)))
+		customStack(List().Push(`_n`, `?!?`, 5)),
+		``)
 	sort.Stable(s)
+	s.Less(0, 1)
+	s.Less(0, 2)
 	s.SetLessFunc(nil)
 	s.SetLessFunc()
 

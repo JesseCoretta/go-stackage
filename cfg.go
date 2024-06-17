@@ -102,7 +102,7 @@ func (r Auxiliary) Get(key string) (value any, ok bool) {
 
 /*
 Set associates key with value, and assigns to receiver instance. See
-also the Unset method.
+also the [Auxiliary.Unset] method.
 
 If the receiver is not initialized, a new allocation is made.
 */
@@ -115,7 +115,7 @@ func (r Auxiliary) Set(key string, value any) Auxiliary {
 
 /*
 Unset removes the key/value pair, identified by key, from the receiver
-instance, if found. See also the Set method.
+instance, if found. See also the [Auxiliary.Set] method.
 
 This method internally calls the following builtin:
 

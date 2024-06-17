@@ -290,7 +290,7 @@ The following types/values are permitted:
   - int: 0 will turn logging off
   - int: 1 will set basic STDOUT logging
   - int: 2 will set basic STDERR logging
-  - *log.Logger: user-defined *log.Logger instance will be set
+  - *[log.Logger]: user-defined *[log.Logger] instance will be set
 
 Case is not significant in the string matching process.
 

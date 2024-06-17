@@ -172,7 +172,7 @@ func (r *condition) setKeyword(kw any) {
 }
 
 /*
-SetOperator sets the receiver's comparison operator using the
+SetOperator sets the receiver's [ComparisonOperator] using the
 specified [Operator]-qualifying input argument (op).
 */
 func (r Condition) SetOperator(op Operator) Condition {
@@ -190,7 +190,8 @@ func (r *condition) setOperator(op Operator) {
 
 /*
 SetExpression sets the receiver's expression value(s) using the
-specified ex input argument.
+specified ex input argument.  See also the [Condition.Expression]
+method.
 */
 func (r Condition) SetExpression(ex any) Condition {
 	if r.IsInit() {

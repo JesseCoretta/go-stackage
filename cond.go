@@ -20,7 +20,7 @@ string construct against which the expression value (ex) is to be
 evaluated in some manner.
 
 The disposition of the evaluation is expressed through one (1) of
-several ComparisonOperator (op) instances made available through
+several [ComparisonOperator] (op) instances made available through
 this package:
 
   - Eq, or "equal to" (=)

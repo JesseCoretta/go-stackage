@@ -31,7 +31,7 @@ type Evaluator func(...any) (any, error)
 PushPolicy is a first-class (closure) function signature
 that may be leveraged by users in order to control what
 types instances may be pushed into a [Stack] instance when
-using its 'Push' method.
+using its [Stack.Push] method.
 
 When authoring functions or methods that conform to this
 signature, the idea is to return true for any value that
@@ -47,7 +47,7 @@ type PushPolicy func(...any) error
 /*
 ValidityPolicy is a first-class (closure) function signature
 that may be leveraged by users in order to better gauge the
-validity of a stack based on its configuration and/or values.
+validity of a [Stack] based on its configuration and/or values.
 
 A ValidityPolicy function or method is executed via the
 [Stack.Valid] method.

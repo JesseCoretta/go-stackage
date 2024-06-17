@@ -1055,7 +1055,7 @@ encapsulation using the first and second slice values respectively.
 
 An instance of []string with only one (1) value is identical to the
 act of providing a single string value, in that both L and R will use
-one (1) value.
+the one value.
 */
 func (r Stack) Encap(x ...any) Stack {
 	if r.IsInit() {

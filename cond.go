@@ -683,7 +683,7 @@ An instance of []string with two (2) values will be used for L and R
 encapsulation using the first and second slice values respectively.
 
 An instance of []string with only one (1) value is identical to the act of
-providing a single string value, in that both L and R will use one value.
+providing a single string value, in that both L and R will use the one value.
 */
 func (r Condition) Encap(x ...any) Condition {
 	if r.IsInit() {

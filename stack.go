@@ -134,7 +134,7 @@ func (r Stack) SetLogLevel(l ...any) Stack {
 
 /*
 LogLevels returns the string representation of a comma-delimited list
-of all active LogLevel values within the receiver.
+of all active [LogLevel] values within the receiver.
 */
 func (r Stack) LogLevels() string {
 	cfg, _ := r.config()
@@ -2227,7 +2227,7 @@ an actual slice value was found.
 The requisite slice shall be one (1) of the following, depending on
 ordering mode in effect:
 
-  - In the default mode -- LIFO -- this shall be the final slice (index "Stack.Len() - 1", or the "far right" element)
+  - In the default mode -- LIFO -- this shall be the final slice (index [Stack.Len] - 1", or the "far right" element)
   - In the alternative mode -- FIFO -- this shall be the first slice (index 0, or the "far left" element)
 
 Note that if the receiver is in an invalid state, or has a zero length,
@@ -2276,12 +2276,12 @@ func (r *stack) pop() (slice any, ok bool) {
 }
 
 /*
-Push appends the provided value(s) to the receiver,
-and returns the receiver in fluent form.
+Push appends the provided value(s) to the receiver, and returns the
+receiver in fluent form.
 
-Note that if the receiver is in an invalid state, or
-if maximum capacity has been set and reached, each of
-the values intended for append shall be ignored.
+Note that if the receiver is in an invalid state, or if maximum capacity
+has been set and reached, each of the values intended for append shall
+be ignored.
 */
 func (r Stack) Push(y ...any) Stack {
 	if r.IsInit() {
@@ -2653,11 +2653,10 @@ func (r *stack) getPresentationPolicy() PresentationPolicy {
 }
 
 /*
-SetValidityPolicy assigns the provided [ValidityPolicy] closure
-function instance to the receiver, thereby allowing users to
-introduce inline verification checks of a [Stack] to better
-gauge its validity. The provided function shall be executed
-by the [Stack.Valid] method.
+SetValidityPolicy assigns the provided [ValidityPolicy] closure function
+instance to the receiver, thereby allowing users to introduce inline
+verification checks of a [Stack] to better gauge its validity. The provided
+function shall be executed by the [Stack.Valid] method.
 */
 func (r Stack) SetValidityPolicy(vpol ValidityPolicy) Stack {
 	if r.IsInit() {

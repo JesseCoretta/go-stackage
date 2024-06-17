@@ -39,22 +39,23 @@ type nodeConfig struct {
 
 /*
 Auxiliary is a map[string]any type alias extended by this package. It
-can be created within any Stack instance when [re]initialized using
-the SetAuxiliary method extended through instances of the Stack type,
-and can be accessed using the Auxiliary() method in similar fashion.
+can be created within any [Stack] instance when [re]initialized using
+the [Stack.SetAuxiliary] method extended through instances of the [Stack]
+type, and can be accessed using the [Stack.Auxiliary] method in similar
+fashion.
 
-The Auxiliary type extends four (4) methods: Get, Set, Len and Unset.
-These are purely for convenience. Given that instances of this type
-can easily be cast to standard map[string]any by the user, the use of
-these methods is entirely optional.
+The [Auxiliary] type extends four (4) methods: [Auxiliary.Get], [Auxiliary.Set],
+[Auxiliary.Len] and [Auxiliary.Unset]. These are purely for convenience.  Given
+that instances of this type can easily be cast to standard map[string]any by the
+user, the use of these methods is entirely optional.
 
-The Auxiliary map instance is available to be leveraged in virtually
+The [Auxiliary] map instance is available to be leveraged in virtually
 any way deemed appropriate by the user. Its primary purpose is for
 storage of any instance(s) pertaining to the *administration of the
 stack*, as opposed to the storage of content normally submitted *into*
-said stack.
+said [Stack].
 
-Examples of suitable instance types for storage within the Auxiliary
+Examples of suitable instance types for storage within the [Auxiliary]
 map include, but are certainly not limited to:
 
   - HTTP server listener / mux
@@ -67,7 +68,7 @@ map include, but are certainly not limited to:
   - text/template instances
   - channels
 
-Which instances are considered suitable for storage within Auxiliary map
+Which instances are considered suitable for storage within [Auxiliary] map
 instances is entirely up to the user. This package shall not impose ANY
 controls or restrictions regarding the content within this instances of
 this type, nor its behavior.

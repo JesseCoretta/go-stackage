@@ -33,6 +33,7 @@ var (
 	split   func(string, string) []string       = strings.Split
 	trimS   func(string) string                 = strings.TrimSpace
 	join    func([]string, string) string       = strings.Join
+	scmp    func(string, string) int            = strings.Compare
 	now     func() time.Time                    = time.Now
 )
 

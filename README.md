@@ -17,7 +17,7 @@ The main goal of this package is provide an extremely reliable and accommodating
   - Stack instances are either LIFO (stack based, default) or FIFO (queue based)
     - FIFO is First-In/First-Out (like a line at your favorite deli: first come, first serve)
     - LIFO is Last-In/First-Out (like those plate-stacking apparatuses found in restaurant kitchens, in which the first plate inserted shall be the last plate removed)
-  - Flexible Stack configuration controls, allowing custom stringer presentation, push controls and validity-checking policies to be imposed
+  - Flexible Stack configuration controls, allowing custom stringer presentation, sorting closures, push controls and validity-checking policies to be imposed
   - Recursive design - Stacks can reside in Stacks. Conditions can reside in Stacks. Conditions can contain other Stacks. Whatever!
     - Eligible values are easily navigated using the Stack.Traverse method using an ordered sequence of indices, or slice index numbers
     - Conversely, recursion capabilities can also be easily disabled per instance!
@@ -74,6 +74,14 @@ func (r MyStack) NewMethodName([input signature]) [<output signature>] {
 func (r MyStack) String() string {
  	// return the result from a "TYPE CAST -> EXEC" call
 	return stackage.Stack(r).String()
+}
+
+// For added convenience, adopters can write their own private "cast"
+// method for quick transformation back to the derived Stack type.
+// This allows easy access to base methods which the adopter has not
+// explicitly wrapped.
+func (r MyStack) cast() stackage.Stack {
+	return stackage.Stack(r)
 }
 ```
 

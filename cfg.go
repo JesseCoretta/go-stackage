@@ -28,12 +28,13 @@ type nodeConfig struct {
 	err error              // error pertaining to the outer type state (Condition/Stack)
 	aux Auxiliary          // auxiliary admin-related object storage, user managed
 
-	typ stackType   // stacks only: defines the typ/kind of stack
-	sym string      // stacks only: user-controlled symbol char(s)
-	ljc string      // [list] stacks only: joining delim
-	mtx *sync.Mutex // stacks only: optional locking system
-	ldr *time.Time  // for lock duration; ephemeral, nil if not locked / no locking capabilities
-	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
+	lss func(int, int) bool // stacks only: for sort.Interface qualification
+	typ stackType           // stacks only: defines the typ/kind of stack
+	sym string              // stacks only: user-controlled symbol char(s)
+	ljc string              // [list] stacks only: joining delim
+	mtx *sync.Mutex         // stacks only: optional locking system
+	ldr *time.Time          // for lock duration; ephemeral, nil if not locked / no locking capabilities
+	ord bool                // true = FIFO, false = LIFO (default); applies to stacks only
 }
 
 /*

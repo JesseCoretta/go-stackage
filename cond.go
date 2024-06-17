@@ -511,7 +511,7 @@ Addr returns the string representation of the pointer
 address for the receiver. This may be useful for logging
 or debugging operations.
 
-Note: this method calls fmt.Sprintf.
+Note: this method calls [fmt.Sprintf].
 */
 func (r Condition) Addr() (addr string) {
 	if r.IsInit() {

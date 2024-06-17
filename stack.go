@@ -230,19 +230,33 @@ func (r stack) defaultLesser(idx1, idx2 int) bool {
 /*
 SetLessFunc assigns the provided closure instance to the receiver instance,
 thereby allowing effective use of the [Stack.Less] method.
+
+If a nil value, or no values, are submitted, the package-default sorting
+mechanism will take precedence.
 */
-func (r Stack) SetLessFunc(function func(int, int) bool) Stack {
+func (r Stack) SetLessFunc(function ...func(int, int) bool) Stack {
 	if r.IsInit() {
-		r.stack.setLessFunc(function)
+		r.stack.setLessFunc(function...)
 	}
 
 	return r
 }
 
-func (r *stack) setLessFunc(function func(int, int) bool) {
+func (r *stack) setLessFunc(function ...func(int, int) bool) {
+	var funk func(int, int) bool
+	if len(function) > 0 {
+		if function[0] == nil {
+			funk = r.defaultLesser
+		} else {
+			funk = function[0]
+		}
+	} else {
+		funk = r.defaultLesser
+	}
+
 	if !r.positive(ronly) {
 		cfg, _ := r.config()
-		cfg.lss = function
+		cfg.lss = funk
 	}
 
 	return

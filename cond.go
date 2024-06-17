@@ -482,7 +482,7 @@ thereof) assigned to the receiver instance:
 
   - An uninitialized or zero instance returns zero (0)
   - An initialized instance with no [Condition.Expression] assigned (nil) returns zero (0)
-  - A [Stack] or [Stack] type alias assigned as the [Condition.Expression] shall impose its own stack length as the return value (even if zero (0))
+  - A [Stack] or [Stack] type alias assigned as the [Condition.Expression] shall impose its own length as the return value (even if zero (0))
 
 All other type instances assigned as an [Condition.Expression] shall result in a
 return of one (1); this includes slice types, maps, arrays and any other
@@ -616,7 +616,7 @@ Evaluate uses the [Evaluator] closure function to apply the value (x)
 to the receiver in order to conduct a matching/assertion test or
 analysis for some reason. This is entirely up to the user.
 
-A Boolean value returned indicative of the result. Note that if an
+An expression value is returned alongside an error. Note that if an
 instance of [Evaluator] was not assigned to the [Condition] prior to
 execution of this method, the return value shall always be false.
 */
@@ -799,7 +799,7 @@ expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
 representation process. Individual string values shall not
 be encapsulated in parenthesis, only the whole (current)
-stack.
+[Stack] instance.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the

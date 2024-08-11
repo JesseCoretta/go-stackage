@@ -42,6 +42,10 @@ const (
 	randIDSize = 24
 )
 
+func newStringBuilder() strings.Builder {
+	return strings.Builder{}
+}
+
 func bool2str(b bool) string {
 	if b {
 		return `true`
@@ -139,38 +143,31 @@ This function, when combined with the act of replacing
 all newline (ASCII #10, "\n") characters with a single
 space, can help with the conversion of a multi-line or
 indented "block value" into a single line value more
-cleanly. In particular, this will be necessary during
-the parsing (marshaling) of text rules into proper ACI
-type instances.
+cleanly.
 */
-func condenseWHSP(b string) (a string) {
-	// remove leading and trailing
-	// WHSP/HTAB characters ...
+func condenseWHSP(b string) string {
 	b = trimS(b)
 
 	var last bool // previous char was WHSP or HTAB.
+	var builder strings.Builder
 
 	for i := 0; i < len(b); i++ {
 		c := rune(b[i])
 		switch c {
-
-		// match either whsp OR horizontal tab
-		case rune(9), rune(32):
+		case rune(9), rune(32): // match either WHSP or horizontal tab
 			if !last {
-				last = !last
-				a += string(rune(32)) // only add whsp (not htab) for consistency
+				last = true
+				builder.WriteRune(rune(32)) // Add WHSP
 			}
-
-		// match all other chars ...
-		default:
+		default: // match all other characters
 			if last {
-				last = !last
+				last = false
 			}
-			a += string(c)
+			builder.WriteRune(c)
 		}
 	}
 
-	return
+	return builder.String()
 }
 
 /*

@@ -1768,62 +1768,49 @@ processing of a request for string representation of the receiver.
 */
 func (r stack) assembleStringStack(str []string, ot string, oc stackType) string {
 	// Padding char (or lack thereof)
-	pad := padValue(!r.positive(nspad), ``)
+	pad := padValue(!r.positive(nspad), "")
 
-	var fstr []string
+	builder := newStringBuilder()
+
 	if r.positive(lonce) {
-		// We're here because Lead-Once was requested,
-		// so just place the type symbol/word at the
-		// beginning and don't use it as a join value.
 		if oc != list {
-			fstr = append(fstr, ot)
+			builder.WriteString(ot)
 		}
-
-		// Append previous content as-is.
-		fstr = append(fstr, str...)
+		for _, val := range str {
+			builder.WriteString(val)
+		}
 	} else {
-		// We're here because the user wants a symbol
-		// or word to appear between every stack val
-		// OR because the user is stringing a List.
 		if oc == list {
-			// Since we're dealing with a simple
-			// list-style stack, use pad char as
-			// the join value.
+			var joinChar string
 			if ljc := r.getListDelimiter(); len(ljc) > 0 {
-				fstr = append(fstr, join(str, ljc))
+				joinChar = ljc
 			} else {
-				fstr = append(fstr, join(str, pad))
+				joinChar = pad
 			}
+			builder.WriteString(join(str, joinChar))
 		} else {
-			// Use the outerType as the join
-			// char (e.g.: '&&', '||', 'AND',
-			// et al).
 			var tjn string
 			var char string
 			if len(r.getSymbol()) > 0 {
 				if !r.positive(nspad) {
-					char = string(rune(32))
+					char = " "
 				}
-
 				sympad := padValue(!r.positive(nspad), char)
 				j := sympad + ot + sympad
 				tjn = join(str, j)
 			} else {
-				char = string(rune(32)) // by default, use WHSP padding for symbol ops
+				char = " "
 				sympad := padValue(true, char)
 				j := sympad + ot + sympad
 				tjn = join(str, j)
 			}
-			fstr = append(fstr, tjn)
+			builder.WriteString(tjn)
 		}
 	}
 
-	// Finally, join the completed slices using the
-	// pad char, enclose in parenthesis (maybe), and
-	// condense any consecutive WHSP/HTAB chars down
-	// to one (1) WHSP char as needed.
-	fpad := pad + join(fstr, pad) + pad
+	fpad := pad + builder.String() + pad
 	result := condenseWHSP(r.paren(fpad))
+
 	return result
 }
 

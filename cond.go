@@ -107,7 +107,9 @@ be present, regardless of the state of the input value aux.
 */
 func (r Condition) SetAuxiliary(aux ...Auxiliary) Condition {
 	if r.IsInit() {
-		r.condition.setAuxiliary(aux...)
+		if !r.getState(ronly) {
+			r.condition.setAuxiliary(aux...)
+		}
 	}
 	return r
 }
@@ -154,7 +156,9 @@ input argument.
 */
 func (r Condition) SetKeyword(kw any) Condition {
 	if r.IsInit() {
-		r.condition.setKeyword(kw)
+		if !r.getState(ronly) {
+			r.condition.setKeyword(kw)
+		}
 	}
 
 	return r
@@ -177,7 +181,9 @@ specified [Operator]-qualifying input argument (op).
 */
 func (r Condition) SetOperator(op Operator) Condition {
 	if r.IsInit() {
-		r.condition.setOperator(op)
+		if !r.getState(ronly) {
+			r.condition.setOperator(op)
+		}
 	}
 	return r
 }
@@ -195,7 +201,9 @@ method.
 */
 func (r Condition) SetExpression(ex any) Condition {
 	if r.IsInit() {
-		r.condition.setExpression(ex)
+		if !r.getState(ronly) {
+			r.condition.setExpression(ex)
+		}
 	}
 	return r
 }
@@ -204,6 +212,151 @@ func (r *condition) setExpression(ex any) {
 	if v, ok := r.assertConditionExpressionValue(ex); ok {
 		r.ex = v
 	}
+}
+
+/*
+SetEqualityPolicy sets or unsets the [EqualityPolicy] within the receiver
+instance.
+
+When fed an [EqualityPolicy], it shall override the package default mechanism
+beginning at the next call of [Condition.IsEqual].
+
+When fed zero (0) [EqualityPolicy] instances, or a value of nil, the previously
+specified instance will be removed, at which point the default behavior resumes.
+*/
+func (r Condition) SetEqualityPolicy(fn ...EqualityPolicy) Condition {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			if len(fn) == 0 {
+				r.condition.cfg.eqf = nil
+			} else {
+				r.condition.cfg.eqf = fn[0]
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+SetUnmarshaler sets or unsets the [Unmarshaler] within the receiver
+instance.
+
+When fed an [Unmarshaler], it shall override the package default mechanism
+beginning at the next call of [Condition.Unmarshal].
+
+When fed zero (0) [Unmarshaler] instances, or a value of nil, the previously
+specified instance will be removed, at which point the default behavior resumes.
+*/
+func (r Condition) SetUnmarshaler(fn ...Unmarshaler) Condition {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			if len(fn) == 0 {
+				r.condition.cfg.umf = nil
+			} else {
+				r.condition.cfg.umf = fn[0]
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+Unmarshal returns an instance of []any containing the unmarshaled instance
+of the receiver. This can be used for use in deep inspections of [Condition]
+or [Condition]-alias instances.
+
+Those instances that contain complex nested [Stack] or [Stack]-alias instances
+specified as the [Condition.Expression] will have those instances unmarshaled
+by way of the [Stack.Unmarshal] method.
+
+All other type instances used for the [Condition.Expression] are added to the
+return value as-is in all cases, even if nil.
+
+Note that the underlying configuration within any [Condition] or [Condition]-alias
+instance is lost during the transfer, thus the return value cannot easily
+be used in the reverse context, meaning it cannot aid in marshaling a new
+[Condition] or [Condition]-alias instance under ordinary circumstances.
+*/
+func (r Condition) Unmarshal() (slice []any, err error) {
+	if r.IsInit() {
+		if fn := r.condition.cfg.umf; fn != nil {
+			// use the user-authored closure unmarshaler
+			slice, err = fn()
+		} else {
+			// use default unmarshaler
+			slice, err = r.condition.unmarshalDefault()
+		}
+	}
+
+	return
+}
+
+/*
+unmarshalDefault is a private method called by Condition.Unmarshal.
+*/
+func (r condition) unmarshalDefault() (slice []any, err error) {
+	var nexpr any
+	if s, ok := stackTypeAliasConverter(r.ex); ok {
+		nexpr, err = s.Unmarshal() // unmarshaled stack/stack-alias
+	} else {
+		nexpr = r.ex // orig
+	}
+
+	slice = []any{
+		`CONDITION`,
+		r.kw,
+		r.op,
+		nexpr,
+	}
+
+	return
+}
+
+/*
+IsEqual returns a Boolean value indicative of the outcome of a recursive
+comparison of all values found within the receiver and input value o.
+
+The parameters of this process are described within the [Stack.IsEqual]
+notes.
+*/
+func (r Condition) IsEqual(o any) (err error) {
+	if r.IsInit() {
+		// handle condition/condition-alias assertion
+		// and exit immediately if it fails due to a
+		// bad type, or uninitialized input for o.
+		if s, ok := conditionTypeAliasConverter(o); ok {
+			if fn := r.condition.cfg.eqf; fn != nil {
+				// use the user-authored closure assertion
+				err = fn(r, o)
+			} else {
+				// use default assertion
+				err = r.condition.isEqual(s.condition)
+			}
+		}
+	}
+
+	return
+}
+
+func (r *condition) isEqual(o *condition) error {
+	if r.kw != o.kw {
+		return errorf("Condition keyword mismatch")
+	}
+
+	if r.op.String() != o.op.String() {
+		return errorf("Condition operator mismatch")
+	}
+
+	if r.op.Context() != o.op.Context() {
+		return errorf("Condition operator (context) mismatch")
+	}
+
+	iexpr := r.ex
+	jexpr := o.ex
+
+	return valuesEqual(iexpr, jexpr)
 }
 
 /*
@@ -219,7 +372,9 @@ variadic fashion.
 */
 func (r Condition) SetLogLevel(l ...any) Condition {
 	if r.IsInit() {
-		r.condition.setLogLevel(l...)
+		if !r.getState(ronly) {
+			r.condition.setLogLevel(l...)
+		}
 	}
 	return r
 }
@@ -250,7 +405,9 @@ transcription to the underlying logger.
 */
 func (r Condition) UnsetLogLevel(l ...any) Condition {
 	if r.IsInit() {
-		r.condition.unsetLogLevel(l...)
+		if !r.getState(ronly) {
+			r.condition.unsetLogLevel(l...)
+		}
 	}
 	return r
 }
@@ -279,9 +436,6 @@ The following types/values are permitted:
   - *[log.Logger]: user-defined *[log.Logger] instance will be set; it should not be nil
 
 Case is not significant in the string matching process.
-
-Logging may also be set globally using the [SetDefaultLogger]
-package level function. Similar semantics apply.
 */
 func (r Condition) SetLogger(logger any) Condition {
 	if r.IsInit() {
@@ -318,6 +472,8 @@ to the assigned input value err, whether nil or not.
 This method may be most valuable to users who have chosen
 to extend this type by aliasing, and wish to control the
 handling of error conditions in another manner.
+
+This may be used regardless of [Condition.IsReadOnly] status.
 */
 func (r Condition) SetErr(err error) Condition {
 	if r.IsInit() {
@@ -408,7 +564,9 @@ in the midst of many.
 */
 func (r Condition) SetCategory(cat string) Condition {
 	if r.IsInit() {
-		r.condition.setCategory(cat)
+		if !r.getState(ronly) {
+			r.condition.setCategory(cat)
+		}
 	}
 	return r
 }
@@ -455,6 +613,23 @@ func (r *Condition) Init() Condition {
 }
 
 /*
+Free frees the receiver instance entirely, including the underlying
+configuration. An error is returned if the instance is read-only and
+cannot be freed.
+*/
+func (r *Condition) Free() (err error) {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.condition = nil
+			return
+		}
+		err = errorf("%T is read-only; cannot free", r)
+	}
+
+	return
+}
+
+/*
 SetID assigns the provided string value (or lack thereof) to the receiver.
 This is optional, and is usually only needed in complex [Condition] structures
 in which "labeling" certain components may be advantageous. It has no effect
@@ -465,13 +640,15 @@ randomly generated using math/rand and assigned as the ID.
 */
 func (r Condition) SetID(id string) Condition {
 	if r.IsInit() {
-		if lc(id) == `_random` {
-			id = randomID(randIDSize)
-		} else if lc(id) == `_addr` {
-			id = r.Addr()
-		}
+		if !r.getState(ronly) {
+			if lc(id) == `_random` {
+				id = randomID(randIDSize)
+			} else if lc(id) == `_addr` {
+				id = r.Addr()
+			}
 
-		r.condition.cfg.setID(id)
+			r.condition.cfg.setID(id)
+		}
 	}
 	return r
 }
@@ -639,7 +816,9 @@ Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetEvaluator(x Evaluator) Condition {
 	if r.IsInit() {
-		r.condition.cfg.evl = x
+		if !r.getState(ronly) {
+			r.condition.cfg.evl = x
+		}
 	}
 	return r
 }
@@ -653,7 +832,9 @@ Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetValidityPolicy(x ValidityPolicy) Condition {
 	if r.IsInit() {
-		r.condition.cfg.vpf = x
+		if !r.getState(ronly) {
+			r.condition.cfg.vpf = x
+		}
 	}
 
 	return r
@@ -668,14 +849,16 @@ Specifying nil shall disable this capability if enabled.
 */
 func (r Condition) SetPresentationPolicy(x PresentationPolicy) Condition {
 	if r.IsInit() {
-		r.condition.cfg.rpf = x
+		if !r.getState(ronly) {
+			r.condition.cfg.rpf = x
+		}
 	}
 
 	return r
 }
 
 /*
-Encap accepts input characters for use in controlled condition value
+SetEncap accepts input characters for use in controlled condition value
 encapsulation. Acceptable input types are:
 
 A single string value will be used for both L and R encapsulation.
@@ -686,11 +869,20 @@ encapsulation using the first and second slice values respectively.
 An instance of []string with only one (1) value is identical to the act of
 providing a single string value, in that both L and R will use the one value.
 */
-func (r Condition) Encap(x ...any) Condition {
+func (r Condition) SetEncap(x ...any) Condition {
 	if r.IsInit() {
-		r.condition.cfg.setEncap(x...)
+		if !r.getState(ronly) {
+			r.condition.cfg.setEncap(x...)
+		}
 	}
 	return r
+}
+
+/*
+Deprecated: Use [Condition.SetEncap].
+*/
+func (r Condition) Encap(x ...any) Condition {
+	return r.SetEncap(x...)
 }
 
 /*
@@ -709,7 +901,7 @@ func (r *condition) getEncap() [][]string {
 }
 
 /*
-NoNesting sets the no-nesting bit within the receiver. If
+SetNoNesting sets the no-nesting bit within the receiver. If
 set to true, the receiver shall ignore any [Stack] or [Stack]
 type alias instance when assigned using the [Condition.SetExpression]
 method. In such a case, only primitives, etc., shall be honored during
@@ -720,9 +912,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the nesting bit (i.e.: true->false and
 false->true)
 */
-func (r Condition) NoNesting(state ...bool) Condition {
+func (r Condition) SetNoNesting(state ...bool) Condition {
 	r.setState(nnest, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Condition.SetNoNesting].
+*/
+func (r Condition) NoNesting(state ...bool) Condition {
+	return r.SetNoNesting(state...)
 }
 
 /*
@@ -734,7 +933,7 @@ See also the [Condition.IsNesting] method.
 */
 func (r Condition) CanNest() (can bool) {
 	if r.IsInit() {
-		can = !r.condition.positive(nnest)
+		can = !r.getState(nnest)
 	}
 	return
 }
@@ -794,7 +993,7 @@ func (r condition) isFIFO() (result bool) {
 }
 
 /*
-Paren sets the string-encapsulation bit for parenthetical
+SetParen sets the string-encapsulation bit for parenthetical
 expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
 representation process. Individual string values shall not
@@ -806,9 +1005,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
-func (r Condition) Paren(state ...bool) Condition {
+func (r Condition) SetParen(state ...bool) Condition {
 	r.setState(parens, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Condition.SetParen].
+*/
+func (r Condition) Paren(state ...bool) Condition {
+	return r.SetParen(state...)
 }
 
 /*
@@ -817,6 +1023,24 @@ receiver is parenthetical.
 */
 func (r Condition) IsParen() bool {
 	return r.getState(parens)
+}
+
+/*
+SetReadOnly sets the receiver bit 'ronly' to a positive state.
+This will prevent any writes to the receiver or its underlying
+configuration.
+*/
+func (r Condition) SetReadOnly(state ...bool) Condition {
+	r.setState(ronly, state...)
+	return r
+}
+
+/*
+IsReadOnly returns a Boolean value indicative of whether the
+receiver is set as read-only.
+*/
+func (r Condition) IsReadOnly() bool {
+	return r.getState(ronly)
 }
 
 func (r Condition) getState(cf cfgFlag) (state bool) {
@@ -828,14 +1052,16 @@ func (r Condition) getState(cf cfgFlag) (state bool) {
 
 func (r Condition) setState(cf cfgFlag, state ...bool) {
 	if r.IsInit() {
-		if len(state) > 0 {
-			if state[0] {
-				r.condition.setOpt(cf)
+		if !r.getState(ronly) || cf == ronly {
+			if len(state) > 0 {
+				if state[0] {
+					r.condition.setOpt(cf)
+				} else {
+					r.condition.unsetOpt(cf)
+				}
 			} else {
-				r.condition.unsetOpt(cf)
+				r.condition.toggleOpt(cf)
 			}
-		} else {
-			r.condition.toggleOpt(cf)
 		}
 	}
 }
@@ -861,7 +1087,7 @@ func (r *condition) positive(cf cfgFlag) bool {
 }
 
 /*
-NoPadding sets the no-space-padding bit within the receiver.
+SetNoPadding sets the no-space-padding bit within the receiver.
 String values within the receiver shall not be padded using
 a single space character (ASCII #32).
 
@@ -870,9 +1096,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the quotation bit (i.e.: true->false and
 false->true)
 */
-func (r Condition) NoPadding(state ...bool) Condition {
+func (r Condition) SetNoPadding(state ...bool) Condition {
 	r.setState(nspad, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Condition.SetNoPadding].
+*/
+func (r Condition) NoPadding(state ...bool) Condition {
+	return r.SetNoPadding(state...)
 }
 
 /*
@@ -968,6 +1201,55 @@ func (r condition) string() string {
 	}
 
 	return s
+}
+
+/*
+ConvertCondition returns an instance of [Condition] alongside a Boolean
+value.
+
+If the input value is a native [Condition], it is returned as-is alongside
+a Boolean value of true.
+
+If the input value is a [Condition]-alias, it is converted to a native
+[Condition] instance and returned alongside a Boolean value of true.
+
+Any other scenario returns a zero [Condition] alongside a Boolean value
+of false.
+*/
+func ConvertCondition(in any) (Condition, bool) {
+	return conditionTypeAliasConverter(in)
+}
+
+/*
+conditionTypeAliasConverter attempts to convert any (u) back to a bonafide instance
+of Condition. This will only work if input value u is a type alias of Condition. An
+instance of Condition is returned along with a success-indicative Boolean value.
+*/
+func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
+	if u != nil {
+		// If it isn't a Condition alias, but is a
+		// genuine Condition, just pass it back
+		// with a thumbs-up ...
+		if co, isCond := u.(Condition); isCond {
+			C = co
+			converted = isCond
+			return
+		}
+
+		a, v, _ := derefPtr(typOf(u), valOf(u))
+		b := typOf(Condition{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Condition); ok {
+				if !assert.IsZero() {
+					C = assert
+					converted = true
+				}
+			}
+		}
+	}
+
+	return
 }
 
 const badCond = `<invalid_condition>`

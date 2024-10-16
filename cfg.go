@@ -22,19 +22,23 @@ type nodeConfig struct {
 	ppf PushPolicy         // closure filterer
 	vpf ValidityPolicy     // closure validator
 	rpf PresentationPolicy // closure stringer
+	eqf EqualityPolicy     // closure equality
+	lss LessFunc           // stacks only: closure sort.Interface qualifier
+	umf Unmarshaler        // closure unmarshal
+	maf Marshaler          // closure marshal
 	log *logSystem         // logging subsystem
 	opt cfgFlag            // parens, cfold, lonce, etc...
 	enc [][]string         // val encapsulators
 	err error              // error pertaining to the outer type state (Condition/Stack)
 	aux Auxiliary          // auxiliary admin-related object storage, user managed
+	mfn func(any) error    // marshal closure
 
-	lss func(int, int) bool // stacks only: for sort.Interface qualification
-	typ stackType           // stacks only: defines the typ/kind of stack
-	sym string              // stacks only: user-controlled symbol char(s)
-	ljc string              // [list] stacks only: joining delim
-	mtx *sync.Mutex         // stacks only: optional locking system
-	ldr *time.Time          // for lock duration; ephemeral, nil if not locked / no locking capabilities
-	ord bool                // true = FIFO, false = LIFO (default); applies to stacks only
+	typ stackType   // stacks only: defines the typ/kind of stack
+	sym string      // stacks only: user-controlled symbol char(s)
+	ljc string      // [list] stacks only: joining delim
+	mtx *sync.Mutex // stacks only: optional locking system
+	ldr *time.Time  // for lock duration; ephemeral, nil if not locked / non-locking
+	ord bool        // true = FIFO, false = LIFO (default); applies to stacks only
 }
 
 /*

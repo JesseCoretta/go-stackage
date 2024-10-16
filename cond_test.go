@@ -4,8 +4,25 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"strings"
 	"testing"
 )
+
+// any type would do, but lets do a struct
+// because we don't use structs for operators
+// within this package for built-ins.
+type fakeOperator struct {
+	Str string
+	Ctx string
+}
+
+func (r fakeOperator) Context() string {
+	return r.Ctx
+}
+
+func (r fakeOperator) String() string {
+	return r.Str
+}
 
 func ExampleSetDefaultConditionLogLevel() {
 	// define a custom loglevel cfg
@@ -28,6 +45,105 @@ func ExampleSetDefaultConditionLogLevel() {
 func ExampleDefaultConditionLogLevel() {
 	fmt.Printf("%d", DefaultConditionLogLevel())
 	// Output: 0
+}
+
+func ExampleCondition_IsEqual() {
+	c1 := Cond(`Keyword`, Eq, 123)
+	c2 := Cond(`Keyword`, Gt, 123)
+	fmt.Printf("Conditions are equal: %t", c1.IsEqual(c2) == nil)
+	// Output: Conditions are equal: false
+}
+
+func ExampleCondition_SetEqualityPolicy() {
+	c1 := Cond(`KEYWORD`, Eq, `This is A value`)
+	c2 := Cond(`Keyword`, Eq, `this is a VALUE`)
+
+	// We'd like to compare the two Condition
+	// instances -- but ignore case folding in
+	// the keyword or value, and only compare
+	// the string forms of the Eq comparison
+	// operator (=), as Operator interface
+	// qualifiers can manifest as any type...
+	policy := func(a, b any) error {
+		// Let's convert instances in case they are
+		// type alias Conditions. Alternatively, if
+		// we knew which type(s) to expect, we could
+		// just live dangerously and wing it ...
+		C1, ok1 := ConvertCondition(a)
+		C2, ok2 := ConvertCondition(b)
+		if !ok1 || !ok2 {
+			return fmt.Errorf("Non-condition input failed equality assertion")
+		}
+
+		// Normalize keywords before equality
+		// checks for maximum compatibility.
+		kw1 := strings.ToLower(C1.Keyword())
+		kw2 := strings.ToLower(C2.Keyword())
+		if kw1 != kw2 {
+			return fmt.Errorf("Keyword mismatch")
+		}
+
+		// Generally the operator is just a few
+		// characters, e.g.: ">=" or "=", so we
+		// will skip normalization. YMMV ...
+		if C1.Operator().String() != C2.Operator().String() {
+			return fmt.Errorf("Operator mismatch")
+		}
+
+		// Naturally if strings aren't the only
+		// thing that might be encountered, you
+		// may opt for more type coverage here.
+		valA, okA := C1.Expression().(string)
+		valB, okB := C2.Expression().(string)
+		if !okA || !okB {
+			return fmt.Errorf("Expression type mismatch")
+		}
+
+		// Compare values. Naturally, we could use
+		// this opportunity to perform other kinds
+		// of sanitation -- such as the removal of
+		// any leading or trailing WHSP, et al ...
+		if strings.ToLower(valA) != strings.ToLower(valB) {
+			return fmt.Errorf("Expression content mismatch")
+		}
+
+		// Instances seem to be equal
+		return nil
+	}
+
+	// Assign our function to whichever Condition
+	// instance is used as the receiver (or both,
+	// optionally) ...
+	c1.SetEqualityPolicy(policy)
+
+	fmt.Printf("Conditions are equal: %t", c1.IsEqual(c2) == nil)
+	// Output: Conditions are equal: true
+}
+
+func ExampleCondition_SetUnmarshaler() {
+	// convert the condition (the receiver) to
+	// a map[string]string instance.
+	var c Condition = Cond(`Keyword`, Eq, `this is the value`)
+	tomap := func(_ ...any) (out []any, err error) {
+		//err = errors.New("Set your error, if applicable")
+		out = []any{map[string]string{
+			`keyword`:  c.Keyword(),
+			`operator`: c.Operator().String(),
+			`value`:    c.Expression().(string)}}
+
+		return out, err
+	}
+
+	// assign new func to Condition
+	c.SetUnmarshaler(tomap)
+	o, err := c.Unmarshal()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// Print output
+	fmt.Println(o[0])
+	// Output: map[keyword:Keyword operator:= value:this is the value]
 }
 
 func ExampleCondition_Auxiliary() {
@@ -838,6 +954,9 @@ func TestCondition_codecov(t *testing.T) {
 	}
 
 	c.Init()
+	c.SetEqualityPolicy()
+	c.SetUnmarshaler()
+	c.Unmarshal()
 	c.Paren()
 	c.Paren(true)
 	c.Paren(false)
@@ -882,4 +1001,22 @@ func TestCondition_codecov(t *testing.T) {
 	if Cx, ok := conditionTypeAliasConverter(customCondition(cx)); !ok {
 		t.Errorf("%s failed: %T->%T conversion failure", t.Name(), cx, Cx)
 	}
+
+	var fo Operator = fakeOperator{Str: `>`, Ctx: `gtContext`}
+	var cz Condition = Cond(`koyword`, fo, `Value`)
+	cx.IsEqual(cz)
+
+	cz.Free()
+	fo = fakeOperator{Str: `!=`, Ctx: `gtContext`}
+	cz = Cond(`keyword`, fo, `Value`)
+	cx.IsEqual(cz)
+	cx.Free()
+	cz.SetReadOnly()
+	cz.Free()
+	cz.IsReadOnly()
+	cz.SetReadOnly()
+	cz.Free()
+
+	subc := []any{`CONDITION`, `Keywerdd`, Gt, 5}
+	extractConditionValues([]any{`CONDITION`, `Keyword`, Eq, subc})
 }

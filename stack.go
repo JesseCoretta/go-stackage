@@ -100,8 +100,22 @@ func newStack(t stackType, fifo bool, c ...int) *stack {
 }
 
 /*
-IsZero returns a Boolean value indicative of whether the
-receiver is nil, or uninitialized.
+IsEmpty returns a Boolean value indicative of a receiver length of zero
+(0).  This method wraps a call of [Stack.Len] == 0, and is only present
+for compatibility and convenience reasons.
+*/
+func (r Stack) IsEmpty() bool {
+	if r.IsInit() {
+		return r.Len() == 0
+	}
+
+	return true
+}
+
+/*
+IsZero returns a Boolean value indicative of whether the receiver is nil,
+or uninitialized. Following use of [Stack.Free], this method will return
+true.
 */
 func (r Stack) IsZero() bool {
 	return r.stack.isZero()
@@ -126,8 +140,12 @@ the same as specifying LogLevel3, LogLevel4 and LogLevel6 in
 variadic fashion.
 */
 func (r Stack) SetLogLevel(l ...any) Stack {
-	cfg, _ := r.config()
-	cfg.log.shift(l...)
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			cfg, _ := r.config()
+			cfg.log.shift(l...)
+		}
+	}
 
 	return r
 }
@@ -147,8 +165,13 @@ instructing the logging subsystem to discard events submitted for
 transcription to the underlying logger.
 */
 func (r Stack) UnsetLogLevel(l ...any) Stack {
-	cfg, _ := r.config()
-	cfg.log.unshift(l...)
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			cfg, _ := r.config()
+			cfg.log.unshift(l...)
+		}
+	}
+
 	return r
 }
 
@@ -243,16 +266,18 @@ thereby allowing effective use of the [Stack.Less] method.
 If a nil value, or no values, are submitted, the package-default sorting
 mechanism will take precedence.
 */
-func (r Stack) SetLessFunc(function ...func(int, int) bool) Stack {
+func (r Stack) SetLessFunc(function ...LessFunc) Stack {
 	if r.IsInit() {
-		r.stack.setLessFunc(function...)
+		if !r.getState(ronly) {
+			r.stack.setLessFunc(function...)
+		}
 	}
 
 	return r
 }
 
-func (r *stack) setLessFunc(function ...func(int, int) bool) {
-	var funk func(int, int) bool
+func (r *stack) setLessFunc(function ...LessFunc) {
+	var funk LessFunc
 	if len(function) > 0 {
 		if function[0] == nil {
 			funk = r.defaultLesser
@@ -263,41 +288,38 @@ func (r *stack) setLessFunc(function ...func(int, int) bool) {
 		funk = r.defaultLesser
 	}
 
-	if !r.positive(ronly) {
-		cfg, _ := r.config()
-		cfg.lss = funk
-	}
+	cfg, _ := r.config()
+	cfg.lss = funk
 
 	return
 }
 
 /*
 Swap implements the func(int,int) signature required by the [sort.Interface]
-signature. See also the [Stack.SetSwapFunc] method for a means of specifying
-user-authored instances of this function.
+signature.
 */
 func (r Stack) Swap(i, j int) {
 	if r.IsInit() {
-		r.stack.swap(i, j)
+		if !r.getState(ronly) {
+			r.stack.swap(i, j)
+		}
 	}
 }
 
 func (r *stack) swap(i, j int) {
-	if !r.positive(ronly) {
-		if ok := i <= r.ulen(); !ok {
-			return
-		} else if ok = j <= r.ulen(); !ok {
-			return
-		}
-
-		i++
-		j++
-
-		r.lock()
-		defer r.unlock()
-
-		(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
+	if ok := i <= r.ulen(); !ok {
+		return
+	} else if ok = j <= r.ulen(); !ok {
+		return
 	}
+
+	i++
+	j++
+
+	r.lock()
+	defer r.unlock()
+
+	(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
 }
 
 /*
@@ -313,7 +335,9 @@ be present, regardless of the state of the input value aux.
 */
 func (r Stack) SetAuxiliary(aux ...Auxiliary) Stack {
 	if r.IsInit() {
-		r.stack.setAuxiliary(aux...)
+		if !r.getState(ronly) {
+			r.stack.setAuxiliary(aux...)
+		}
 	}
 	return r
 }
@@ -404,7 +428,9 @@ In short, once you go FIFO, you cannot go back.
 */
 func (r Stack) SetFIFO(fifo bool) Stack {
 	if r.IsInit() {
-		r.stack.setFIFO(fifo)
+		if !r.getState(ronly) {
+			r.stack.setFIFO(fifo)
+		}
 	}
 	return r
 }
@@ -444,6 +470,8 @@ to the assigned input value err, whether nil or not.
 This method may be most valuable to users who have chosen
 to extend this type by aliasing, and wish to control the
 handling of error conditions in another manner.
+
+This may be used regardless of [Stack.IsReadOnly] status.
 */
 func (r Stack) SetErr(err error) Stack {
 	if r.IsInit() {
@@ -569,9 +597,6 @@ The following types/values are permitted:
   - *[log.Logger]: user-defined *[log.Logger] instance will be set; it should not be nil
 
 Case is not significant in the string matching process.
-
-Logging may also be set globally using the [SetDefaultLogger] package-level
-function. Similar semantics apply.
 */
 func (r Stack) SetLogger(logger any) Stack {
 	if r.IsInit() {
@@ -583,26 +608,34 @@ func (r Stack) SetLogger(logger any) Stack {
 }
 
 /*
-Transfer will iterate the receiver (r) and add all slices
-contained therein to the destination instance (dest).
+Transfer will iterate the receiver (r) and add all slices contained
+therein to the destination instance (dest), which must be a previously
+initialized [Stack] or [Stack]-alias instance, else false is returned.
 
-The following circumstances will result in a false return:
+If capacity constraints are in-force within the destination instance,
+and the transfer request cannot proceed due to it being larger than
+the sum number of available slices, false is returned.
 
-  - Capacity constraints are in-force within the destination instance, and the transfer request (if larger than the sum number of available slices) cannot proceed as a result
-  - The destination instance is nil, or has not been properly initialized
-  - The receiver instance (r) contains no slices to transfer
+If [Stack.IsInit] returns false, this method returns false, as there
+is nothing to transfer.
 
-The receiver instance (r) is not modified in any way as a
-result of calling this method. If the receiver (source) should
-undergo a call to its [Stack.Reset] method following a call to the
-[Stack.Transfer] method, only the source will be emptied, and of the
-slices that have since been transferred instance shall remain
-in the destination instance.
+The receiver instance (r) is not modified in any way as a result of
+calling this method. If the receiver (source) should undergo a call to
+its [Stack.Reset] or [Stack.Free] methods following a call to the this
+method, only the source will be emptied, and all of the slices that have
+since been transferred instance shall remain in the destination instance.
+
+A return value of true indicates a successful transfer.
 */
-func (r Stack) Transfer(dest Stack) (ok bool) {
-	if r.Len() > 0 && dest.IsInit() {
-		ok = r.transfer(dest.stack)
+func (r Stack) Transfer(dest any) (ok bool) {
+	if r.IsInit() {
+		if s, sok := stackTypeAliasConverter(dest); sok {
+			if !s.getState(ronly) {
+				ok = r.transfer(s.stack)
+			}
+		}
 	}
+
 	return
 }
 
@@ -657,16 +690,20 @@ Use of the Replace method shall not result in fragmentation of the
 receiver instance; this method does not honor any attempt to replace
 any receiver slice value with nil.
 */
-func (r Stack) Replace(x any, idx int) bool {
-	return r.stack.replace(x, idx)
+func (r Stack) Replace(x any, idx int) (ok bool) {
+	if r.IsInit() && x != nil {
+		if !r.getState(ronly) {
+			ok = r.stack.replace(x, idx)
+		}
+	}
+
+	return
 }
 
 func (r *stack) replace(x any, i int) (ok bool) {
 	if r != nil {
-		if !r.positive(ronly) {
-			if ok = i+1 <= r.ulen(); ok {
-				(*r)[i+1] = x
-			}
+		if ok = i+1 <= r.ulen(); ok {
+			(*r)[i+1] = x
 		}
 	}
 
@@ -763,13 +800,37 @@ func (r *stack) insert(x any, left int) (ok bool) {
 }
 
 /*
+Free frees the receiver instance entirely, including the underlying
+configuration. An error is returned if the instance is read-only or
+uninitialized.
+
+See also [Stack.Reset].
+*/
+func (r *Stack) Free() (err error) {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			r.stack = nil
+			return
+		}
+		err = errorf("%T is read-only; cannot free", r)
+	}
+
+	return
+}
+
+/*
 Reset will silently iterate and delete each slice found within
 the receiver, leaving it unpopulated but still retaining its
-active configuration. Nothing is returned.
+active configuration. Nothing is returned.  No action is taken
+if the receiver is empty.
+
+See also [Stack.Free].
 */
 func (r Stack) Reset() {
 	if r.IsInit() {
-		r.stack.reset()
+		if !r.getState(ronly) {
+			r.stack.reset()
+		}
 	}
 }
 
@@ -777,13 +838,10 @@ func (r Stack) Reset() {
 reset is a private method called by [Stack.Reset].
 */
 func (r *stack) reset() {
-	if !r.positive(ronly) {
-
-		var ct int = 0
-		for i := r.ulen(); i > 0; i-- {
-			ct++
-			r.remove(i - 1)
-		}
+	var ct int = 0
+	for i := r.ulen(); i > 0; i-- {
+		ct++
+		r.remove(i - 1)
 	}
 }
 
@@ -795,7 +853,8 @@ true indicates the receiver length became shorter by one (1).
 Use of the Remove method shall not result in fragmentation of
 the stack: gaps resulting from the removal of slice instances
 shall immediately be "collapsed" using the subsequent slices
-available.
+available.  No action is taken if the receiver is empty or
+read-only.
 */
 func (r Stack) Remove(idx int) (slice any, ok bool) {
 	if r.IsInit() {
@@ -811,9 +870,6 @@ remove is a private method called by [Stack.Remove].
 */
 func (r *stack) remove(idx int) (slice any, ok bool) {
 
-	r.lock()
-	defer r.unlock()
-
 	var found bool
 	var index int
 	if slice, index, found = r.index(idx); found {
@@ -822,6 +878,15 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 		var contents []any
 		var preserved int
 
+		// zero out everything except the config slice
+		cfg, _ := r.config()
+
+		var R stack = make(stack, 0)
+		R = append(R, cfg)
+
+		r.lock()
+		defer r.unlock()
+
 		// Gather what we want to keep.
 		for i := 1; i < r.len(); i++ {
 			if index != i {
@@ -829,12 +894,6 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 				contents = append(contents, (*r)[i])
 			}
 		}
-
-		// zero out everything except the config slice
-		cfg, _ := r.config()
-
-		var R stack = make(stack, 0)
-		R = append(R, cfg)
 
 		R = append(R, contents...)
 
@@ -849,7 +908,7 @@ func (r *stack) remove(idx int) (slice any, ok bool) {
 }
 
 /*
-Paren sets the string-encapsulation bit for parenthetical
+SetParen sets the string-encapsulation bit for parenthetical
 expression within the receiver. The receiver shall undergo
 parenthetical encapsulation ( (...) ) during the string
 representation process. Individual string values shall not
@@ -861,9 +920,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the encapsulation bit (i.e.: true->false
 and false->true)
 */
-func (r Stack) Paren(state ...bool) Stack {
+func (r Stack) SetParen(state ...bool) Stack {
 	r.setState(parens, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetParen].
+*/
+func (r Stack) Paren(state ...bool) Stack {
+	return r.SetParen(state...)
 }
 
 /*
@@ -937,24 +1003,30 @@ func (r Stack) IsParen() bool {
 }
 
 /*
-Fold will fold the case of logical Boolean operators which
-are not represented through symbols. For example, `AND`
-becomes `and`, or vice versa. This won't have any effect
-on List-based receivers, or if symbols are used in place
-of said Boolean words.
+SetFold will fold the case of logical Boolean operators which
+are not represented through symbols. For example, `AND` becomes
+`and`, or vice versa. This won't have any effect on List-based
+receivers, or if symbols are used in place of said Boolean words.
 
 A Boolean input value explicitly sets the bit as intended.
 Execution without a Boolean input value will *TOGGLE* the
 current state of the case-folding bit (i.e.: true->false
 and false->true)
 */
-func (r Stack) Fold(state ...bool) Stack {
+func (r Stack) SetFold(state ...bool) Stack {
 	r.setState(cfold, state...)
 	return r
 }
 
 /*
-NegativeIndices will enable negative index support when using
+Deprecated: Use [Stack.SetFold].
+*/
+func (r Stack) Fold(state ...bool) Stack {
+	return r.SetFold(state...)
+}
+
+/*
+SetNegativeIndices will enable negative index support when using
 the [Stack.Index] method extended by this type. See the method
 documentation for further details.
 
@@ -963,13 +1035,20 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the negative indices bit (i.e.: true->false
 and false->true)
 */
-func (r Stack) NegativeIndices(state ...bool) Stack {
+func (r Stack) SetNegativeIndices(state ...bool) Stack {
 	r.setState(negidx, state...)
 	return r
 }
 
 /*
-ForwardIndices will enable forward index support when using
+Deprecated: Use [Stack.SetForwardIndices].
+*/
+func (r Stack) NegativeIndices(state ...bool) Stack {
+	return r.SetNegativeIndices(state...)
+}
+
+/*
+SetForwardIndices will enable forward index support when using
 the [Stack.Index] method extended by this type. See the method
 documentation for further details.
 
@@ -978,9 +1057,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the forward indices bit (i.e.: true->false
 and false->true)
 */
-func (r Stack) ForwardIndices(state ...bool) Stack {
+func (r Stack) SetForwardIndices(state ...bool) Stack {
 	r.setState(fwdidx, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetForwardIndices].
+*/
+func (r Stack) ForwardIndices(state ...bool) Stack {
+	return r.SetForwardIndices(state...)
 }
 
 /*
@@ -1054,7 +1140,7 @@ func (r *stack) getListDelimiter() string {
 }
 
 /*
-Encap accepts input characters for use in controlled [Stack] value
+SetEncap accepts input characters for use in controlled [Stack] value
 encapsulation.
 
 A single string value will be used for both L and R encapsulation.
@@ -1066,7 +1152,7 @@ An instance of []string with only one (1) value is identical to the
 act of providing a single string value, in that both L and R will use
 the one value.
 */
-func (r Stack) Encap(x ...any) Stack {
+func (r Stack) SetEncap(x ...any) Stack {
 	if r.IsInit() {
 		if !r.getState(ronly) {
 			r.stack.setEncap(x...)
@@ -1074,6 +1160,13 @@ func (r Stack) Encap(x ...any) Stack {
 	}
 
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetEncap].
+*/
+func (r Stack) Encap(x ...any) Stack {
+	return r.SetEncap(x...)
 }
 
 /*
@@ -1189,7 +1282,7 @@ ID returns the assigned identifier string, if set, from within the underlying
 stack configuration.
 */
 func (r Stack) ID() (id string) {
-	id = "uninitialized"
+	id = "unspecified"
 	if r.IsInit() {
 		id = r.stack.getID()
 	}
@@ -1205,7 +1298,7 @@ func (r *stack) getID() string {
 }
 
 /*
-LeadOnce sets the lead-once bit within the receiver. This
+SetLeadOnce sets the lead-once bit within the receiver. This
 causes two (2) things to happen:
 
   - Only use the configured operator once in a stack, and ...
@@ -1215,13 +1308,20 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the lead-once bit (i.e.: true->false and
 false->true)
 */
-func (r Stack) LeadOnce(state ...bool) Stack {
+func (r Stack) SetLeadOnce(state ...bool) Stack {
 	r.setState(lonce, state...)
 	return r
 }
 
 /*
-NoPadding sets the no-space-padding bit within the receiver.
+Deprecated: Use [Stack.SetLeadOnce].
+*/
+func (r Stack) LeadOnce(state ...bool) Stack {
+	return r.SetLeadOnce(state...)
+}
+
+/*
+SetNoPadding sets the no-space-padding bit within the receiver.
 String values within the receiver shall not be padded using
 a single space character (ASCII #32).
 
@@ -1230,13 +1330,20 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the padding bit (i.e.: true->false and
 false->true)
 */
-func (r Stack) NoPadding(state ...bool) Stack {
+func (r Stack) SetNoPadding(state ...bool) Stack {
 	r.setState(nspad, state...)
 	return r
 }
 
 /*
-NoNesting sets the no-nesting bit within the receiver. If
+Deprecated: Use [Stack.SetNoPadding].
+*/
+func (r Stack) NoPadding(state ...bool) Stack {
+	return r.SetNoPadding(state...)
+}
+
+/*
+SetNoNesting sets the no-nesting bit within the receiver. If
 set to true, the receiver shall ignore any [Stack] or [Stack]
 type alias instance when pushed using the [Stack.Push] method.
 In such a case, only primitives, [Condition] instances, etc.,
@@ -1257,9 +1364,16 @@ Execution without a Boolean input value will *TOGGLE* the
 current state of the nesting bit (i.e.: true->false and
 false->true)
 */
-func (r Stack) NoNesting(state ...bool) Stack {
+func (r Stack) SetNoNesting(state ...bool) Stack {
 	r.setState(nnest, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetNoNesting].
+*/
+func (r Stack) NoNesting(state ...bool) Stack {
+	return r.SetNoNesting(state...)
 }
 
 /*
@@ -1282,13 +1396,20 @@ func (r Stack) IsPadded() bool {
 }
 
 /*
-ReadOnly sets the receiver bit 'ronly' to a positive state.
+SetReadOnly sets the receiver bit 'ronly' to a positive state.
 This will prevent any writes to the receiver or its underlying
 configuration.
 */
-func (r Stack) ReadOnly(state ...bool) Stack {
+func (r Stack) SetReadOnly(state ...bool) Stack {
 	r.setState(ronly, state...)
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetReadOnly].
+*/
+func (r Stack) ReadOnly(state ...bool) Stack {
+	return r.SetReadOnly(state...)
 }
 
 /*
@@ -1300,36 +1421,23 @@ func (r Stack) IsReadOnly() bool {
 }
 
 /*
-Symbol sets the provided symbol expression, which will be
-a sequence of any characters desired, to represent various
-Boolean operators without relying on words such as "AND".
-If a non-zero sequence of characters is set, they will be
-used to supplant the default word-based operators within
+SetSymbol sets the provided symbol expression, which will be a sequence
+of any characters desired, to represent various Boolean operators without
+relying on words such as "AND". If a non-zero sequence of characters is
+set, they will be used to supplant the default word-based operators within
 the given stack in which the symbol is configured.
 
 Acceptable input types are string and rune.
 
-Execution of this method with no arguments empty the symbol
-store within the receiver, thereby returning to the default
-word-based behavior.
+Execution of this method with no arguments empty the symbol store within
+the receiver, thereby returning to the default word-based behavior.
 
 This method has no effect on list-style [Stack] instances.
 */
-func (r Stack) Symbol(c ...any) Stack {
+func (r Stack) SetSymbol(c ...any) Stack {
 	if r.IsInit() {
 		if !r.getState(ronly) {
-			var str string
-			for i := 0; i < len(c); i++ {
-				switch tv := c[i].(type) {
-				case string:
-					str += tv
-				case rune:
-					char := string(tv)
-					str += char
-				}
-			}
-
-			r.stack.setSymbol(str)
+			r.stack.setSymbol(c...)
 		}
 	}
 
@@ -1337,15 +1445,31 @@ func (r Stack) Symbol(c ...any) Stack {
 }
 
 /*
+Deprecated: Use [Stack.SetSymbol].
+*/
+func (r Stack) Symbol(c ...any) Stack {
+	return r.SetSymbol(c...)
+}
+
+/*
 setSymbol is a private method called by [Stack.Symbol].
 */
-func (r *stack) setSymbol(sym string) {
-	sc, _ := r.config()
+func (r *stack) setSymbol(c ...any) {
+	var str string
+	for i := 0; i < len(c); i++ {
+		switch tv := c[i].(type) {
+		case string:
+			str += tv
+		case rune:
+			char := string(tv)
+			str += char
+		}
+	}
 
-	if sc.typ != list {
+	if sc, _ := r.config(); sc.typ != list {
 		r.lock()
 		defer r.unlock()
-		sc.setSymbol(sym)
+		sc.setSymbol(str)
 	}
 }
 
@@ -1451,18 +1575,27 @@ func (r stack) positive(x cfgFlag) bool {
 }
 
 /*
-Mutex enables the receiver's mutual exclusion locking capabilities.
+SetMutex enables the receiver's mutual exclusion locking capabilities.
 
 Subsequent calls of write-related methods, such as [Stack.Push],
 [Stack.Pop], [Stack.Remove] and others, shall invoke MuTeX locking at
 the latest possible state of processing, thereby minimizing the duration
 of a lock.
 */
-func (r Stack) Mutex() Stack {
+func (r Stack) SetMutex() Stack {
 	if r.IsInit() {
-		r.stack.setMutex()
+		if !r.getState(ronly) {
+			r.stack.setMutex()
+		}
 	}
 	return r
+}
+
+/*
+Deprecated: Use [Stack.SetMutex].
+*/
+func (r Stack) Mutex() Stack {
+	return r.SetMutex()
 }
 
 /*
@@ -1555,7 +1688,7 @@ func (r stack) len() int {
 }
 
 /*
-Len returns the integer length of the receiver.
+Len returns the integer length or "size" of the receiver.
 */
 func (r Stack) Len() (i int) {
 	if r.IsInit() {
@@ -1712,7 +1845,8 @@ func (r *stack) string() (assembled string) {
 }
 
 /*
-defaultAssertionHandler is a private method called by stack.string.
+defaultAssertionHandler is a private method called by stack.string
+and stack.isEqual.
 */
 func (r stack) defaultAssertionHandler(x any) (str string) {
 
@@ -1723,7 +1857,8 @@ func (r stack) defaultAssertionHandler(x any) (str string) {
 	// possibilities in the following evaluated order:
 	// • An initialized Stack, or type alias of Stack, or ...
 	// • An initialized Condition, or type alias of Condition, or ...
-	// • Something that has its own "stringer" (String()) method.
+	// • Something that has its own "stringer" (String()) method, or ...
+	// • A Go primitive
 	//
 	// BUG FIX: shadow the "ok" variable for conversion checks,
 	// and use (Stack|Condition).IsInit to decide whether the
@@ -1895,8 +2030,7 @@ func (r *stack) reveal() (err error) {
 	// scan each slice (except the config
 	// slice) and analyze its structure.
 	for i := 0; i < r.len() && err == nil; i++ {
-		sl, _, _ := r.index(i) // cfg offset handled by index method, be honest
-		if sl != nil {
+		if sl, _, _ := r.index(i); sl != nil { // cfg offset handled by index method, be honest
 			// If the element is a stack, begin descent
 			// through recursion.
 			if outer, ook := stackTypeAliasConverter(sl); ook && outer.Len() > 0 {
@@ -2077,6 +2211,66 @@ func (r stack) traverseStack(u any, idx int, indices ...int) (slice any, ok, don
 }
 
 /*
+Front returns the slice from the logical "front" of the receiver instance
+alongside a Boolean value indicative of success.  The returned slice is
+not removed from the receiver instance.
+
+In LIFO mode (the default), this returns the right-most slice. In FIFO mode,
+this returns the left-most slice, and is analogous to the concept of "top"
+in other queue implementations.
+*/
+func (r Stack) Front() (slice any, ok bool) {
+	if r.IsInit() {
+
+		if r.IsFIFO() {
+			for i := 0; i < r.Len(); i++ {
+				if slice, ok = r.Index(i); ok {
+					break
+				}
+			}
+			return
+		}
+
+		for i := r.Len(); i > 0; i-- {
+			if slice, ok = r.Index(i - 1); ok {
+				break
+			}
+		}
+	}
+
+	return
+}
+
+/*
+Back returns the slice from the logical "rear" of the receiver instance
+alongside a Boolean value indicative of success.  The returned slice is
+not removed from the receiver instance.
+
+In LIFO mode (the default), this returns the left-most slice. In FIFO mode,
+this returns the right-most slice.
+*/
+func (r Stack) Back() (slice any, ok bool) {
+	if r.IsInit() {
+		if !r.IsFIFO() {
+			for i := 0; i < r.Len(); i++ {
+				if slice, ok = r.Index(i); ok {
+					break
+				}
+			}
+			return
+		}
+
+		for i := r.Len(); i > 0; i-- {
+			if slice, ok = r.Index(i - 1); ok {
+				break
+			}
+		}
+	}
+
+	return
+}
+
+/*
 Index returns the Nth slice within the given receiver alongside the
 true index number and a Boolean value indicative of a successful call
 of a non-nil value.
@@ -2218,11 +2412,10 @@ ordering mode in effect:
   - In the alternative mode -- FIFO -- this shall be the first slice (index 0, or the "far left" element)
 
 Note that if the receiver is in an invalid state, or has a zero length,
-nothing will be removed, and a meaningless value of true will be returned
-alongside a nil slice value.
+nothing will be removed.
 */
 func (r Stack) Pop() (popped any, ok bool) {
-	if r.IsInit() {
+	if !r.IsEmpty() {
 		if !r.getState(ronly) {
 			popped, ok = r.stack.pop()
 		}
@@ -2234,11 +2427,6 @@ func (r Stack) Pop() (popped any, ok bool) {
 pop is a private method called by [Stack.Pop].
 */
 func (r *stack) pop() (slice any, ok bool) {
-
-	if r.ulen() < 1 {
-		ok = true
-		return
-	}
 
 	r.lock()
 	defer r.unlock()
@@ -2307,7 +2495,11 @@ Reverse shall re-order the receiver's current slices in a sequence that is the p
 of the original.
 */
 func (r Stack) Reverse() Stack {
-	r.stack.reverse()
+	if !r.IsEmpty() {
+		if !r.getState(ronly) {
+			r.stack.reverse()
+		}
+	}
 	return r
 }
 
@@ -2316,13 +2508,11 @@ reverse is a private niladic and void method called exclusively by [Stack.Revers
 */
 func (r *stack) reverse() {
 
-	if r.ulen() > 0 {
-		r.lock()
-		defer r.unlock()
+	r.lock()
+	defer r.unlock()
 
-		for i, j := 1, r.len()-1; i < j; i, j = i+1, j-1 {
-			(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
-		}
+	for i, j := 1, r.len()-1; i < j; i, j = i+1, j-1 {
+		(*r)[i], (*r)[j] = (*r)[j], (*r)[i]
 	}
 }
 
@@ -2378,11 +2568,9 @@ func (r Stack) Defrag(max ...int) Stack {
 						sub.Defrag(m)
 					} else if cub, ok := conditionTypeAliasConverter(slice); ok {
 						// Instance is Condition/Condition alias
-						if cub.IsNesting() {
-							if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
-								// Condition expression contains a Stack/Stack alias
-								sub.Defrag(m)
-							}
+						if sub, ok := stackTypeAliasConverter(cub.Expression()); ok {
+							// Condition expression contains a Stack/Stack alias
+							sub.Defrag(m)
 						}
 					}
 				}
@@ -2391,6 +2579,386 @@ func (r Stack) Defrag(max ...int) Stack {
 	}
 
 	return r
+}
+
+/*
+IsEqual returns a Boolean value indicative of the outcome of a recursive
+comparison of all values found within the receiver and input value o.
+
+The parameters of this process are as follows:
+
+  - All Go primitives (numbers, bool and string) are compared as-is
+  - If both values are explicit nil, true is returned
+  - Invalid instances return false in all cases
+  - All pointer instances are dereferenced -- regardless of reference depth (e.g.: **string, *string, etc. become string) -- and then rechecked
+  - Stack, Stack-alias, Condition and Condition-alias types utilize their respective `IsEqual` method
+  - Structs are compared based on non-private field configuration, field order and underlying values; anonymous (embedded) fields are permitted
+  - Slices and Arrays are compared based on matching capacity (if applicable), length, order and content only; the assertion process does not distinguish between the two types
+  - Maps are compared based on matching length, keys and values
+  - Functions and methods are compared based on their pointer addresses -- or, as a fallback, their respective I/O signatures; this allows distinct closures of like-signatures to qualify
+  - Channels, UnsafePointers and Uintptrs are compared as-is
+  - Interfaces are de-enveloped and then rechecked
+
+This method is experimental, may change in future releases and can be
+particularly costly wherever large or complex instances are concerned.
+Please use sparingly.
+*/
+func (r Stack) IsEqual(o any) error {
+	if !r.IsInit() {
+		return errorf("Not initialized")
+	}
+
+	// handle stack/stack-alias assertion and
+	// exit immediately if it fails due to a
+	// bad type, or uninitialized input for o.
+	if s, ok := stackTypeAliasConverter(o); ok {
+		if sc, _ := r.config(); sc.eqf != nil {
+			// use the user-authored closure assertion
+			// with the original instance
+			return sc.eqf(r, o)
+		}
+
+		// use default assertion with the converted
+		// instance.
+		return r.stack.isEqual(s.stack)
+	}
+
+	return errorf("Cannot perform equality assertion; bad input")
+}
+
+/*
+isEqual is a private method called by the package-default IsEqual method.
+It calls the top-level valuesEqual function, meant to compare two values,
+which in turn calls any number of type-specific equality functions based
+on the content encountered.
+*/
+func (r *stack) isEqual(o *stack) (err error) {
+	// Before we bother to run functions,
+	// lets see if the two instances are
+	// actually the same pointer.
+	if r == o {
+		return nil
+	}
+
+	// compare len/cap of stacks
+	if !capLenEqual(r.cap(), o.cap(), r.len(), o.len()) {
+		err = errorf("Capacity or length mismatch")
+		return
+	}
+
+	// Compare the kinds of stacks
+	if r.kind() != o.kind() {
+		err = errorf("Stack kind mismatch")
+		return
+	}
+
+	// iterate each slice and compare using
+	// the generic valuesEqual function ...
+	for i := 0; i < r.ulen() && err == nil; i++ {
+		isl, _, _ := r.index(i)
+		jsl, _, _ := o.index(i)
+		err = valuesEqual(isl, jsl)
+	}
+
+	return
+}
+
+/*
+SetEqualityPolicy sets or unsets the [EqualityPolicy] within the receiver
+instance.
+
+When fed an [EqualityPolicy], it shall override the package default mechanism
+beginning at the next call of [Stack.IsEqual].
+
+When fed zero (0) [EqualityPolicy] instances, or a value of nil, the previously
+specified instance will be removed, at which point the default behavior resumes.
+*/
+func (r Stack) SetEqualityPolicy(fn ...EqualityPolicy) Stack {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			sc, _ := r.config()
+
+			r.lock()
+			defer r.unlock()
+
+			if len(fn) == 0 {
+				sc.eqf = nil
+			} else {
+				sc.eqf = fn[0]
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+SetUnmarshaler sets or unsets the [Unmarshaler] within the receiver
+instance.
+
+When fed an [Unmarshaler], it shall override the package default mechanism
+beginning at the next call of [Stack.Unmarshal].
+
+When fed zero (0) [Unmarshaler] instances, or a value of nil, the previously
+specified instance will be removed, at which point the default behavior
+resumes.
+*/
+func (r Stack) SetUnmarshaler(fn ...Unmarshaler) Stack {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			sc, _ := r.config()
+
+			r.lock()
+			defer r.unlock()
+
+			if len(fn) == 0 {
+				sc.umf = nil
+			} else {
+				sc.umf = fn[0]
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+SetMarshaler sets or unsets the [Marshaler] within the receiver instance.
+
+When fed an [Marshaler], it shall override the package default mechanism
+beginning at the next call of [Stack.Marshal].
+
+When fed zero (0) [Marshaler] instances, or a value of nil, the previously
+specified instance will be removed, at which point the default behavior
+resumes.
+*/
+func (r Stack) SetMarshaler(fn ...Marshaler) Stack {
+	if r.IsInit() {
+		if !r.getState(ronly) {
+			sc, _ := r.config()
+
+			r.lock()
+			defer r.unlock()
+
+			if len(fn) == 0 {
+				sc.maf = nil
+			} else {
+				sc.maf = fn[0]
+			}
+		}
+	}
+
+	return r
+}
+
+/*
+Unmarshal returns slices of any ([]interface{}) based on the raw contents
+of the receiver instance. The output produced by this method is identical
+to the desired [Stack.Marshal] method input.
+
+This method is intended for generalized use, and may be overridden using
+the [Stack.SetUnmarshaler] method.
+*/
+func (r Stack) Unmarshal() (slice []any, err error) {
+	if r.IsInit() {
+		if sc, _ := r.config(); sc.umf != nil {
+			// use the user-authored closure unmarshaler
+			slice, err = sc.umf()
+		} else {
+			// use default unmarshaler
+			slice, err = r.stack.unmarshalDefault()
+		}
+	}
+
+	return
+}
+
+/*
+unmarshalDefault is a private method called by Stack.Unmarshal.
+*/
+func (r stack) unmarshalDefault() (slices []any, err error) {
+	slices = append(slices, r.kind())
+	for i := 0; i < r.ulen() && err == nil; i++ {
+		slice, _, _ := r.index(i) // auto-skip config
+		var subSlices []any
+		if sub, ok := stackTypeAliasConverter(slice); ok {
+			// Instance is Stack/Stack alias;
+			// use native unmarshalDefault.
+			if subSlices, err = sub.unmarshalDefault(); err == nil {
+				slices = append(slices, subSlices)
+			}
+		} else if cub, ok := conditionTypeAliasConverter(slice); ok {
+			// Instance is Condition/Condition alias;
+			// use the Condition.Unmarshal method.
+			if subSlices, err = cub.Unmarshal(); err == nil {
+				slices = append(slices, subSlices)
+			}
+		} else {
+			// Anything and everything -- even nil -- that is not a
+			// Stack/Stack alias or Condition/Condition alias, will
+			// be taken as-is.
+			slices = append(slices, slice)
+		}
+	}
+
+	return
+}
+
+/*
+Marshal returns an error following an attempt to read the variadic 'in'
+value(s) into the receiver instance. The appropriate input for this method
+is the output produced by [Stack.Unmarshal].
+
+This method is intended for generalized use, and may be overridden using
+the [Stack.SetMarshaler] method.
+*/
+func (r *Stack) Marshal(in ...any) (err error) {
+	if len(in) == 0 {
+		err = errorf("Empty marshaler input")
+	} else {
+		var xs Stack
+		var xc Condition
+
+		if !r.IsInit() {
+			// use default marshaler
+			if xs, xc, err = marshalDefault(in); xs.IsInit() {
+				r.stack = xs.stack
+			} else if xc.IsInit() {
+				err = errorf("Cannot Unmarshal Condition only; must envelope in Stack")
+			}
+		} else if sc, _ := r.config(); sc.maf != nil {
+			// use the user-authored closure marshaler
+			err = sc.maf(in...)
+		} else {
+			// use default marshaler
+			if xs, xc, err = marshalDefault(in); xs.IsInit() {
+				r.Push(xs)
+			} else if xc.IsInit() {
+				r.Push(xc)
+			}
+		}
+	}
+
+	return
+}
+
+func stackByWord(label string) Stack {
+	switch uc(label) {
+	case `LIST`:
+		return List()
+	case `AND`:
+		return And()
+	case `NOT`:
+		return Not()
+	case `OR`:
+		return Or()
+	}
+
+	return Basic()
+}
+
+func extractConditionValues(in []any) (c Condition, ok bool) {
+	if len(in) != 4 {
+		return
+	}
+	var word string
+	var op Operator
+
+	if W, ok := in[1].(string); ok {
+		word = W
+	}
+	if O, ok := in[2].(Operator); ok {
+		op = O
+	}
+	if E, ok := in[3].([]any); ok {
+		var xm Stack
+		var xn Condition
+		xm, xn, _ = marshalDefault(E)
+		if xm.IsInit() {
+			c = Cond(word, op, xm)
+		} else if xn.IsInit() {
+			c = Cond(word, op, xn)
+		}
+	} else {
+		c = Cond(word, op, in[3])
+	}
+
+	return
+}
+
+func marshalDefault(in []any) (x Stack, c Condition, err error) {
+	if len(in) == 0 {
+		err = errorf("Empty input")
+		return
+	}
+
+	// De-envelope needlessly enveloped value
+	in = deenvelopeSingleStack(in)
+
+	// The first string value in a stack indicates the
+	// appropriate type of stack or condition
+	lab, ok := in[0].(string)
+	if !ok {
+		err = errorf("Cannot unmarshal without stack label")
+		return
+	}
+
+	switch uc(lab) {
+	case `CONDITION`:
+		// A condition is an instance of []any
+		// with four values. The 1st is the
+		// 'CONDITION' label. The 2nd is the
+		// Keyword of a condition. The 3rd is
+		// the Operator and the last is the
+		// expression (value).  Convert this
+		// to a proper instance of Condition.
+		c, _ = extractConditionValues(in)
+		return
+	case `LIST`, `AND`, `OR`, `NOT`, `BASIC`:
+		x = stackByWord(lab).Push(in[1:]...)
+	default:
+		// No idea what the value is, just
+		// use a Basic
+		x = Basic().Push(in...)
+	}
+
+	// Iterate through the new stack (x) and
+	// Make sure there are no nested []any
+	// instance. If found, try to convert
+	// them to Stacks or Conditions by self
+	// executing this same function and if
+	// converted, replace the index with the
+	// new value.
+	for i := 0; i < x.Len(); i++ {
+		slice, _ := x.Index(i)
+		if tv, aok := slice.([]any); aok {
+			var xz Stack
+			var xc Condition
+			if xz, xc, err = marshalDefault(tv); xz.IsInit() {
+				// Was a stack; replace old slice
+				x.Replace(xz, i)
+			} else if xc.IsInit() {
+				// Was a condition; replace old slice
+				x.Replace(xc, i)
+			}
+		}
+	}
+
+	return
+}
+
+func deenvelopeSingleStack(in []any) []any {
+	if len(in) == 1 {
+		for {
+			if inner, ok := in[0].([]any); ok {
+				in = inner
+			} else {
+				break
+			}
+		}
+	}
+
+	return in
 }
 
 /*
@@ -2513,7 +3081,7 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 	var pct int
 	for i := 0; i < len(x); i++ {
 		var err error
-		if !r.capReached() {
+		if !r.isFull() {
 			if err = meth(x[i]); err != nil {
 				r.setErr(err)
 				break
@@ -2528,21 +3096,29 @@ func (r *stack) methodAppend(meth PushPolicy, x ...any) *stack {
 }
 
 /*
-CapReached returns a Boolean value indicative of whether the receiver
-has reached the maximum configured capacity.
+IsFull returns a Boolean value indicative of whether the receiver has reached
+the maximum configured capacity. This method wraps [Stack.Len] == [Stack.Cap].
+When no maximum capacity is specified, this method returns false.
 */
-func (r Stack) CapReached() (cr bool) {
+func (r Stack) IsFull() (full bool) {
 	if r.IsInit() {
-		cr = r.capReached()
+		full = r.isFull()
 	}
-	return
 
+	return
 }
 
 /*
-capReached is a private method called by [Stack.CapReached].
+Deprecated: Use [Stack.IsFull] instead.
 */
-func (r stack) capReached() (rc bool) {
+func (r Stack) CapReached() bool {
+	return r.IsFull()
+}
+
+/*
+isFull is a private method called by [Stack.IsFull].
+*/
+func (r stack) isFull() (rc bool) {
 	if r.cap() == 0 {
 		return false
 	}
@@ -2559,7 +3135,7 @@ func (r *stack) genericAppend(x ...any) {
 
 	for i := 0; i < len(x); i++ {
 		if r.canPushNester(x[i]) {
-			if !r.capReached() {
+			if !r.isFull() {
 				*r = append(*r, x[i])
 				pct++
 			}
@@ -2669,6 +3245,55 @@ getValidityPolicy is a private method called by [Stack.Valid].
 func (r *stack) getValidityPolicy() ValidityPolicy {
 	sc, _ := r.config()
 	return sc.vpf
+}
+
+/*
+ConvertStack returns an instance of [Stack] alongside a Boolean value.
+
+If the input value is a native [Stack], it is returned as-is alongside a
+Boolean value of true.
+
+If the input value is a [Stack]-alias, it is converted to a native [Stack]
+instance and returned alongside a Boolean value of true.
+
+Any other scenario returns a zero [Stack] alongside a Boolean value of
+false.
+*/
+func ConvertStack(in any) (Stack, bool) {
+	return stackTypeAliasConverter(in)
+}
+
+/*
+stackTypeAliasConverter attempts to convert any (u) back to a bonafide
+instance of Stack. This will only work if input value u is a type alias
+of Stack.  An instance of Stack is returned along with a Boolean value
+of true.
+*/
+func stackTypeAliasConverter(u any) (S Stack, converted bool) {
+	if u != nil {
+		// If it isn't a Stack alias, but is a
+		// genuine Stack, just pass it back
+		// with a thumbs-up ...
+		if st, isStack := u.(Stack); isStack {
+			S = st
+			converted = isStack
+			return
+		}
+
+		a, v, _ := derefPtr(typOf(u), valOf(u))
+		b := typOf(Stack{}) // target (dest) type
+		if a.ConvertibleTo(b) {
+			X := v.Convert(b).Interface()
+			if assert, ok := X.(Stack); ok {
+				if !assert.IsZero() {
+					S = assert
+					converted = true
+				}
+			}
+		}
+	}
+
+	return
 }
 
 const badStack = `<invalid_stack>`

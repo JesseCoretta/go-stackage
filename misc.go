@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand" // not for crypto, don't worry :)
 	"reflect"
-	//"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -126,6 +125,341 @@ func strInSliceFold(str string, slice []string) bool {
 }
 
 /*
+isPtr returns a Boolean value indicative of whether kind
+reflection revealed the presence of a pointer type.
+*/
+func isPtr(t reflect.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	return t.Kind() == reflect.Ptr
+}
+
+func derefPtr(t reflect.Type, v reflect.Value) (reflect.Type, reflect.Value, reflect.Kind) {
+	// loop to handle **type instances
+	var k reflect.Kind
+	for {
+		if isPtr(t) {
+			t = t.Elem()
+			v = v.Elem()
+			continue
+		}
+		break
+	}
+	k = v.Kind()
+
+	return t, v, k
+}
+
+func assertReflect(x any) (at reflect.Type, av reflect.Value) {
+	switch tv := x.(type) {
+	case reflect.Value:
+		at = tv.Type()
+		av = tv
+	default:
+		at = typOf(tv)
+		av = valOf(tv)
+	}
+
+	return
+}
+
+func sliceOrArrayKind(k ...reflect.Kind) bool {
+	if len(k) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(k); i++ {
+		if k[i] != reflect.Slice && k[i] != reflect.Array {
+			return false
+		}
+	}
+
+	return true
+}
+
+func valueIsValid(v ...reflect.Value) bool {
+	if len(v) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(v); i++ {
+		if !v[i].IsValid() {
+			return false
+		}
+	}
+
+	return true
+}
+
+func channelsEqual(x, y any) error {
+
+	xft, xfv := assertReflect(x)
+	yft, yfv := assertReflect(y)
+
+	if !valueIsValid(xfv, yfv) {
+		return errorf("Channel(s) invalid")
+	}
+
+	xfk := xft.Kind()
+	yfk := yft.Kind()
+
+	if xfk != reflect.Chan || yfk != reflect.Chan {
+		return errorf("Channel kind mismatch")
+	}
+
+	if xft != yft {
+		return errorf("Channel type mismatch")
+	}
+
+	if x != y {
+		return errorf("Channel mismatch")
+	}
+
+	return nil
+}
+
+func functionsEqual(x, y any) error {
+
+	if x == nil || y == nil {
+		return errorf("Nil functions incomparable")
+	}
+
+	xft, _ := assertReflect(x)
+	yft, _ := assertReflect(y)
+
+	xfk := xft.Kind()
+	yfk := yft.Kind()
+
+	if xfk != reflect.Func || yfk != reflect.Func {
+		return errorf("Function kind mismatch")
+	}
+
+	if xft != yft {
+		return errorf("Function type mismatch")
+	}
+
+	// Try to match by signature elements...
+	return nil
+}
+
+func primitivesEqual(x, y reflect.Value) (tried bool, err error) {
+	if !valueIsValid(x, y) {
+		err = errorf("Nil input")
+		return
+	}
+
+	if isKnownPrimitive(x.Interface()) {
+		tried = true
+		if isKnownPrimitive(y.Interface()) {
+			if !x.Equal(y) {
+				err = errorf("primitive mismatch")
+			}
+			return
+		}
+		err = errorf("primitive incomparable to non-primitive")
+	}
+
+	return
+}
+
+func valuesEqual(x, y any) error {
+
+	if x == nil && y == nil {
+		return nil
+	}
+
+	_, xrv, xrk := derefPtr(assertReflect(x))
+	_, yrv, yrk := derefPtr(assertReflect(y))
+
+	if tried, err := primitivesEqual(xrv, yrv); tried {
+		return err
+	}
+
+	switch xrk {
+	case reflect.Struct:
+		if tried, err := stackageStructsEqual(x, y); tried {
+			return err
+		}
+
+		// whatever they are, handle manually
+		return structsEqual(x, y)
+	case reflect.Slice, reflect.Array:
+		return slicesEqual(x, y)
+	case reflect.Map:
+		return mapsEqual(x, y)
+	default:
+		return matchExtra(xrk, yrk, xrv, yrv, x, y)
+	}
+}
+
+func matchExtra(l, k reflect.Kind, a, b reflect.Value, x, y any) error {
+
+	switch k {
+	case reflect.Func:
+		return functionsEqual(x, y)
+	case reflect.Chan:
+		return channelsEqual(x, y)
+	case reflect.UnsafePointer, reflect.Uintptr:
+		return uuptrsEqual(l, k, a, b)
+	}
+
+	return errorf("Unsupported type")
+}
+
+func uuptrsEqual(l, k reflect.Kind, x, y reflect.Value) error {
+	if l == k {
+		if x.Interface() != y.Interface() {
+			return errorf("UnsafePointer mismatch")
+		}
+	} else {
+		return errorf("Uintptr or unsafepointer kind mismatch")
+	}
+
+	return nil
+}
+
+func stackageStructsEqual(x, y any) (tried bool, err error) {
+	// Are they both condition/condition alias?
+	if icd, iokc := conditionTypeAliasConverter(x); iokc {
+		tried = true
+		if jcd, jokc := conditionTypeAliasConverter(y); jokc {
+			err = icd.IsEqual(jcd)
+			return
+		}
+	}
+
+	// Are they both stack/stack alias?
+	if ist, ioks := stackTypeAliasConverter(x); ioks {
+		tried = true
+		if jst, joks := stackTypeAliasConverter(y); joks {
+			err = ist.IsEqual(jst)
+			return
+		}
+	}
+
+	err = errorf("Cannot compare stackage instances, cannot convert")
+
+	return
+}
+
+func mapsEqual(x, y any) (err error) {
+
+	xrt, xrv, xrk := derefPtr(assertReflect(x))
+	yrt, yrv, yrk := derefPtr(assertReflect(y))
+
+	if xrk != reflect.Map || xrk != yrk {
+		err = errorf("Cannot compare non-map instances")
+		return
+	}
+
+	if xrt != yrt {
+		err = errorf("Map type mismatch")
+		return
+	}
+
+	if xrv.Len() != yrv.Len() {
+		err = errorf("Map length mismatch")
+		return
+	}
+
+	for _, key := range xrv.MapKeys() {
+		xval := xrv.MapIndex(key).Interface()
+		yval := yrv.MapIndex(key).Interface()
+		if err = valuesEqual(xval, yval); err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+func structsEqual(x, y any) (err error) {
+	xrt, xrv, xrk := derefPtr(assertReflect(x))
+	yrt, yrv, yrk := derefPtr(assertReflect(y))
+
+	if xrk != yrk {
+		err = errorf("Struct type mismatch")
+		return
+	}
+
+	if xrt.NumField() != yrt.NumField() {
+		err = errorf("Struct field number mismatch")
+		return
+	}
+
+	for i := 0; i < xrt.NumField() && err == nil; i++ {
+		xtf := xrt.Field(i)
+		xvf := xrv.Field(i)
+
+		ytf := yrt.Field(i)
+		yvf := yrv.Field(i)
+
+		xn := xtf.Name
+		yn := ytf.Name
+
+		if xn != yn {
+			xanon := xtf.Anonymous
+			yanon := ytf.Anonymous
+
+			if !(xanon && yanon) {
+				err = errorf("Struct anonymous field mismatch failed")
+				return
+			}
+		}
+
+		err = valuesEqual(xvf.Interface(), yvf.Interface())
+	}
+
+	return
+}
+
+/*
+capLenEqual will compare the input c1/c2 as capacity
+indicators and l1/l2 as length indicators. If there
+are no capacity constraints indicated, a comparison
+is made based on length alone.
+*/
+func capLenEqual(c1, c2, l1, l2 int) bool {
+	if c1 != 0 || c2 != 0 {
+		return c1 == c2 && l1 == l2
+	}
+	return l1 == l2
+}
+
+func slicesEqual(x, y any) (err error) {
+
+	_, xrv, xrk := derefPtr(assertReflect(x))
+	_, yrv, yrk := derefPtr(assertReflect(y))
+
+	if !sliceOrArrayKind(xrk, yrk) {
+		err = errorf("Slice/array kind mismatch")
+		return
+	}
+
+	if !capLenEqual(xrv.Cap(), yrv.Cap(), xrv.Len(), yrv.Len()) {
+		err = errorf("Slice/array capacity or length mismatch")
+		return
+	}
+
+	for i := 0; i < xrv.Len() && err == nil; i++ {
+		_, xv, _ := derefPtr(xrv.Index(i).Type(), xrv.Index(i))
+		_, yv, _ := derefPtr(yrv.Index(i).Type(), yrv.Index(i))
+
+		// Get primitives out of the way
+		var tried bool
+		if tried, err = primitivesEqual(xv, yv); tried {
+			return
+		}
+
+		err = valuesEqual(xv, yv)
+	}
+
+	return
+}
+
+/*
 condenseWHSP returns input string b with all contiguous
 WHSP or Horizontal TAB characters condensed into single
 WHSP characters (ASCII #32). For example:
@@ -171,89 +505,15 @@ func condenseWHSP(b string) string {
 }
 
 /*
-stackTypeAliasConverter attempts to convert any (u) back to a bonafide instance
-of Stack. This will only work if input value u is a type alias of Stack. An
-instance of Stack is returned along with a success-indicative Boolean value.
-*/
-func stackTypeAliasConverter(u any) (S Stack, converted bool) {
-	if u != nil {
-		// If it isn't a Stack alias, but is a
-		// genuine Stack, just pass it back
-		// with a thumbs-up ...
-		if st, isStack := u.(Stack); isStack {
-			S = st
-			converted = isStack
-			return
-		}
-
-		a, v := derefPtr(u)
-		b := typOf(Stack{}) // target (dest) type
-		if a.ConvertibleTo(b) {
-			X := v.Convert(b).Interface()
-			if assert, ok := X.(Stack); ok {
-				if !assert.IsZero() {
-					S = assert
-					converted = true
-				}
-			}
-		}
-	}
-
-	return
-}
-
-/*
-conditionTypeAliasConverter attempts to convert any (u) back to a bonafide instance
-of Condition. This will only work if input value u is a type alias of Condition. An
-instance of Condition is returned along with a success-indicative Boolean value.
-*/
-func conditionTypeAliasConverter(u any) (C Condition, converted bool) {
-	if u != nil {
-		// If it isn't a Condition alias, but is a
-		// genuine Condition, just pass it back
-		// with a thumbs-up ...
-		if co, isCond := u.(Condition); isCond {
-			C = co
-			converted = isCond
-			return
-		}
-
-		a, v := derefPtr(u)
-		b := typOf(Condition{}) // target (dest) type
-		if a.ConvertibleTo(b) {
-			X := v.Convert(b).Interface()
-			if assert, ok := X.(Condition); ok {
-				if !assert.IsZero() {
-					C = assert
-					converted = true
-				}
-			}
-		}
-	}
-
-	return
-}
-
-func derefPtr(u any) (t reflect.Type, v reflect.Value) {
-	t = typOf(u) // current (src) type
-	v = valOf(u) // current (src) value
-
-	// unwrap any pointers for
-	// maximum compatibility
-	if isPtr(u) {
-		t = t.Elem()
-		v = v.Elem()
-	}
-
-	return
-}
-
-/*
 getStringer uses reflect to obtain and return a given
 type instance's String ("stringer") method, if present.
 If not, nil is returned.
 */
 func getStringer(x any) (meth func() string) {
+	if x == nil {
+		return nil
+	}
+
 	if v := valOf(x); !v.IsZero() {
 		if method := v.MethodByName(`String`); method.Kind() != reflect.Invalid {
 			if _meth, ok := method.Interface().(func() string); ok {
@@ -263,17 +523,6 @@ func getStringer(x any) (meth func() string) {
 	}
 	return
 }
-
-/*
-a quick means of getting the caller name for logging purposes.
-*/
-/*
-func fmname() string {
-	x, _, _, _ := runtime.Caller(1)
-	name := split(runtime.FuncForPC(x).Name(), string(rune(46)))
-	return uc(name[len(name)-1])
-}
-*/
 
 /*
 encapValue will encapsulate value v using encapsulation scheme
@@ -338,13 +587,6 @@ func foldValue(do bool, value string) (s string) {
 	return
 }
 
-func isPtr(x any) (is bool) {
-	if x != nil {
-		is = typOf(x).Kind() == reflect.Ptr
-	}
-	return
-}
-
 func isNumberPrimitive(x any) bool {
 	switch x.(type) {
 	case int, int8, int16, int32, int64,
@@ -374,13 +616,21 @@ func isBoolPrimitive(x any) bool {
 	return false
 }
 
-func isKnownPrimitive(x any) (is bool) {
-	if isStringPrimitive(x) {
-		is = true
-	} else if isNumberPrimitive(x) {
-		is = true
-	} else if isBoolPrimitive(x) {
-		is = true
+func isKnownPrimitive(x ...any) (is bool) {
+	if len(x) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(x); i++ {
+		if isStringPrimitive(x[i]) {
+			is = true
+		} else if isNumberPrimitive(x[i]) {
+			is = true
+		} else if isBoolPrimitive(x[i]) {
+			is = true
+		} else {
+			break
+		}
 	}
 
 	return
@@ -533,17 +783,9 @@ type Interface interface {
 	// instance is considered nil, or unset.
 	IsZero() bool
 
-	// Stack: CanNest returns a Boolean value indicative of whether the
-	// receiver is allowed to append (Push) additional Stack instances
-	// into its collection of slices.
-	//
-	// Condition: CanNest returns a Boolean value indicative of whether
-	// the receiver is allowed to set a Stack instance as its Expression
-	// value.
-	//
-	// See also the NoNesting and IsNesting methods for either of these
-	// types.
-	CanNest() bool
+	// IsEqual performs an equality check against the receiver
+	// instance and the input value.
+	IsEqual(any) error
 
 	// IsParen returns a Boolean value indicative of whether the receiver
 	// instance, when represented as a string value, shall encapsulate in
@@ -579,6 +821,26 @@ type Interface interface {
 	//
 	// See also the NoNesting and CanNest method for either of these types.
 	IsNesting() bool
+
+	// Unmarshal will unmarshal the receiver instance.
+	//
+	// Stack or Stack-alias instances become []any.
+	//
+	// Condition or Condition-alias instances become an anonymous
+	// struct as the sole slice member within []any.
+	Unmarshal() ([]any, error)
+
+	// Stack: CanNest returns a Boolean value indicative of whether the
+	// receiver is allowed to append (Push) additional Stack instances
+	// into its collection of slices.
+	//
+	// Condition: CanNest returns a Boolean value indicative of whether
+	// the receiver is allowed to set a Stack instance as its Expression
+	// value.
+	//
+	// See also the NoNesting and IsNesting methods for either of these
+	// types.
+	CanNest() bool
 
 	// ID returns the identifier assigned to the receiver, if set. This
 	// may be anything the user chooses to set, or it may be auto-assigned

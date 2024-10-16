@@ -66,3 +66,63 @@ Note that basic [Stack] instances are ineligible for the process of
 string representation, thus no PresentationPolicy may be set.
 */
 type PresentationPolicy func(...any) string
+
+/*
+EqualityPolicy is a first-class (closure) function signature that may be
+leveraged by users in order to gain full control over the equality assertion
+mechanism between two (2) [Stack] or [Stack]-alias instances, or two (2)
+[Condition] or [Condition]-alias instances.
+
+An EqualityPolicy may be set, or unset, using the [Stack.SetEqualityPolicy] and
+[Condition.SetEqualityPolicy] methods as needed.  When the [Stack.IsEqual] or
+[Condition.IsEqual] methods are called, the appropriate EqualityPolicy will be
+invoked.
+
+By default, when no custom EqualityPolicy is specified, the receiver will
+compare itself to the input value (any) provided as described in the notes
+of the [Stack.IsEqual] and [Condition.IsEqual] methods. It is noted that,
+given sufficiently complex or large structures, the default mechanism is
+fairly costly. A user-implemented alternative closure, when assigned to the
+instance(s) in question, can mitigate this drawback through more selective
+and fine-tuned assertion processes.
+*/
+type EqualityPolicy func(any, any) error
+
+/*
+Unmarshaler is a first-class (closure) function signature that may be
+leveraged by users in order to gain full control over the unmarshaling
+process of a [Stack] or [Stack]-alias instance and all of its contents
+therein.
+
+An Unmarshaler may be set, or unset, using the [Stack.SetUnmarshaler] and
+[Condition.SetUnmarshaler] methods as needed. When the [Stack.Unmarshal]
+method is called, it invokes the appropriate Unmarshaler.
+
+By default, when no custom Unmarshaler is specified, the return type is
+[]any, which is the type that is used to mimic any form of [Stack]. Any
+[Condition] and [Condition] instances present are also mimicked, except
+the copied instance -- if it contains a [Stack] or [Stack]-alias as the
+[Condition.Expression] -- will have its [Stack] or [Stack]-alias swapped
+with an instance of []any in recursive manner.  Note that none of the
+original content is modified as as a result of this process, and when
+completed, the user will be left with the original instance alongside a
+nearly identical mimicry that may be freely dissected or modified as needed.
+
+Users authoring their own Unmarshaler need only utilize the return []any
+as an outer-envelope only -- the enveloped value(s) within may be of any
+number and of any combination of types, assembled or [re]-structured in
+any way desired.
+*/
+type Unmarshaler func(...any) ([]any, error)
+
+/*
+Marshaler is a first-class (closure) function signature that may be
+leveraged by users in order to gain full control over the marshaling
+process that deposits content into a [Stack] or [Stack]-alias instance.
+*/
+type Marshaler func(...any) (err error)
+
+/*
+LessFunc qualifies for [sort.Interface].
+*/
+type LessFunc func(int, int) bool

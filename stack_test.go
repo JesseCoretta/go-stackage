@@ -3,10 +3,12 @@ package stackage
 import (
 	"bytes"
 	"fmt"
+	// uncomment for TestStackagePerf runs
 	//"log"
 	//"net/http"
 	//_ "net/http/pprof"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	_ "time"
@@ -44,47 +46,63 @@ import (
 // other tests else you'll hang at some point!  Definitely
 // don't repackage/redistribute this package while this test
 // function is UNcommented.
-/*
-func TestStackagePerf(t *testing.T) {
-        ch := make(chan bool)
-        go func() {
-		// edit this listener (e.g.: use TCP/8080) as
-		// seen fit.
-                log.Println(http.ListenAndServe(":1234", nil))
-        }()
-
-        for {
-        	custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
-		//thisIsMyNightmare := And().Push(
-		_ = And().Push(
-		        `this1`,
-		        Or().Mutex().Push(
-		                custom,
-		                And().Push(
-		                        `this4`,
-		                        Not().Mutex().Push(
-		                                Or().Push(
-		                                        Cond(`dayofweek`, Ne, "Wednesday"),
-		                                        Cond(`ssf`, Ge, "128"),
-		                                        Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
-		                                ),
-		                        ),
-		                ),
-		                And().Push(
-		                        Or().Push(
-		                                Cond(`keyword2`, Lt, "someothervalue"),
-		                        ),
-		                ),
-		                Cond(`keyword`, Gt, Or().Push(`...`)),
-		        ),
-		        `this2`,
-		)
-
-		//os.Stdout.Write([]byte(thisIsMyNightmare.String()))
-        }
-        <-ch
-}
-*/
+//func TestStackagePerf(t *testing.T) {
+//        ch := make(chan bool)
+//        go func() {
+//		// edit this listener (e.g.: use TCP/8080) as
+//		// seen fit.
+//                log.Println(http.ListenAndServe(":1234", nil))
+//        }()
+//
+//        for {
+//        	custom := Cond(`outer`, Ne, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
+//        	custom2 := Cond(`inner`, Eq, customStack(And().Push(Cond(`keyword`, Eq, "somevalue"))))
+//		a1 := And().Push(
+//                	`this4`,
+//                	Not().Mutex().Push(
+//                	        Or().Push(
+//                	                custom2,
+//                	                Cond(`dayofweek`, Ne, "Wednesday"),
+//                	                Cond(`ssf`, Ge, "128"),
+//                	                Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
+//                	        ),
+//                	),
+//		)
+//                a2 := And().Push(
+//                        `this4`,
+//                        Not().Mutex().Push(
+//                                Or().Push(
+//                                        custom2,
+//                                        Cond(`dayofweek`, Ne, "Wednesday"),
+//                                        Cond(`ssf`, Gt, "128"),
+//                                        Cond(`greeting`, Ne, List().Push(List().Push(List().Push(``)))),
+//                                ),
+//                        ),
+//                )
+//
+//		//thisIsMyNightmare := And().Push(
+//		_ = And().Push(
+//		        `this1`,
+//		        Or().Mutex().Push(
+//		                custom,
+//				a1,
+//		                And().Push(
+//		                        Or().Push(
+//		                                Cond(`keyword2`, Lt, "someothervalue"),
+//		                        ),
+//		                ),
+//		                Cond(`keyword`, Gt, Or().Push(`...`)),
+//		        ),
+//		        `this2`,
+//		)
+//
+//		custom.IsEqual(custom2)
+//		a1.IsEqual(a2)
+//
+//		//os.Stdout.Write([]byte(thisIsMyNightmare.String()))
+//        }
+//        <-ch
+//}
 
 /*
 This example demonstrates basic support for stack sorting via the
@@ -96,6 +114,119 @@ func ExampleStack_String_withSort() {
 	sort.Stable(names)
 	fmt.Println(names)
 	// Output: Anna Betty Frank Jim Xavier aly fargus
+}
+
+/*
+This example demonstrates the means of converting a custom [Stack]-alias
+instance into a native [Stack] that contains the same values. Optionally,
+users may shadow the first return value, and use the second (bool) value
+to ascertain whether the instance was converted successfully.
+*/
+func ExampleConvertStack() {
+	var native Stack = List().Push(`this`, `is`, `a`, `native`, `stack`)
+	type YourStack Stack
+
+	// A custom instance could have been
+	// assembled in a variety of ways.
+	//
+	// For this example, we'll just use a
+	// basic cast just for brevity.
+	custom := YourStack(native)
+
+	back, ok := ConvertStack(custom)
+	if !ok {
+		fmt.Printf("Failed to convert %T", custom)
+		return
+	}
+
+	slice, found := back.Index(0) // any index would do
+	if !found {
+		fmt.Printf("Content not found")
+		return
+	}
+
+	fmt.Printf("Value: %v", slice)
+	// Output: Value: this
+}
+
+/*
+This example demonstrates the means for assigning a custom marshaler
+function or method to a [Stack] instance.
+*/
+func ExampleStack_SetMarshaler() {
+	var r Stack = List()
+
+	// Lets write a marshaler that converts
+	// string numbers to ints, each of which
+	// are added to Stack r.
+	r.SetMarshaler(func(in ...any) (err error) {
+		if len(in) == 0 {
+			err = fmt.Errorf("No input content")
+			return
+		}
+
+		for i := 0; i < len(in); i++ {
+			if assert, ok := in[i].(string); ok {
+				var num int
+				if num, err = strconv.Atoi(assert); err != nil {
+					break
+				} else {
+					r.Push(num)
+				}
+			} else {
+				err = fmt.Errorf("Cannot assert %T as a string", in[i])
+				break
+			}
+		}
+
+		return
+	})
+
+	if err := r.Marshal(`1`, `2`, `3`, `4`); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	slice, _ := r.Index(1)
+
+	fmt.Printf("Slice is %T", slice)
+	// Output: Slice is int
+}
+
+/*
+This example demonstrates the means for assigning a custom unmarshaler
+function or method to a [Stack] instance.
+*/
+func ExampleStack_SetUnmarshaler() {
+	var r Stack = List().Push(`1`, `2`, `3`, `4`)
+	// Write an unmarshaler that extracts just the
+	// values, depositing them within the []any
+	// output instance.
+	r.SetUnmarshaler(func(_ ...any) (out []any, err error) {
+		for i := 0; i < r.Len(); i++ {
+			slice, _ := r.Index(i)
+			assert, ok := slice.(string)
+			// We only want string types
+			if ok {
+				out = append(out, assert)
+			} else {
+				err = fmt.Errorf("Unsupported slice type: %T", slice)
+				break
+			}
+		}
+
+		return
+	})
+
+	out, err := r.Unmarshal()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	lout := len(out)
+	fmt.Printf("Output has %d strings: %t", lout, lout == 4)
+	// Output: Output has 4 strings: true
 }
 
 /*
@@ -111,6 +242,14 @@ func ExampleStack_Swap() {
 	// Output: Jim
 }
 
+func ExampleStack_Free() {
+	var names Stack = List() // initialize
+	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
+	names.Free()
+	fmt.Printf("%T is zero: %t", names, names.IsZero())
+	// Output: stackage.Stack is zero: true
+}
+
 /*
 This example demonstrates a simple order-based comparison using two
 string values by way of the [Stack.Less] method.  In this scenario,
@@ -124,7 +263,7 @@ needs to be devised by the end-user.  See the [Stack.SetLessFunc] method.
 func ExampleStack_Less() {
 	var names Stack = List().SetDelimiter(' ')
 	names.Push(`Frank`, `Anna`, `Xavier`, `Betty`, `aly`, `Jim`, `fargus`)
-	fmt.Println(names.Less(0, 1))
+	fmt.Println(names.Less(0, 1)) // is Frank before Anna?
 	// Output: false
 }
 
@@ -612,6 +751,174 @@ func TestStackAnd_001(t *testing.T) {
 		return
 	}
 }
+
+func TestStack_IsEqual(t *testing.T) {
+	channel := make(chan error, 2)
+
+	var str1 *string = new(string)
+	*str1 = `this is crazy`
+
+	var str2 *string = new(string)
+	*str2 = `this is crazy`
+
+	var iface1 any = struct{}{}
+	var iface2 any = struct{}{}
+
+	A := And().Paren().Push(
+		Cond(`Test`, Eq, List().Push(
+			`sub_nested_number_0`,
+			`sub_nested_number_1`,
+		)),
+		[]string{`1`, `2`, `3`, `4`},
+		iface1,
+		map[int]any{
+			0: map[any]any{
+				uint8(0):  `hehe`,
+				uint16(1): `omg`,
+				true:      false,
+				`runes`:   []rune{'H', 'E', 'L', 'P', ' ', 'M', 'E'},
+			},
+			1: nil,
+			2: []uint{1, 2, 3, 4},
+		},
+		Or().Paren().Push(
+			And().Push(`deep_string`),
+			`sub_element_number_0`,
+			`sub_element_number_1`,
+		),
+		//TestStack_IsEqual,
+		&str1, // **string
+		channel,
+		struct{}{},
+		&struct{}{},
+		rune(76),
+		nil,
+	)
+
+	B := And().Paren().Push(
+		Cond(`Test`, Eq, List().Push(
+			`sub_nested_number_0`,
+			`sub_nested_number_1`,
+		)),
+		[4]string{`1`, `2`, `3`, `4`},
+		iface2,
+		map[int]any{
+			0: map[any]any{
+				uint8(0):  `hehe`,
+				uint16(1): `omg`,
+				true:      false,
+				`runes`:   []rune{'H', 'E', 'L', 'P', ' ', 'M', 'E'},
+			},
+			1: nil,
+			2: []uint{1, 2, 3, 4},
+		},
+		Or().Paren().Push(
+			And().Push(`deep_string`),
+			`sub_element_number_0`,
+			`sub_element_number_1`,
+		),
+		//TestStack_Unmarshal_default,
+		&str2, // **string
+		channel,
+		struct{}{},
+		&struct{}{},
+		rune(76),
+		nil,
+	)
+
+	if err := A.IsEqual(B); err != nil {
+		t.Errorf("%s failed: %v", t.Name(), err)
+		return
+	}
+}
+
+func TestStack_Unmarshal_default(t *testing.T) {
+
+	// Make a stack with senseless garbage
+	A := And().Paren().Push(
+		// Condition with Stack expr
+		Cond(`Test`, Eq, List().Push(
+			`sub_nested_number_0`,
+			`sub_nested_number_1`,
+		)),
+		// just a string
+		`top_element_number_0`,
+		// Stack
+		Or().Paren().Push(
+			And().Push(`deep_string`),
+			`sub_element_number_0`,
+			`sub_element_number_1`,
+		),
+		// A random rune
+		rune(76),
+		// A byte -- 0x2B (ASCII #43, "+")
+		byte(43),
+	)
+
+	slices, err := A.Unmarshal()
+	if err != nil {
+		t.Errorf("%s failed: %v", t.Name(), err)
+		return
+	}
+
+	want := 6
+	if got := len(slices); got != want {
+		t.Errorf("%s failed: want %d, got %d", t.Name(), want, got)
+		return
+	}
+
+	var n Stack
+	if err = n.Marshal(slices); err != nil {
+		t.Errorf("%s failed: %v", t.Name(), err)
+		return
+	}
+
+	//printf("Top-Stack: %s(%d)\n", n.Kind(), n.Len())
+	//n.debugStack(0)
+	//printf("End-of-Stack\n")
+}
+
+/*
+func (r Stack) debugStack(lvl int) {
+	for i := 0; i < r.Len(); i++ {
+		slice, _ := r.Index(i)
+		switch tv := slice.(type) {
+		case Condition:
+			expr := tv.Expression()
+			if tv.IsNesting() {
+				if sub, ok := stackTypeAliasConverter(expr); ok {
+					printf("%d:%d - Condition-Nested-Stack::[KW]%s [OP]%s [%s(%d)]\n",
+						i, lvl, tv.Keyword(), tv.Operator(), sub.Kind(), sub.Len())
+					sub.debugStack(lvl+1)
+					printf("%d:%d - End-of-Condition-Nested-Stack\n", i, lvl)
+				}
+			} else {
+				printf("%d:%d - Condition::[%s]\n", lvl, i, tv)
+	                        if isKnownPrimitive(tv) {
+	                                printf("%d:%d - Primitive-Condition-Expr: %s\n",
+						i, lvl,	primitiveStringer(tv))
+	                        } else if meth := getStringer(expr); meth != nil {
+	                                printf("%d:%d - Stringer-Condition-Expr: %s\n", i, lvl, meth())
+	                        }
+			}
+		case Stack:
+			printf("%d:%d - Nested-Stack(%s)[%d]::\n",
+				i, lvl, tv.Kind(), tv.Len())
+			tv.debugStack(lvl+1)
+			printf("%d:%d - End-of-Nested-Stack\n", i, lvl)
+		default:
+			if isKnownPrimitive(tv) {
+				printf("-:%d - Primitive-Stack-Value: (%T) %s\n",
+					i, tv, primitiveStringer(tv))
+			} else if meth := getStringer(tv); meth != nil {
+				printf("-:%d - Stringer-Stack-Value: %s\n", i, meth())
+			} else {
+				printf("-:%d - NoStringer-Stack-Value: %T\n", i, tv)
+			}
+		}
+	}
+}
+*/
 
 func TestStack_IsNesting(t *testing.T) {
 
@@ -1527,10 +1834,19 @@ func TestStack_codecov(t *testing.T) {
 	s.NoNesting(true)
 	s.NoNesting(false)
 	s.Logger()
+	s.IsEqual(nil)
 
 	s = List()
+	s.SetUnmarshaler()
+	s.SetMarshaler()
+	s.Marshal()
+	s.Unmarshal()
+	s.IsEqual(struct{}{})
+	s.IsEqual(s)
 	s.Pop()
 	s.Push(-1, -2, -3, -4, -5)
+	s.Front()
+	s.Back()
 	s.NegativeIndices(true)
 
 	for i := 0; i < s.Len(); i++ {
@@ -1552,8 +1868,8 @@ func TestStack_codecov(t *testing.T) {
 	s.config()
 	s.IsEncap()
 	s.ReadOnly()
-	s.ReadOnly(true)
-	s.ReadOnly(false)
+	s.SetReadOnly(true)
+	s.SetReadOnly(false)
 	s.IsReadOnly()
 	s.Avail()
 	s.traverse()
@@ -1567,9 +1883,10 @@ func TestStack_codecov(t *testing.T) {
 	s.NoNesting(false)
 	s.CanMutex()
 
-	s.ReadOnly()
-	s.ReadOnly(true)
-	s.ReadOnly(false)
+	s.SetReadOnly()
+	s.SetReadOnly(true)
+	s.Free()
+	s.SetReadOnly(false)
 
 	s.Push(customStruct{`keyword`, `vaLUE`})
 	_ = s.String()
@@ -1615,6 +1932,36 @@ func TestStack_codecov(t *testing.T) {
 	s.SetErr(errorf(errorf(`this is a serious error`))) // err err
 	s.Err()
 	s.SetErr(nil)
+
+	k := List(8).Push(`1`, `2`, `3`, `4`).SetFIFO(true)
+	k.Front()
+	k.Back()
+
+	l := List().Push(`1`, `2`, `3`, `4`)
+	l.IsEqual(k)
+	l.SetEqualityPolicy(func(x, y any) error {
+		return nil
+	})
+	l.IsEqual(k)
+
+	m := And().Push(`1`, `2`, `3`, `4`)
+	m.SetEqualityPolicy()
+	m.IsEqual(l)
+	m.Marshal()
+
+	var ak Stack
+	ak.Marshal([]any{`CONDITION`, `Keyword`, Eq, `value`})
+
+	ak = List()
+	ak.Marshal([]any{`CONDITION`, `Keyword`, Eq, `value`})
+	ak.Marshal([]any{`other`, `stack`})
+	ak.Marshal([]any{`CONDITION`, `Keyword`, Eq}) // missing value
+	ak.Marshal()
+	ak.Marshal([]any{5, `bogus`})
+	marshalDefault([]any{})
+
+	ak = stackByWord(`NOT`)
+	ak = stackByWord(`blarg`)
 
 	s.SetLogger(`off`)
 	s.SetLogger(0)

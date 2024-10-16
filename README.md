@@ -111,24 +111,7 @@ When operating in default mode, an equality assertion between the receiver and t
   - Channels, UnsafePointers and Uintptrs are compared as-is
   - Interfaces are de-enveloped and then rechecked
 
-### Custom closure
-
-```
-var stacksEqual EqualityPolicy = func(other any) (is bool) {
-	// For this example, we only care about
-	// strings. We've relaxed case-folding.
-	if 
-
-	for i := 0; i <
-}
-
-// With our closure in hand, we can assign it on any Stack meant to hold
-// such content:
-myStack.SetEqualityPolicy(stacksEqual)
-myStack.IsEqual(myOtherStack)
-```
-
-## Marshaling and unmarshaling
+ Marshaling and unmarshaling
 
 This package supports marshaling and unmarshaling of Stack instances which contain any combination of values, including those equal to, or derived from, Stack and Condition types.
 

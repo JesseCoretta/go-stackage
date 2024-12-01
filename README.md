@@ -8,6 +8,10 @@
 
 stackage implements flexible general-use Stack and Condition types with many useful features. It can be used to create object-based Boolean statements, abstract mathematical constructs, simple lists and much more: the possibilities are endless!
 
+## Status
+
+This package is now archived. The API is stable and no additional work is required. Enjoy!
+
 ## Mission
 
 The main goal of this package is provide an extremely reliable and accommodating stack/condition solution that is suitable for use in virtually any conceivable Go-based scenario in which objects of these types are needed. While extremely extensible and flexible, it should always be possible to use this package with no need for additional (non main) code while operating in extremely simple scenarios.
@@ -33,10 +37,6 @@ The main goal of this package is provide an extremely reliable and accommodating
   - Adopters may create a type alias of the Condition and/or Stack types
     - See the [Type Aliasing](#type-aliasing) section below
   - Fast, reliable, useful, albeit very niche
-
-## Status
-
-This package is no longer considered experimental, as it is currently in use in the wild with impressive results.
 
 ## License
 
